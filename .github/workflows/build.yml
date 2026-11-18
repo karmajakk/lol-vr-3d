@@ -1,0 +1,85 @@
+name: Build the APK
+
+# Every push is built to check that it works.
+# A version is published when the VERSION file of the main branch holds a number
+# whose "vX.Y.Z" release doesn't exist yet (or when a "vX.Y.Z" tag is pushed).
+# The APK is attached and the notes come from CHANGELOG.md.
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Get the code
+        run: |
+          git clone --no-checkout "https://github.com/${GITHUB_REPOSITORY}.git" .
+          git checkout --quiet "${GITHUB_SHA}"
+
+      - name: Work out the version
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+            echo "PUBLIER=oui" >> "$GITHUB_ENV"
+          elif [[ "${GITHUB_REF}" == refs/heads/main ]]; then
+            V="$(tr -d '[:space:]' < VERSION)"
+            echo "VERSION=${V}" >> "$GITHUB_ENV"
+            if gh release view "v${V}" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+              echo "PUBLIER=non" >> "$GITHUB_ENV"
+            else
+              echo "PUBLIER=oui" >> "$GITHUB_ENV"
+            fi
+          else
+            echo "VERSION=dev-${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
+            echo "PUBLIER=non" >> "$GITHUB_ENV"
+          fi
+
+      - name: Build the APK
+        run: |
+          export LOLVR_VERSION_CODE="${GITHUB_RUN_NUMBER}"
+          export LOLVR_VERSION_NAME="${VERSION}"
+          scripts/build.sh
+
+      - name: Publish the version
+        if: env.PUBLIER == 'oui'
+        run: |
+          # Notes = the "## [X.Y.Z]" section of CHANGELOG.md
+          awk -v v="[$VERSION]" '
+            /^## / { if (found) exit; if (index($0, v)) { found = 1; next } }
+            found { print }
+          ' CHANGELOG.md > notes.md
+          if [ ! -s notes.md ]; then
+            echo "Version ${VERSION}." > notes.md
+          fi
+          echo "" >> notes.md
+          echo "Installation: download \`lol-vr-3d.apk\` below and install it with SideQuest, over the previous version (saves are kept)." >> notes.md
+          gh release create "v${VERSION}" build/lol-vr-3d.apk --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" --title "Lands of Lore VR 3D ${VERSION}" --notes-file notes.md --latest
+
+      - name: Sync the notes of every release with CHANGELOG.md
+        if: github.ref == 'refs/heads/main'
+        run: |
+          for tag in $(gh release list --repo "$GITHUB_REPOSITORY" --limit 100 --json tagName --jq '.[].tagName' | grep '^v'); do
+            V="${tag#v}"
+            awk -v v="[$V]" '
+              /^## / { if (found) exit; if (index($0, v)) { found = 1; next } }
+              found { print }
+            ' CHANGELOG.md > sync.md
+            [ -s sync.md ] || continue
+            echo "" >> sync.md
+            echo "Installation: download \`lol-vr-3d.apk\` below and install it with SideQuest, over the previous version (saves are kept)." >> sync.md
+            gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --title "Lands of Lore VR 3D ${V}" --notes-file sync.md > /dev/null
+          done

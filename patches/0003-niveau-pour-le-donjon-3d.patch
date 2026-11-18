@@ -1,0 +1,98 @@
+diff --git a/engines/kyra/engine/lol.cpp b/engines/kyra/engine/lol.cpp
+index c4f86a30..0734c863 100644
+--- a/engines/kyra/engine/lol.cpp
++++ b/engines/kyra/engine/lol.cpp
+@@ -45,6 +45,11 @@ LolvrGameState g_lolvrState = {1, 0, {0}, 0, 0, 0, 0, 0, 0, 0, {0}, {0}};
+ __attribute__((visibility("default"))) const LolvrGameState *retro_lolvr_state(void) {
+ 	return &g_lolvrState;
+ }
++LolvrLevelData g_lolvrLevel;
++__attribute__((visibility("default"))) const LolvrLevelData *retro_lolvr_level(void) {
++	g_lolvrLevel.version = 1;
++	return &g_lolvrLevel;
++}
+ }
+ 
+ namespace Kyra {
+@@ -968,6 +973,22 @@ void LoLEngine::runLoop() {
+ 		g_lolvrState.reserved[0]++;
+ 		g_lolvrState.reserved[1] = _currentControlMode | (_weaponsDisabled ? 0x100 : 0); // 0x100: character sheet
+ 		g_lolvrState.reserved[3] = countActiveCharacters(); // lol-vr: where the portraits (and their buttons) are
++		// lol-vr-3d: party position and walls (doors change them)
++		g_lolvrLevel.level = _currentLevel;
++		g_lolvrLevel.block = _currentBlock;
++		g_lolvrLevel.direction = _currentDirection;
++		g_lolvrLevel.inDungeon = 1;
++		{
++			bool changed = false;
++			for (int i = 0; i < 1024; i++)
++				for (int k = 0; k < 4; k++)
++					if (g_lolvrLevel.walls[i * 4 + k] != _levelBlockProperties[i].walls[k]) {
++						g_lolvrLevel.walls[i * 4 + k] = _levelBlockProperties[i].walls[k];
++						changed = true;
++					}
++			if (changed)
++				g_lolvrLevel.wallsSerial++;
++		}
+ 
+ 		_timer->update();
+ 
+diff --git a/engines/kyra/engine/lol.h b/engines/kyra/engine/lol.h
+index a9028a26..5d58ca6b 100644
+--- a/engines/kyra/engine/lol.h
++++ b/engines/kyra/engine/lol.h
+@@ -50,6 +50,30 @@ struct LolvrGameState {
+ 	int32 reserved[4];  // [0] dungeon loop ticks, [1] control mode, [2] bit 0: automap open, bit 1: game menu open
+ };
+ extern LolvrGameState g_lolvrState;
++
++// lol-vr-3d: the current level, for the 3D dungeon. The frontend reads it through
++// retro_lolvr_level(). The pointers stay valid until gfxSerial changes.
++struct LolvrLevelData {
++	int32 version;          // 1
++	uint32 gfxSerial;       // incremented each time level graphics are (re)loaded
++	uint32 wallsSerial;     // incremented each time the walls array below changes
++	int32 level;            // 0 = no level loaded
++	int32 block;            // party position: block index (y * 32 + x)
++	int32 direction;        // 0 north, 1 east, 2 south, 3 west
++	int32 inDungeon;        // 1 while the dungeon loop runs
++	uint8 walls[1024 * 4];  // wall type of each side (N, E, S, W) of each block
++	const uint8 *wllVmpMap; // 256: wall type -> VMP page (0 = nothing drawn)
++	const uint8 *wllWallFlags; // 256
++	const int8 *wllShapeMap;   // 256: wall type -> decoration
++	const uint16 *vmp;      // VMP table
++	int32 vmpLen;
++	const uint8 *vcnBlocks; // 8x8 blocks, 4 bits per pixel (32 bytes each)
++	const uint8 *vcnShift;  // per block palette shift
++	int32 vcnCount;
++	const uint8 *vcnColTable; // 128
++	uint8 palette[384];     // 128 colours, 6-bit VGA
++};
++extern LolvrLevelData g_lolvrLevel;
+ }
+ 
+ namespace Audio {
+diff --git a/engines/kyra/engine/scene_lol.cpp b/engines/kyra/engine/scene_lol.cpp
+index 210b4828..d0fbb26b 100644
+--- a/engines/kyra/engine/scene_lol.cpp
++++ b/engines/kyra/engine/scene_lol.cpp
+@@ -405,6 +405,19 @@ void LoLEngine::loadLevelGraphics(const char *file, int specialColor, int weight
+ 	for (int i = 0; i < vmpLen; i++)
+ 		_vmpPtr[i] = READ_LE_UINT16(&v[i << 1]);
+ 
++	// lol-vr-3d: hand the level graphics to the 3D dungeon
++	g_lolvrLevel.wllVmpMap = _wllVmpMap;
++	g_lolvrLevel.wllWallFlags = _wllWallFlags;
++	g_lolvrLevel.wllShapeMap = _wllShapeMap;
++	g_lolvrLevel.vmp = _vmpPtr;
++	g_lolvrLevel.vmpLen = vmpLen;
++	g_lolvrLevel.vcnBlocks = _vcnBlocks;
++	g_lolvrLevel.vcnShift = _vcnShift;
++	g_lolvrLevel.vcnCount = vcnLen / 32;
++	g_lolvrLevel.vcnColTable = _vcnColTable;
++	memcpy(g_lolvrLevel.palette, _screen->getPalette(0).getData(), 384);
++	g_lolvrLevel.gfxSerial++;
++
+ 	Palette tpal(256);
+ 	if (_flags.use16ColorMode) {
+ 		uint8 *dst = tpal.getData();

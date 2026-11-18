@@ -1,0 +1,187 @@
+diff --git a/engines/kyra/engine/lol.cpp b/engines/kyra/engine/lol.cpp
+index 9094a563..c4f86a30 100644
+--- a/engines/kyra/engine/lol.cpp
++++ b/engines/kyra/engine/lol.cpp
+@@ -39,6 +39,14 @@
+ #include "backends/keymapper/keymapper.h"
+ #include "backends/keymapper/standard-actions.h"
+ 
++// lol-vr: see lol.h
++extern "C" {
++LolvrGameState g_lolvrState = {1, 0, {0}, 0, 0, 0, 0, 0, 0, 0, {0}, {0}};
++__attribute__((visibility("default"))) const LolvrGameState *retro_lolvr_state(void) {
++	return &g_lolvrState;
++}
++}
++
+ namespace Kyra {
+ 
+ const char *const LoLEngine::kMouseKeymapName = "lolmouse";
+@@ -527,6 +535,11 @@ Common::KeymapArray LoLEngine::initKeymaps() {
+ void LoLEngine::pauseEngineIntern(bool pause) {
+ 	KyraEngine_v1::pauseEngineIntern(pause);
+ 	pauseDemoPlayer(pause);
++	// lol-vr: the ScummVM menu (or another pause) covers the whole screen
++	if (pause)
++		g_lolvrState.reserved[2] |= 4;
++	else
++		g_lolvrState.reserved[2] &= ~4;
+ }
+ 
+ Common::Error LoLEngine::go() {
+@@ -951,6 +964,11 @@ void LoLEngine::runLoop() {
+ 			_nextScriptFunc = 0;
+ 		}
+ 
++		// lol-vr: the dungeon loop is running (reserved[0] ticks, reserved[1] = control mode)
++		g_lolvrState.reserved[0]++;
++		g_lolvrState.reserved[1] = _currentControlMode | (_weaponsDisabled ? 0x100 : 0); // 0x100: character sheet
++		g_lolvrState.reserved[3] = countActiveCharacters(); // lol-vr: where the portraits (and their buttons) are
++
+ 		_timer->update();
+ 
+ 		checkFloatingPointerRegions();
+@@ -3510,6 +3528,11 @@ int LoLEngine::inflictDamage(uint16 target, int damage, uint16 attacker, int ski
+ 			return 0;
+ 
+ 		if (damage > 0) {
++			if (!(attacker & 0x8000)) {
++				// lol-vr: the party hit a monster
++				g_lolvrState.hitDamage = damage;
++				g_lolvrState.hitSerial++;
++			}
+ 			m->hitPoints -= damage;
+ 			m->damageReceived = 0x8000 | damage;
+ 			m->flags |= 0x10;
+@@ -3565,6 +3588,12 @@ int LoLEngine::inflictDamage(uint16 target, int damage, uint16 attacker, int ski
+ 
+ 		setCharacterMagicOrHitPoints(target, 0, -damage, 1);
+ 
++		if (damage > 0) {
++			// lol-vr: a party member was hurt
++			g_lolvrState.hurtDamage = damage;
++			g_lolvrState.hurtSerial++;
++		}
++
+ 		if (c->hitPointsCur <= 0) {
+ 			characterHitpointsZero(target, flags);
+ 		} else {
+@@ -4101,6 +4130,7 @@ uint16 LoLEngine::getNearestPartyMemberFromPos(int x, int y) {
+ // magic atlas
+ 
+ void LoLEngine::displayAutomap() {
++	g_lolvrState.reserved[2] |= 1; // lol-vr: the automap covers the whole screen
+ 	snd_playSoundEffect(105, -1);
+ 	gui_toggleButtonDisplayMode(_flags.isTalkie ? 78 : 76, 1);
+ 
+@@ -4193,6 +4223,7 @@ void LoLEngine::displayAutomap() {
+ 	addLevelItems();
+ 	gui_notifyButtonListChanged();
+ 	enableSysTimer(2);
++	g_lolvrState.reserved[2] &= ~1; // lol-vr
+ }
+ 
+ void LoLEngine::updateAutoMap(uint16 block) {
+diff --git a/engines/kyra/engine/lol.h b/engines/kyra/engine/lol.h
+index 2cfadf37..a9028a26 100644
+--- a/engines/kyra/engine/lol.h
++++ b/engines/kyra/engine/lol.h
+@@ -32,6 +32,26 @@
+ 
+ #include "common/list.h"
+ 
++// lol-vr: game state shared with the VR frontend. The frontend reads it through
++// retro_lolvr_state(), exported by the libretro core.
++extern "C" {
++struct LolvrGameState {
++	int32 version;
++	int32 level;        // current level number (0 before a game is started)
++	char tileset[16];   // level graphics set, e.g. "FOREST1"
++	uint32 sfxSerial;   // incremented each time a sound effect is played
++	int32 sfxTrack;
++	int32 sfxVolume;    // 0..255
++	uint32 hurtSerial;  // incremented each time a party member takes damage
++	int32 hurtDamage;
++	uint32 hitSerial;   // incremented each time the party damages a monster
++	int32 hitDamage;
++	char sfxName[16];   // sound file of the last effect, e.g. "DOORMTOP" (empty if none)
++	int32 reserved[4];  // [0] dungeon loop ticks, [1] control mode, [2] bit 0: automap open, bit 1: game menu open
++};
++extern LolvrGameState g_lolvrState;
++}
++
+ namespace Audio {
+ class SeekableAudioStream;
+ } // End of namespace Audio
+diff --git a/engines/kyra/engine/scene_lol.cpp b/engines/kyra/engine/scene_lol.cpp
+index 532afdf4..210b4828 100644
+--- a/engines/kyra/engine/scene_lol.cpp
++++ b/engines/kyra/engine/scene_lol.cpp
+@@ -57,6 +57,7 @@ void LoLEngine::loadLevel(int index) {
+ 		_timer->disable(i);
+ 
+ 	_currentLevel = index;
++	g_lolvrState.level = index; // lol-vr
+ 	_updateFlags = 0;
+ 
+ 	setDefaultButtonState();
+@@ -302,6 +303,9 @@ void LoLEngine::loadLevelGraphics(const char *file, int specialColor, int weight
+ 		_lastSpecialColor = specialColor;
+ 		_lastSpecialColorWeight = weight;
+ 		_lastBlockDataFile = file;
++		// lol-vr: tell the frontend which area we are in
++		g_lolvrState.level = _currentLevel;
++		Common::strlcpy(g_lolvrState.tileset, file, sizeof(g_lolvrState.tileset));
+ 		if (palFile)
+ 			_lastOverridePalFile = palFile;
+ 		else
+diff --git a/engines/kyra/gui/gui_lol.cpp b/engines/kyra/gui/gui_lol.cpp
+index 926e60dc..b2732d26 100644
+--- a/engines/kyra/gui/gui_lol.cpp
++++ b/engines/kyra/gui/gui_lol.cpp
+@@ -2209,6 +2209,11 @@ int GUI_LoL::redrawShadedButtonCallback(Button *button) {
+ }
+ 
+ int GUI_LoL::runMenu(Menu &menu) {
++	// lol-vr: a game menu covers the middle of the screen while this function runs
++	struct LolvrMenuFlag {
++		LolvrMenuFlag() { g_lolvrState.reserved[2] |= 2; }
++		~LolvrMenuFlag() { g_lolvrState.reserved[2] &= ~2; }
++	} lolvrMenuFlag;
+ 	_currentMenu = &menu;
+ 	_lastMenu = _currentMenu;
+ 	_newMenu = 0;
+diff --git a/engines/kyra/sequence/sequences_lol.cpp b/engines/kyra/sequence/sequences_lol.cpp
+index 4a8863e2..466b6995 100644
+--- a/engines/kyra/sequence/sequences_lol.cpp
++++ b/engines/kyra/sequence/sequences_lol.cpp
+@@ -1106,6 +1106,7 @@ void LoLEngine::setupEpilogueData(bool load) {
+ }
+ 
+ void LoLEngine::showOutro(int character, bool maxDifficulty) {
++	g_lolvrState.level = 0; // lol-vr: back to a plain full-screen picture for the ending
+ 	setupEpilogueData(true);
+ 	TIMInterpreter *timBackUp = _tim;
+ 	_tim = new TIMInterpreter(this, _screen, _system);
+diff --git a/engines/kyra/sound/sound_lol.cpp b/engines/kyra/sound/sound_lol.cpp
+index cd9eee50..cfbc8100 100644
+--- a/engines/kyra/sound/sound_lol.cpp
++++ b/engines/kyra/sound/sound_lol.cpp
+@@ -164,6 +164,17 @@ void LoLEngine::snd_playSoundEffect(int track, int volume) {
+ 		return;
+ 
+ 	volume &= 0xFF;
++	// lol-vr: lets the frontend react to sound effects (controller haptics)
++	{
++		int16 nameIndex = _ingameSoundIndex[track * 2];
++		if (nameIndex >= 0 && nameIndex < _ingameSoundListSize)
++			Common::strlcpy(g_lolvrState.sfxName, _ingameSoundList[nameIndex].c_str(), sizeof(g_lolvrState.sfxName));
++		else
++			g_lolvrState.sfxName[0] = 0;
++		g_lolvrState.sfxTrack = track;
++		g_lolvrState.sfxVolume = volume;
++		g_lolvrState.sfxSerial++;
++	}
+ 	int16 prIndex = _ingameSoundIndex[track * 2 + 1];
+ 	uint16 priority = (prIndex > 0) ? (prIndex * volume) >> 8 : -prIndex;
+ 

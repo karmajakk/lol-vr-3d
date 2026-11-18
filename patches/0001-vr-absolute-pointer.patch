@@ -1,0 +1,60 @@
+diff --git a/backends/platform/libretro/src/libretro-os-inputs.cpp b/backends/platform/libretro/src/libretro-os-inputs.cpp
+index 2e577827..ecca82af 100644
+--- a/backends/platform/libretro/src/libretro-os-inputs.cpp
++++ b/backends/platform/libretro/src/libretro-os-inputs.cpp
+@@ -19,6 +19,9 @@
+ 
+ #include "backends/platform/libretro/include/libretro-defs.h"
+ #include "backends/platform/libretro/include/libretro-os.h"
++
++// lol-vr: private pointer id used by the VR frontend to announce absolute-pointer mode
++#define LOLVR_POINTER_ID 0x4C56
+ #include "backends/platform/libretro/include/libretro-mapper.h"
+ #include "backends/platform/libretro/include/libretro-core.h"
+ #include "backends/platform/libretro/include/libretro-graphics-surface.h"
+@@ -210,7 +213,44 @@ void OSystem_libretro::processInputs(void) {
+ 		}
+ 	}
+ 
+-	if (retro_setting_get_pointer_device() == RETRO_DEVICE_POINTER) {
++	// lol-vr: a VR frontend drives the cursor with an absolute pointer (controller ray)
++	// that hovers continuously, plus real left/right buttons. The frontend announces
++	// itself by answering 1 to the private id LOLVR_POINTER_ID.
++	if (retro_input_cb(0, RETRO_DEVICE_POINTER, 0, LOLVR_POINTER_ID) == 1) {
++		int p_x = retro_input_cb(0, RETRO_DEVICE_POINTER, 0, RETRO_DEVICE_ID_POINTER_X);
++		int p_y = retro_input_cb(0, RETRO_DEVICE_POINTER, 0, RETRO_DEVICE_ID_POINTER_Y);
++		int sw = getScreenWidth();
++		int sh = getScreenHeight();
++		int px = (int)((int64)(p_x + 0x7fff) * sw / 0xffff);
++		int py = (int)((int64)(p_y + 0x7fff) * sh / 0xffff);
++		px = CLIP<int>(px, 0, sw > 0 ? sw - 1 : 0);
++		py = CLIP<int>(py, 0, sh > 0 ? sh - 1 : 0);
++
++		if (px != _mouseX || py != _mouseY) {
++			Common::Event ev;
++			ev.type = Common::EVENT_MOUSEMOVE;
++			ev.mouse.x = px;
++			ev.mouse.y = py;
++			ev.relMouse.x = px - _mouseX;
++			ev.relMouse.y = py - _mouseY;
++			_mouseX = px;
++			_mouseY = py;
++			_events.push_back(ev);
++			setMousePosition(_mouseX, _mouseY);
++		}
++
++		for (int i = 0; i < 2; i++) {
++			bool down = retro_input_cb(0, RETRO_DEVICE_MOUSE, 0, retroButtons[i]);
++			if (down != _mouseButtons[i]) {
++				Common::Event ev;
++				_mouseButtons[i] = down;
++				ev.type = eventID[i][down ? 0 : 1];
++				ev.mouse.x = _mouseX;
++				ev.mouse.y = _mouseY;
++				_events.push_back(ev);
++			}
++		}
++	} else if (retro_setting_get_pointer_device() == RETRO_DEVICE_POINTER) {
+ 		int p_x     = retro_input_cb(0, RETRO_DEVICE_POINTER, 0, RETRO_DEVICE_ID_POINTER_X);
+ 		int p_y     = retro_input_cb(0, RETRO_DEVICE_POINTER, 0, RETRO_DEVICE_ID_POINTER_Y);
+ 		int p_press = retro_input_cb(0, RETRO_DEVICE_POINTER, 0, RETRO_DEVICE_ID_POINTER_PRESSED);
