@@ -97,6 +97,23 @@ bool hasSolidWall(const DungeonGfx &g, uint8_t t) {
 
 } // namespace
 
+void spriteToRgba(const uint8_t *px, const uint8_t *al, const uint8_t *pal, uint8_t *out) {
+	const int W = 176, H = 120, OH = 128;
+	memset(out, 0, (size_t)W * OH * 4);
+	for (int y = 0; y < H; y++)
+		for (int x = 0; x < W; x++) {
+			int i = y * W + x;
+			if (!al[i])
+				continue;
+			uint8_t *o = out + (size_t)i * 4;
+			int c = px[i];
+			o[0] = vga(pal[c * 3]);
+			o[1] = vga(pal[c * 3 + 1]);
+			o[2] = vga(pal[c * 3 + 2]);
+			o[3] = 255;
+		}
+}
+
 bool isSolidBlock(const uint8_t *walls, int block, const DungeonGfx &gfx) {
 	const uint8_t *w = walls + (block & 1023) * 4;
 	for (int k = 0; k < 4; k++)
@@ -112,6 +129,7 @@ void decodeDungeonTextures(const DungeonGfx &g, DungeonTextures &out) {
 	for (int i = 0; i < 256; i++) {
 		out.typeLayer[i] = out.doorLayer[i] = out.decalLayer[i] = -1;
 		out.doorDepth[i] = 1.0f;
+		out.faceDepth[i] = 1.0f;
 		out.kind[i] = kWallFace;
 	}
 	if (!g.vmp || !g.vcn || !g.colTable || !g.palette || !g.vmpMap || g.vmpLen < 330)
@@ -202,6 +220,10 @@ void decodeDungeonTextures(const DungeonGfx &g, DungeonTextures &out) {
 				out.kind[t] = kWallObject;
 			}
 			out.typeLayer[t] = out.layers;
+			// Un cadre de porte (mur ajouré) est dessiné par le jeu à la profondeur de sa porte : son
+			// pied dit où, comme pour la porte.
+			if (seeThrough && bottom >= 50 && bottom < kDunWallRows - 2)
+				out.faceDepth[t] = clampDepth(48.0f / ((float)bottom + 1.0f - 48.0f));
 			Rgba *img = newLayer();
 			for (int i = 0; i < n; i++)
 				if (al[i])
@@ -389,7 +411,8 @@ void buildDungeonMesh(const uint8_t *walls, const DungeonGfx &g, const DungeonTe
 			float nx = (float)dx[k], nz = (float)dz[k];
 			float fx = cx + nx * S * 0.5f, fz = cz + nz * S * 0.5f;
 			float layer = tex.typeLayer[t] >= 0 ? typeLayer : (float)tex.pageLayer[page];
-			upright(fx, fz, nx, nz, layer, faceShade[k], 1.0f, false);
+			float fr = tex.faceDepth[t];
+			upright(fx - nx * (fr - 1.0f) * S * 0.5f, fz - nz * (fr - 1.0f) * S * 0.5f, nx, nz, layer, faceShade[k], fr, false);
 			// La porte se dresse plus loin dans la case, à la profondeur où le jeu la dessine.
 			if (tex.doorLayer[t] >= 0) {
 				float r = tex.doorDepth[t];

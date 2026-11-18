@@ -456,7 +456,9 @@ struct App {
 	bool dungeonVisible = false;
 	lolvr::LevelSnapshot level;
 	lolvr::DungeonTextures dunTex;
-	uint32_t builtGfx = 0, builtWalls = 0, builtCapture = 0;
+	uint32_t builtGfx = 0, builtWalls = 0, builtCapture = 0, builtSprites = 0;
+	uint32_t spriteVersion[32] = {0};
+	int spriteId[32] = {0};
 	int shownLevel = 0;
 	float partyX = 0, partyZ = 0, partyYaw = 0; // position affichée du groupe (glisse vers la vraie)
 	SceneState ss;
@@ -1681,6 +1683,82 @@ int portraitX(int count, int index) {
 	return index * 66 + t * (index + 1) + 83;
 }
 
+// Le rayon du doigt dans le donjon 3D : le mur droit devant le groupe, ou le sol jusqu'à ce mur.
+// Renvoie la position correspondante dans l'image du jeu (0..1), et le point touché (monde).
+bool dungeonPick(App &app, Vec3 tip, Vec3 dir, float &gu, float &gv, Vec3 &hitW, Vec3 &rightW, Vec3 &upW) {
+	const lolvr::LevelSnapshot &l = app.level;
+	if (l.level <= 0)
+		return false;
+	const float S = lolvr::kBlockSize, H = lolvr::kWallHeight;
+	Mat4 model = lolvr::dungeonModel(app.roomPos, app.dunYaw, app.partyX, app.partyZ, app.partyYaw);
+	Vec3 c0{model.m[0], model.m[1], model.m[2]}, c1{model.m[4], model.m[5], model.m[6]}, c2{model.m[8], model.m[9], model.m[10]};
+	Vec3 t{model.m[12], model.m[13], model.m[14]};
+	auto toLevel = [&](Vec3 p) { Vec3 r = p - t; return Vec3{dot(c0, r), dot(c1, r), dot(c2, r)}; };
+	auto dirLevel = [&](Vec3 v) { return Vec3{dot(c0, v), dot(c1, v), dot(c2, v)}; };
+	Vec3 o = toLevel(tip), v = dirLevel(dir);
+	static const int dx[4] = {0, 1, 0, -1}, dz[4] = {-1, 0, 1, 0};
+	const int d = l.direction & 3;
+	Vec3 f{(float)dx[d], 0.0f, (float)dz[d]}, r{-f.z, 0.0f, f.x};
+	float cx, cz;
+	lolvr::blockCenter(l.block, cx, cz);
+	Vec3 center{cx, 0.0f, cz};
+	int ahead = l.block + dz[d] * 32 + dx[d];
+	const uint8_t faceType = ahead >= 0 && ahead < 1024 ? l.walls[ahead * 4 + ((d + 2) & 3)] : 0;
+	bool faceWall = faceType != 0 && app.dunTex.kind[faceType] == lolvr::kWallFace;
+	// Le mur (ou le cadre de porte) se tient à cette profondeur dans la case devant : 1 = sur sa face.
+	const float fr = faceWall ? app.dunTex.faceDepth[faceType] : 1.0f;
+	Vec3 hit;
+	float px = -1, py = -1;
+	// 1. Le mur droit devant (sa face tournée vers le groupe)
+	if (faceWall) {
+		float den = dot(v, f);
+		if (den > 1e-4f) {
+			Vec3 facePt = center + f * (S * 0.5f * fr);
+			float tt = dot(facePt - o, f) / den;
+			if (tt > 0.0f) {
+				hit = o + v * tt;
+				// L'image du mur (128 x 96, horizon au milieu) est agrandie de fr autour de mi-hauteur.
+				float u = 0.5f + dot(hit - facePt, r) / (S * fr);
+				float row = 48.0f - (hit.y - H * 0.5f) / (H * 0.5f * fr) * 48.0f;
+				if (u >= 0.0f && u <= 1.0f && row >= 0.0f && row <= 96.0f && hit.y >= 0.0f && hit.y <= H) {
+					px = 136.0f + u * 128.0f;
+					py = 8.0f + row;
+				}
+			}
+		}
+	}
+	// 2. Le sol, de sous le joueur jusqu'au bout de la case devant (ou jusqu'au mur)
+	if (px < 0.0f && v.y < -1e-4f) {
+		float tt = -o.y / v.y;
+		hit = o + v * tt;
+		float fw = dot(hit - center, f) / S, lat = dot(hit - center, r) / S;
+		float maxF = faceWall ? 0.5f * fr : 1.5f;
+		if (fw >= 0.0f && fw <= maxF && fabsf(lat) <= 0.6f) {
+			float y, w;
+			if (fw >= 0.5f) {
+				float k = fw - 0.5f;
+				y = 104.0f - 24.0f * k;
+				w = 128.0f - 48.0f * k;
+			} else {
+				y = 120.0f - 32.0f * fw;
+				w = 176.0f - 96.0f * fw;
+			}
+			px = 112.0f + 88.0f + clampf(lat, -0.5f, 0.5f) * w;
+			py = clampf(y, 1.0f, 119.0f);
+			// Le point du sol est montré à plat
+			f = Vec3{0, 1, 0};
+		}
+	}
+	if (px < 0.0f)
+		return false;
+	gu = px / 320.0f;
+	gv = py / 200.0f;
+	hitW = transformPoint(model, hit);
+	rightW = normalize(transformDir(model, r));
+	upW = f.y > 0.5f ? normalize(transformDir(model, Vec3{(float)dx[d], 0.0f, (float)dz[d]})) : normalize(transformDir(model, Vec3{0, 1, 0}));
+	return true;
+}
+
 void updateUi(App &app, float dt, double now, bool pointer, bool triggerPressed, XrVector2f rightStick, lolvr::UiFrameOutput &out) {
 	lolvr::UiFrameInput in;
 	in.dt = dt;
@@ -1736,6 +1814,25 @@ void updateUi(App &app, float dt, double now, bool pointer, bool triggerPressed,
 	if (!app.ui.hasLayout() && app.screenPlaced)
 		app.ui.resetLayout(in);
 	app.ui.update(in, out, app.ss);
+	// Donjon 3D : le doigt qui ne vise ni l'écran ni une fenêtre peut viser le mur droit devant le
+	// groupe (boutons, leviers, serrures, portes) ou le sol devant lui (objets à ramasser). Le clic
+	// part dans le jeu, là où le jeu dessinerait ce point.
+	if (in.aimValid && !out.pointerValid && !out.hitValid && !out.dragging && app.dungeonVisible) {
+		float gu = 0, gv = 0;
+		Vec3 hit, hr, hu;
+		if (dungeonPick(app, in.tip, in.dir, gu, gv, hit, hr, hu)) {
+			out.pointerValid = true;
+			out.buttonsToGame = true;
+			out.gu = gu;
+			out.gv = gv;
+			out.hitValid = true;
+			out.hit = hit;
+			out.hitRight = hr;
+			out.hitUp = hu;
+			out.hitRadius = 0.012f * length(hit - in.tip);
+			out.pointerLong = false;
+		}
+	}
 
 	if (out.screenDragging)
 		dragScreen(app, out.screenCenter - Vec3{0, app.viewLift, 0} - rotate(screenRot(app), {app.viewShift, 0, 0}), out.screenZoom);
@@ -2137,6 +2234,38 @@ void updateDungeon(App &app, float dt) {
 		app.dungeon.setMesh(verts);
 		app.builtWalls = l.wallsSerial;
 	}
+	// Monstres et objets proches : des images tournées vers le joueur.
+	if (l.spriteSerial != app.builtSprites) {
+		app.builtSprites = l.spriteSerial;
+		static std::vector<uint8_t> rgba((size_t)lolvr::kSpriteTexW * lolvr::kSpriteTexH * 4);
+		std::vector<lolvr::DungeonSprite> list;
+		const size_t one = (size_t)lolvr::kSpriteW * lolvr::kSpriteH;
+		for (size_t i = 0; i < l.sprites.size() && i < (size_t)lolvr::kMaxSprites; i++) {
+			const lolvr::LevelSprite &s = l.sprites[i];
+			if ((i + 1) * one > l.spritePixels.size())
+				break;
+			if (app.spriteVersion[i] != s.version || app.spriteId[i] != s.id) {
+				lolvr::spriteToRgba(&l.spritePixels[i * one], &l.spriteAlpha[i * one], l.screenPalette, rgba.data());
+				app.dungeon.setSpriteImage((int)i, rgba.data());
+				app.spriteVersion[i] = s.version;
+				app.spriteId[i] = s.id;
+			}
+			lolvr::DungeonSprite d;
+			d.x = (float)s.x / 256.0f * lolvr::kBlockSize;
+			d.z = (float)s.y / 256.0f * lolvr::kBlockSize;
+			d.ceiling = s.ceiling;
+			d.layer = (int)i;
+			d.u0 = (float)s.x0 / lolvr::kSpriteTexW;
+			d.u1 = (float)s.x1 / lolvr::kSpriteTexW;
+			d.v0 = (float)s.y0 / lolvr::kSpriteTexH;
+			d.v1 = (float)s.y1 / lolvr::kSpriteTexH;
+			d.width = (float)(s.x1 - s.x0) * lolvr::kSpritePixel;
+			d.height = (float)(s.y1 - s.y0) * lolvr::kSpritePixel * 1.2f;
+			d.offset = ((float)(s.x0 + s.x1) * 0.5f - 88.0f) * lolvr::kSpritePixel;
+			list.push_back(d);
+		}
+		app.dungeon.setSprites(list);
+	}
 	// Le groupe glisse vers sa case (quelques dixièmes de seconde). Les virages ne glissent pas (cela
 	// donne mal au cœur) : un bref fondu au noir, et la pièce a pivoté. Quand le groupe se tourne de
 	// lui-même vers l'endroit que le joueur regarde, rien ne bouge. Un changement de niveau ou une
@@ -2212,12 +2341,11 @@ void updateDungeon(App &app, float dt) {
 	app.dungeonVisible = app.dungeon.hasContent();
 }
 
-// Donjon 3D : le grand écran n'apparaît que lorsqu'on en a besoin. Le donjon en 3D montre déjà les
-// murs ; l'écran revient pour ce que la 3D ne montre pas encore (monstres et objets proches), pour
-// les scènes, la carte, les menus et la fiche d'un personnage, et reste un moment après.
+// Donjon 3D : le grand écran n'apparaît que lorsqu'on en a besoin. Le donjon en 3D montre les murs,
+// les monstres et les objets ; l'écran revient pour les scènes, la carte, les menus et la fiche d'un
+// personnage, et reste un moment après.
 void updateScreenShown(App &app, double now) {
-	bool need = !app.dungeonVisible || app.dungeonMode == 2 || !app.split || app.charSheet || app.automapOpen ||
-	            (app.level.nearObjects & 0x7) != 0;
+	bool need = !app.dungeonVisible || app.dungeonMode == 2 || !app.split || app.charSheet || app.automapOpen;
 	if (need)
 		app.screenNeededAt = now;
 	bool show = need || now - app.screenNeededAt < 1.5;

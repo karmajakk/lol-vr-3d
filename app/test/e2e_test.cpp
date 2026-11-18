@@ -212,6 +212,49 @@ int main(int argc, char **argv) {
 			for (int b : {lvl.block - 33, lvl.block - 32, lvl.block - 31, lvl.block - 1, lvl.block, lvl.block + 1})
 				if (b >= 0 && b < 1024)
 					printf("    bloc %d (%d,%d) : %d %d %d %d\n", b, b & 31, b >> 5, lvl.walls[b * 4], lvl.walls[b * 4 + 1], lvl.walls[b * 4 + 2], lvl.walls[b * 4 + 3]);
+			{
+				// Monstres et objets
+				static std::vector<uint8_t> rgba((size_t)kSpriteTexW * kSpriteTexH * 4);
+				std::vector<DungeonSprite> list;
+				const size_t one = (size_t)kSpriteW * kSpriteH;
+				for (size_t i = 0; i < lvl.sprites.size() && i < (size_t)kMaxSprites; i++) {
+					const LevelSprite &s = lvl.sprites[i];
+					spriteToRgba(&lvl.spritePixels[i * one], &lvl.spriteAlpha[i * one], lvl.screenPalette, rgba.data());
+					dun.setSpriteImage((int)i, rgba.data());
+					DungeonSprite d;
+					d.x = (float)s.x / 256.0f * kBlockSize;
+					d.z = (float)s.y / 256.0f * kBlockSize;
+					d.ceiling = s.ceiling;
+					d.layer = (int)i;
+					d.u0 = (float)s.x0 / kSpriteTexW; d.u1 = (float)s.x1 / kSpriteTexW;
+					d.v0 = (float)s.y0 / kSpriteTexH; d.v1 = (float)s.y1 / kSpriteTexH;
+					d.width = (float)(s.x1 - s.x0) * kSpritePixel;
+					d.height = (float)(s.y1 - s.y0) * kSpritePixel * 1.2f;
+					d.offset = ((float)(s.x0 + s.x1) * 0.5f - 88.0f) * kSpritePixel;
+					list.push_back(d);
+					printf("    sprite %zu : %s id %d à (%.2f, %.2f) bloc %d, %d x %d px\n", i, s.kind ? "objet" : "monstre", s.id, s.x / 256.0, s.y / 256.0,
+					       (s.y >> 8) * 32 + (s.x >> 8), s.x1 - s.x0, s.y1 - s.y0);
+				}
+				dun.setSprites(list);
+			}
+			if (getenv("DUMP_DOOR") && lvl.wallSlots > 0) {
+				// La porte du type 3, et sa face, pour voir ce que le moteur dessine
+				for (int part = 0; part < 2; part++) {
+					int slot = lvl.wallSlot[3];
+					if (slot < 0) break;
+					const uint8_t *px = (part ? lvl.doorPixels : lvl.wallPixels).data() + slot * 128 * 96;
+					const uint8_t *al = (part ? lvl.doorAlpha : lvl.wallAlpha).data() + slot * 128 * 96;
+					std::string fn = out + (part ? "/porte3.ppm" : "/face3.ppm");
+					FILE *fp = fopen(fn.c_str(), "wb");
+					fprintf(fp, "P6\n128 96\n255\n");
+					for (int i = 0; i < 128 * 96; i++) {
+						uint8_t c[3] = {255, 0, 255};
+						if (al[i]) for (int k = 0; k < 3; k++) c[k] = (uint8_t)((lvl.screenPalette[px[i] * 3 + k] & 63) * 4);
+						fwrite(c, 1, 3, fp);
+					}
+					fclose(fp);
+				}
+			}
 			if (atBlock < 0 && isSolidBlock(lvl.walls, lvl.block, g)) {
 				printf("ÉCHEC le groupe est dans un bloc plein\n");
 				failures++;

@@ -31,6 +31,16 @@ struct LolvrGameState {
 };
 const LolvrGameState *retro_lolvr_state(void);
 
+// Un monstre ou un objet près du groupe (voir patches/0003).
+struct LolvrSprite {
+	int16_t x, y;
+	uint8_t kind;
+	uint8_t ceiling;
+	int16_t x0, y0, x1, y1;
+	uint32_t version;
+	uint16_t id;
+};
+
 // Le niveau en cours, pour le donjon en 3D (voir patches/0003).
 struct LolvrLevelData {
 	int32_t version;
@@ -60,6 +70,11 @@ struct LolvrLevelData {
 	int32_t nearObjects;
 	const uint8_t *doorPixels;
 	const uint8_t *doorAlpha;
+	uint32_t spriteSerial;
+	int32_t spriteCount;
+	LolvrSprite sprites[32];
+	const uint8_t *spritePixels;
+	const uint8_t *spriteAlpha;
 };
 const LolvrLevelData *retro_lolvr_level(void);
 }
@@ -355,6 +370,25 @@ void copyLevel() {
 	l.block = s->block;
 	l.direction = s->direction;
 	l.nearObjects = s->nearObjects;
+	// Monstres et objets proches, tels que le moteur vient de les dessiner
+	if (s->spriteSerial != l.spriteSerial && s->spritePixels && s->spriteAlpha && s->spriteCount >= 0 && s->spriteCount <= 32) {
+		const size_t one = (size_t)kSpriteW * kSpriteH;
+		l.sprites.resize(s->spriteCount);
+		l.spritePixels.resize(s->spriteCount * one);
+		l.spriteAlpha.resize(s->spriteCount * one);
+		for (int i = 0; i < s->spriteCount; i++) {
+			const LolvrSprite &a = s->sprites[i];
+			LevelSprite &b = l.sprites[i];
+			b.x = a.x; b.y = a.y; b.kind = a.kind; b.ceiling = a.ceiling;
+			b.x0 = a.x0; b.y0 = a.y0; b.x1 = a.x1; b.y1 = a.y1;
+			b.version = a.version; b.id = a.id;
+		}
+		if (s->spriteCount) {
+			memcpy(l.spritePixels.data(), s->spritePixels, s->spriteCount * one);
+			memcpy(l.spriteAlpha.data(), s->spriteAlpha, s->spriteCount * one);
+		}
+		l.spriteSerial = s->spriteSerial;
+	}
 	if (l.wallsSerial != s->wallsSerial) {
 		memcpy(l.walls, s->walls, sizeof(l.walls));
 		l.wallsSerial = s->wallsSerial;
@@ -603,6 +637,12 @@ bool CoreHost::levelSnapshot(LevelSnapshot &out) const {
 	out.block = l.block;
 	out.direction = l.direction;
 	out.nearObjects = l.nearObjects;
+	if (out.spriteSerial != l.spriteSerial) {
+		out.sprites = l.sprites;
+		out.spritePixels = l.spritePixels;
+		out.spriteAlpha = l.spriteAlpha;
+		out.spriteSerial = l.spriteSerial;
+	}
 	if (out.wallsSerial != l.wallsSerial || out.gfxSerial != l.gfxSerial) {
 		memcpy(out.walls, l.walls, sizeof(out.walls));
 		out.wallsSerial = l.wallsSerial;

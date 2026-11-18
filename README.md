@@ -22,9 +22,12 @@ Early demo. What works:
   controllers, keyboard, wrist menu (gear on the left hand).
 - "3D dungeon: on/off" in the wrist menu, to compare with the original view.
 
-Not there yet: monsters and items in 3D, doors that slide open in 3D (they jump from closed to
-open). The game screen appears by itself when monsters or items are close ahead, and for scenes,
-dialogues, the map and menus.
+- Monsters and items near the party, drawn by the game itself and always facing you.
+- Clicks in the 3D dungeon: on the wall right in front of the party (door buttons, levers,
+  keyholes) and on the floor in front of you (items).
+
+Not there yet: doors that slide open in 3D (they jump from closed to open), spells and thrown
+objects in flight. The game screen appears by itself for scenes, dialogues, the map and menus.
 
 Version details: [CHANGELOG.md](CHANGELOG.md).
 

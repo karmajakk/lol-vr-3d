@@ -2,6 +2,7 @@
 #include "dungeon.h"
 
 #include <GLES3/gl3.h>
+#include <math.h>
 #include <string>
 
 #ifdef __ANDROID__
@@ -88,6 +89,8 @@ GLuint compileShader(GLenum type, const std::string &src) {
 struct Dungeon::Impl {
 	bool srgb = false;
 	GLuint program = 0, vao = 0, vbo = 0, tex = 0;
+	GLuint spriteVao = 0, spriteVbo = 0, spriteTex = 0;
+	std::vector<DungeonSprite> sprites;
 	GLint uViewProj = -1, uModel = -1, uEye = -1, uLight = -1, uTex = -1;
 	GLsizei count = 0;
 	int layers = 0;
@@ -136,7 +139,40 @@ bool Dungeon::init(bool srgbTarget) {
 	glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, stride, (const void *)24);
 	glBindVertexArray(0);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	// Monstres et objets
+	glGenVertexArrays(1, &d->spriteVao);
+	glGenBuffers(1, &d->spriteVbo);
+	glBindVertexArray(d->spriteVao);
+	glBindBuffer(GL_ARRAY_BUFFER, d->spriteVbo);
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (const void *)0);
+	glEnableVertexAttribArray(1);
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, (const void *)12);
+	glEnableVertexAttribArray(2);
+	glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, stride, (const void *)24);
+	glBindVertexArray(0);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glGenTextures(1, &d->spriteTex);
+	glBindTexture(GL_TEXTURE_2D_ARRAY, d->spriteTex);
+	glTexStorage3D(GL_TEXTURE_2D_ARRAY, 1, d->srgb ? GL_SRGB8_ALPHA8 : GL_RGBA8, kSpriteTexW, kSpriteTexH, kMaxSprites);
+	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
 	return true;
+}
+
+void Dungeon::setSpriteImage(int layer, const uint8_t *rgba) {
+	if (!d->spriteTex || layer < 0 || layer >= kMaxSprites)
+		return;
+	glBindTexture(GL_TEXTURE_2D_ARRAY, d->spriteTex);
+	glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, layer, kSpriteTexW, kSpriteTexH, 1, GL_RGBA, GL_UNSIGNED_BYTE, rgba);
+	glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
+}
+
+void Dungeon::setSprites(const std::vector<DungeonSprite> &sprites) {
+	d->sprites = sprites;
 }
 
 void Dungeon::setTextures(const DungeonTextures &tex) {
@@ -191,6 +227,51 @@ void Dungeon::render(const Mat4 &viewProj, const Mat4 &model, Vec3 eye, float li
 	glDisable(GL_BLEND);
 	glBindVertexArray(d->vao);
 	glDrawArrays(GL_TRIANGLES, 0, d->count);
+
+	// Monstres et objets, tournés vers l'œil (repère du niveau : on y ramène la position de l'œil).
+	if (!d->sprites.empty() && d->spriteTex) {
+		Vec3 c0{model.m[0], model.m[1], model.m[2]}, c1{model.m[4], model.m[5], model.m[6]}, c2{model.m[8], model.m[9], model.m[10]};
+		Vec3 rel = eye - Vec3{model.m[12], model.m[13], model.m[14]};
+		Vec3 cam{dot(c0, rel), dot(c1, rel), dot(c2, rel)};
+		std::vector<DungeonVertex> v;
+		v.reserve(d->sprites.size() * 6);
+		auto put = [&](float x, float y, float z, float u, float vv, float layer) {
+			DungeonVertex dv;
+			dv.pos[0] = x; dv.pos[1] = y; dv.pos[2] = z;
+			dv.uvl[0] = u; dv.uvl[1] = vv; dv.uvl[2] = layer;
+			dv.shade = 1.0f;
+			v.push_back(dv);
+		};
+		for (const DungeonSprite &s : d->sprites) {
+			float tx = cam.x - s.x, tz = cam.z - s.z;
+			float tl = sqrtf(tx * tx + tz * tz);
+			if (tl < 1e-3f)
+				continue;
+			// Droite de l'image, vue de l'œil : perpendiculaire au regard, à l'horizontale.
+			float rx = tz / tl, rz = -tx / tl;
+			float cx = s.x + rx * s.offset, cz = s.z + rz * s.offset;
+			float hw = s.width * 0.5f;
+			float y0 = s.ceiling ? kWallHeight - s.height : 0.0f, y1 = y0 + s.height;
+			float L = (float)s.layer;
+			float ax = cx - rx * hw, az = cz - rz * hw, bx = cx + rx * hw, bz = cz + rz * hw;
+			put(ax, y0, az, s.u0, s.v1, L);
+			put(bx, y0, bz, s.u1, s.v1, L);
+			put(bx, y1, bz, s.u1, s.v0, L);
+			put(ax, y0, az, s.u0, s.v1, L);
+			put(bx, y1, bz, s.u1, s.v0, L);
+			put(ax, y1, az, s.u0, s.v0, L);
+		}
+		if (!v.empty()) {
+			glBindBuffer(GL_ARRAY_BUFFER, d->spriteVbo);
+			glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)(v.size() * sizeof(DungeonVertex)), v.data(), GL_STREAM_DRAW);
+			glBindBuffer(GL_ARRAY_BUFFER, 0);
+			glDisable(GL_CULL_FACE);
+			glBindTexture(GL_TEXTURE_2D_ARRAY, d->spriteTex);
+			glBindVertexArray(d->spriteVao);
+			glDrawArrays(GL_TRIANGLES, 0, (GLsizei)v.size());
+			glEnable(GL_CULL_FACE);
+		}
+	}
 	glBindVertexArray(0);
 	glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
 }

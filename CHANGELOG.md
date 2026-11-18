@@ -3,6 +3,17 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.3.0] — Monsters in 3D, clicks in the dungeon
+
+- Monsters and items near the party appear in the 3D dungeon, drawn by the game itself and always
+  facing you (like in the original game), at their real place and size, animated.
+- You can click in the 3D dungeon: on the wall right in front of the party (door buttons, levers,
+  keyholes, switches) and on the floor in front of you (to pick up items). The pointer glows where
+  it aims.
+- Doors and their frames now stand together in the middle of their block, like in the game.
+- The game screen no longer pops up for monsters and items (they are in 3D now); it still comes
+  for scenes, dialogues, the map, menus and character sheets.
+
 ## [0.2.0] — Comfort, doors, objects, sky
 
 - Turning no longer rotates the dungeon smoothly around you (it made people queasy): a very short

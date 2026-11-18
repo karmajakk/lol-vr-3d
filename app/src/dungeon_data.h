@@ -55,6 +55,7 @@ struct DungeonTextures {
 	int typeLayer[256];        // type de mur -> couche (dessin du moteur ; -1 = aucune)
 	int doorLayer[256];        // type de mur -> couche de sa porte (-1 = aucune)
 	float doorDepth[256];      // la porte est à cette fraction de la case (1 = sur la face, 2 = au milieu)
+	float faceDepth[256];      // de même pour le mur lui-même (cadres de porte : au milieu de la case)
 	int decalLayer[256];       // type de mur -> dessin au sol (-1 = aucun)
 	uint8_t kind[256];         // WallKind
 	int skyLayer = -1;
@@ -75,6 +76,13 @@ struct DungeonVertex {
 
 // Construit les murs, le sol et le plafond. walls : 1024 blocs x 4 côtés (N, E, S, O).
 void buildDungeonMesh(const uint8_t *walls, const DungeonGfx &gfx, const DungeonTextures &tex, std::vector<DungeonVertex> &out);
+
+// Monstres et objets dessinés par le moteur (image de 176 x 120, l'objet centré en x = 88) :
+// conversion en image RGBA de 176 x 128, et taille dans le donjon. Un pixel du jeu dessiné en
+// grand correspond à ce qu'on voit tout près, au bas de la vue : environ S / 170 mètres de large,
+// 1,2 fois plus haut (pixels du jeu).
+const float kSpritePixel = kBlockSize / 170.0f;
+void spriteToRgba(const uint8_t *pixels, const uint8_t *alpha, const uint8_t *palette768, uint8_t *rgba176x128);
 
 // Centre d'un bloc, dans le repère du niveau.
 inline void blockCenter(int block, float &x, float &z) {

@@ -45,6 +45,18 @@ struct GameState {
 	bool menuOpen = false;    // un menu du jeu est affiché
 };
 
+// Un monstre ou un objet près du groupe, dessiné par le moteur en grand dans une image de
+// kSpriteW x kSpriteH (patches/0003).
+const int kSpriteW = 176, kSpriteH = 120;
+struct LevelSprite {
+	int x = 0, y = 0;          // position dans le niveau : bloc x * 256 + fin (de même pour y)
+	int kind = 0;              // 0 monstre, 1 objet
+	bool ceiling = false;      // accroché au plafond
+	int x0 = 0, y0 = 0, x1 = 0, y1 = 0; // partie dessinée de l'image
+	uint32_t version = 0;
+	int id = 0;
+};
+
 // Le niveau en cours, pour le donjon en 3D (patches/0003). Les gros tableaux ne sont recopiés que
 // quand gfxSerial change (changement de niveau), les murs quand wallsSerial change (portes).
 struct LevelSnapshot {
@@ -70,6 +82,9 @@ struct LevelSnapshot {
 	std::vector<uint8_t> wallPixels, wallAlpha;
 	std::vector<uint8_t> doorPixels, doorAlpha; // la porte seule (elle se tient au milieu de sa case)
 	uint8_t screenPalette[768] = {0};
+	uint32_t spriteSerial = 0;
+	std::vector<LevelSprite> sprites;
+	std::vector<uint8_t> spritePixels, spriteAlpha; // sprites.size() x kSpriteW x kSpriteH
 };
 
 class CoreHost {
