@@ -512,6 +512,27 @@ int main(int argc, char **argv) {
 			check(o.action == kUiActionCloseHelp && !o.buttonsToGame, "aide : un clic la ferme");
 			in.triggerDown = in.triggerPressed = false;
 			in.helpOpen = false;
+			// Premier lancement : la fenêtre du choix de la vue, deux boutons.
+			in.chooserOpen = true;
+			ui.update(in, o, tmp);
+			SceneState::Panel ch = tmp.panels[4];
+			check(ch.visible && ch.texture != 0 && ch.texture != help.texture, "choix de la vue : la fenêtre est affichée");
+			auto pressAt = [&](float px, float py) {
+				aimAt(ch.center + ch.right * ((px / 584.0f * 2.0f - 1.0f) * ch.halfW) + ch.up * ((1.0f - py / 470.0f * 2.0f) * ch.halfH));
+				in.triggerDown = in.triggerPressed = true;
+				ui.update(in, o, tmp);
+				UiFrameOutput r = o;
+				in.triggerDown = in.triggerPressed = false;
+				ui.update(in, o, tmp);
+				return r;
+			};
+			check(pressAt(150, 200).action == kUiActionChooseClassic, "choix de la vue : bouton classique");
+			check(pressAt(430, 200).action == kUiActionChooseImmersive, "choix de la vue : bouton immersif");
+			UiFrameOutput none = pressAt(292, 420);
+			check(none.action == kUiActionNone && !none.buttonsToGame, "choix de la vue : à côté des boutons, rien");
+			in.chooserOpen = false;
+			in.triggerDown = in.triggerPressed = false;
+			in.helpOpen = false;
 			// Menu du poignet : l'engrenage n'apparaît que si l'on regarde la main gauche
 			in.wristValid = true;
 			in.wristPos = {-0.25f, 0.95f, -0.35f};
@@ -556,13 +577,21 @@ int main(int argc, char **argv) {
 			aimAt(row(2));
 			in.triggerDown = in.triggerPressed = true;
 			ui.update(in, o, tmp);
-			check(o.action == kUiActionToggleDetach, "menu : deuxième ligne, l'écran classique");
+			check(o.action == kUiActionToggleDungeon, "menu : deuxième ligne, le mode immersif");
 			in.triggerDown = in.triggerPressed = false;
 			ui.update(in, o, tmp);
 			aimAt(row(3));
 			in.triggerDown = in.triggerPressed = true;
 			ui.update(in, o, tmp);
-			check(o.action == kUiActionToggleDungeon, "menu : troisième ligne, le donjon 3D");
+			check(o.action == kUiActionToggleScreenAlways, "menu : troisième ligne, l'écran du jeu (mode immersif)");
+			in.triggerDown = in.triggerPressed = false;
+			ui.setDungeonOption(0);
+			ui.update(in, o, tmp);
+			aimAt(row(3));
+			in.triggerDown = in.triggerPressed = true;
+			ui.update(in, o, tmp);
+			check(o.action == kUiActionToggleDetach, "menu : troisième ligne, l'écran classique (vue classique)");
+			ui.setDungeonOption(1);
 			in.triggerDown = in.triggerPressed = false;
 			ui.update(in, o, tmp);
 			aimAt(row(4));

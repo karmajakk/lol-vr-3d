@@ -3,6 +3,18 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.5.0] — One app, two views
+
+- This is now the main project, and it includes the classic view of lol-vr (whose history and
+  documentation are merged here).
+- At first launch, a window asks whether you want the **classic view** or the **immersive
+  mode**, and says it can be changed later from the gear on the left wrist.
+- Wrist menu: "Immersive mode: on/off". In immersive mode there is only one view, the 3D dungeon
+  (no mixed reality, no 486 PC; the left stick click no longer changes the scenery), and the next
+  row chooses "Game screen: if needed" or "always". In the classic view, everything is as in
+  lol-vr: library, mixed reality, 486 PC, and "Classic screen" for the whole image.
+- Documentation (docs/wiki) for both views.
+
 ## [0.4.0] — Walking, shop doors, windows, light
 
 - Walking follows your gaze: the left stick points relative to where you look (forward, back,

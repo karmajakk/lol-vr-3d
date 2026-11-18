@@ -1,12 +1,20 @@
-# Lands of Lore VR 3D (lol-vr-3d)
+# Lands of Lore VR
 
-*Lands of Lore: The Throne of Chaos* (Westwood, 1993) on Meta Quest 3, standalone, with the
-dungeon rebuilt **in true 3D around you**. The original game still runs on
-[ScummVM](https://www.scummvm.org) and decides everything (combat, items, spells, saves); this app
-reads the level the game has loaded and draws its walls, floor and ceiling at full scale around you.
+*Lands of Lore: The Throne of Chaos* (Westwood, 1993) on Meta Quest 3, standalone, no PC needed.
+The original game runs on [ScummVM](https://www.scummvm.org) and decides everything (combat,
+items, spells, saves). Two ways to play, switched at any time from the gear on your left wrist:
 
-This is the sister project of [lol-vr](https://github.com/karmajakk/lol-vr), which shows the game on
-a floating screen in a medieval library. Both apps can be installed side by side.
+- **Immersive mode**: the dungeon rebuilt **in true 3D around you**, at full scale, from the level
+  the game has loaded. One view only; the game screen comes up when needed (shops, conversations,
+  the map, menus).
+- **Classic view**: the game on a floating screen in a medieval library, in your own room (mixed
+  reality) or on an old 486 PC, with the interface in movable windows.
+
+At first launch, a window asks which one you want.
+
+This project now includes [lol-vr](https://github.com/karmajakk/lol-vr), where the classic view
+was first developed (its history is kept here; its changelog is in
+[docs/lol-vr-CHANGELOG.md](docs/lol-vr-CHANGELOG.md)). Documentation: [docs/wiki](docs/wiki/Home.md).
 
 **The game files are not included.** You need your own copy of the game (CD or GOG version).
 
@@ -26,7 +34,8 @@ Early demo. What works:
 - Shop doors and passages to other regions stay in front of you, like a wall with their picture:
   walk into them and the game screen shows the shop, or the new region appears.
 - Dark places stay dark until you light the lamp.
-- "3D dungeon: on/off" in the wrist menu, to compare with the original view.
+- "Immersive mode: on/off" in the wrist menu, to switch to the classic view (library, mixed reality,
+  486 PC) and back.
 
 - Monsters and items near the party, drawn by the game itself and always facing you.
 - Clicks in the 3D dungeon: on the wall right in front of the party (door buttons, levers,
@@ -42,7 +51,8 @@ Version details: [CHANGELOG.md](CHANGELOG.md).
 1. Download `lol-vr-3d.apk` from the
    [latest release](https://github.com/karmajakk/lol-vr-3d/releases/latest).
 2. Connect the headset to your PC, open [SideQuest](https://sidequestvr.com) and install the APK.
-3. In the headset, launch **Lands of Lore VR 3D** (Library → "Unknown sources" filter).
+3. In the headset, launch **Lands of Lore VR 3D** (Library → "Unknown sources" filter) and choose
+   the classic view or the immersive mode.
    A screen tells you the game files are missing: that's expected. This first launch creates
    the folder where they go.
 4. On the PC, copy the game files (the `.PAK` files, including `GENERAL.PAK`, and the `ENG`
@@ -62,8 +72,9 @@ saves there.
 
 Same as lol-vr: aim and pull the trigger to click, X (or the grip) for a right click (drink a
 potion, use an item), left stick to walk, right stick to turn, A to attack, B for magic, Y for the
-map. Look at your left hand and click the gear for the menu (language, classic screen, 3D dungeon
-with the game screen "if needed" or "always", keyboard, controller mapping).
+map. Look at your left hand and click the gear for the menu (language, immersive mode on/off, game
+screen "if needed" or "always" in immersive mode, classic screen in the classic view, keyboard,
+controller mapping).
 
 In the dungeon, the party's position is under your feet. You walk where you look: the left stick
 points relative to your gaze (forward is where you look, sideways is a side step), and when you

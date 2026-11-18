@@ -442,7 +442,11 @@ struct App {
 	lolvr::Dungeon dungeon;
 	bool dungeonOk = false;
 	char tileset[16] = {0};         // région du niveau (« KEEP », « FOREST1 »...)
-	int dungeonMode = 1;            // menu du poignet : 0 non, 1 oui (écran au besoin), 2 oui (écran toujours)
+	int dungeonMode = 1;            // 0 vue classique ; mode immersif : 1 écran au besoin, 2 écran toujours
+	int classicEnv = lolvr::kEnvLibrary; // décor de la vue classique (le mode immersif n'en a qu'un)
+	bool viewChosen = false;        // le joueur a choisi sa vue au premier lancement
+	bool chooserOpen = false;       // la fenêtre du choix de la vue est ouverte
+	bool chooserPlaced = false;
 	bool screenShown = true;        // le grand écran est affiché
 	double screenNeededAt = 0;
 	float dunYaw = 0;               // lacet (monde) vers lequel le groupe regarde
@@ -1119,6 +1123,9 @@ void loadSettings(App &app, int &environment) {
 		} else if (!strcmp(name, "donjon3d")) {
 			if (sscanf(rest, "%d", &iv) == 1)
 				app.dungeonMode = iv >= 0 && iv <= 2 ? iv : 1;
+		} else if (!strcmp(name, "choixvue")) {
+			if (sscanf(rest, "%d", &iv) == 1)
+				app.viewChosen = iv != 0;
 		} else if (!strcmp(name, "engrenage")) {
 			if (sscanf(rest, "%d", &iv) == 1)
 				app.gearKnown = iv != 0;
@@ -1162,7 +1169,7 @@ void saveSettings(App &app) {
 	if (!f)
 		return;
 	fprintf(f, "disposition 2\n");
-	fprintf(f, "decor %d\n", app.environment);
+	fprintf(f, "decor %d\n", app.dungeonMode ? app.classicEnv : app.environment);
 	for (int i = 0; i < kEnvCount; i++)
 		fprintf(f, "ecran %.3f %.3f\n", app.widths[i], app.distances[i]);
 	fprintf(f, "feu %d\n", app.fireOn ? 1 : 0);
@@ -1170,6 +1177,7 @@ void saveSettings(App &app) {
 	fprintf(f, "langue %d\n", app.language);
 	fprintf(f, "engrenage %d\n", app.gearKnown ? 1 : 0);
 	fprintf(f, "donjon3d %d\n", app.dungeonMode);
+	fprintf(f, "choixvue %d\n", app.viewChosen ? 1 : 0);
 	for (int i = 0; i < kEnvCount; i++)
 		fprintf(f, "visee %d %.4f %.4f\n", app.aimSaved[i] ? 1 : 0, app.aimYaw[i], app.aimPitch[i]);
 	if (app.ui.hasLayout())
@@ -1328,6 +1336,18 @@ void setEnvironment(App &app, int env, XrTime time) {
 	}
 }
 
+// Vue classique (mode 0 : bibliothèque, réalité mixte ou PC 486, au choix) ou mode immersif (1 et 2 :
+// le donjon en 3D, une seule vue, sans réalité mixte ni PC 486).
+void setViewMode(App &app, int mode, XrTime time) {
+	const bool was = app.dungeonMode != 0, immersive = mode != 0;
+	if (immersive && !was)
+		app.classicEnv = app.environment;
+	app.dungeonMode = mode;
+	if (immersive != was)
+		setEnvironment(app, immersive ? lolvr::kEnvLibrary : app.classicEnv, time);
+	app.settingsDirty = true;
+}
+
 // ---------------------------------------------------------------------------
 // Vibrations
 
@@ -1471,7 +1491,7 @@ Vec3 viewCenter(const App &app) {
 void updateLayout(App &app, double now) {
 	const float kViewX = 112, kViewY = 0, kViewW = 176, kViewH = 120; // vue du donjon dans l'image 320x200
 	// On attend que l'état soit stable un court instant, pour ne pas clignoter pendant une transition.
-	bool allowed = app.detached && app.environment != lolvr::kEnvPassthroughCrt;
+	bool allowed = (app.detached || app.dungeonMode) && app.environment != lolvr::kEnvPassthroughCrt;
 	if (!allowed) {
 		if (app.split && app.screenPlaced) {
 			app.split = false;
@@ -1777,7 +1797,7 @@ bool dungeonPick(App &app, Vec3 tip, Vec3 dir, float &gu, float &gv, Vec3 &hitW,
 	return true;
 }
 
-void updateUi(App &app, float dt, double now, bool pointer, bool triggerPressed, XrVector2f rightStick, lolvr::UiFrameOutput &out) {
+void updateUi(App &app, XrTime time, float dt, double now, bool pointer, bool triggerPressed, XrVector2f rightStick, lolvr::UiFrameOutput &out) {
 	lolvr::UiFrameInput in;
 	in.dt = dt;
 	in.anchorPos = app.anchorPos;
@@ -1834,12 +1854,19 @@ void updateUi(App &app, float dt, double now, bool pointer, bool triggerPressed,
 	in.characters = app.inDungeon ? app.characters : 0;
 	for (int i = 0; i < in.characters && i < 4; i++)
 		in.portraitX[i] = portraitX(in.characters, i);
-	in.gearHint = !app.gearKnown;
+	in.gearHint = !app.gearKnown && !app.chooserOpen;
+	in.chooserOpen = app.chooserOpen;
 	in.screenHidden = !app.screenShown;
 	in.time = now;
 	app.ui.setInfo(app.imageInfo[0], app.imageInfo[1]);
 	if (!app.ui.hasLayout() && app.screenPlaced)
 		app.ui.resetLayout(in);
+	// La fenêtre du choix de la vue s'ouvre droit devant le joueur.
+	if (app.chooserOpen && !app.chooserPlaced && app.screenPlaced && app.ui.hasLayout()) {
+		Vec3 f = rotate(app.headRot, {0, 0, -1});
+		app.ui.placement[lolvr::kPanelHelp] = lolvr::Ui::defaultHelpPlacement(wrapAngle(atan2f(-f.x, -f.z) - app.anchorYaw));
+		app.chooserPlaced = true;
+	}
 	app.ui.update(in, out, app.ss);
 	// Donjon 3D : le doigt qui ne vise ni l'écran ni une fenêtre peut viser le mur droit devant le
 	// groupe (boutons, leviers, serrures, portes) ou le sol devant lui (objets à ramasser). Le clic
@@ -1896,8 +1923,17 @@ void updateUi(App &app, float dt, double now, bool pointer, bool triggerPressed,
 		app.keyboardOpen = false;
 		break;
 	case lolvr::kUiActionToggleDungeon:
-		app.dungeonMode = (app.dungeonMode + 1) % 3;
-		app.settingsDirty = true;
+		setViewMode(app, app.dungeonMode ? 0 : 1, time);
+		break;
+	case lolvr::kUiActionToggleScreenAlways:
+		setViewMode(app, app.dungeonMode == 2 ? 1 : 2, time);
+		break;
+	case lolvr::kUiActionChooseClassic:
+	case lolvr::kUiActionChooseImmersive:
+		setViewMode(app, out.action == lolvr::kUiActionChooseImmersive ? 1 : 0, time);
+		app.viewChosen = true;
+		app.chooserOpen = false;
+		pulse(app, kRight, 0.3f, 0.03f);
 		break;
 	case lolvr::kUiActionToggleKeyboard:
 		app.keyboardOpen = !app.keyboardOpen;
@@ -1983,7 +2019,7 @@ void updateInput(App &app, XrTime time, float dt, double now) {
 	XrVector2f left = getStick(app, kLeft);
 	XrVector2f right = getStick(app, kRight);
 	lolvr::UiFrameOutput ui;
-	updateUi(app, dt, now, true, clicked[hand] && app.triggerDown[hand], right, ui);
+	updateUi(app, time, dt, now, true, clicked[hand] && app.triggerDown[hand], right, ui);
 	bool toGame = ui.buttonsToGame && !ui.dragging;
 	if (now < app.synthClickUntil) {
 		// Bouton de magie : un clic bref sur le bouton du personnage, à la place du pointeur.
@@ -2096,7 +2132,7 @@ void updateInput(App &app, XrTime time, float dt, double now) {
 		if (app.zoomUsed)
 			placeScreen(app, false);
 	} else if (app.zoomDown) {
-		if (!app.zoomUsed && now - app.zoomSince < 0.6) {
+		if (!app.zoomUsed && now - app.zoomSince < 0.6 && !app.dungeonMode) { // le mode immersif n'a qu'une vue
 			setEnvironment(app, nextEnvironment(app, app.environment), time);
 			pulse(app, kLeft, 0.3f, 0.03f);
 		}
@@ -2537,7 +2573,13 @@ void renderFrame(App &app, float dt, int savedEnvironment) {
 		// Au premier affichage : on retrouve le décor choisi la dernière fois et on place l'écran.
 		if (!app.environmentRestored && app.headValid) {
 			app.environmentRestored = true;
-			setEnvironment(app, savedEnvironment, time);
+			app.classicEnv = savedEnvironment;
+			setEnvironment(app, app.dungeonMode ? lolvr::kEnvLibrary : savedEnvironment, time);
+			// Premier lancement : le joueur choisit sa vue, droit devant lui.
+			if (!app.viewChosen) {
+				app.chooserOpen = true;
+				app.helpOpen = false;
+			}
 		}
 		if (app.headValid && !app.screenPlaced) {
 			updateFloor(app, time);
@@ -2556,7 +2598,7 @@ void renderFrame(App &app, float dt, int savedEnvironment) {
 		} else {
 			CoreHost::get().setMouseButtons(false, false);
 			lolvr::UiFrameOutput ui;
-			updateUi(app, dt, now, false, false, XrVector2f{0, 0}, ui);
+			updateUi(app, time, dt, now, false, false, XrVector2f{0, 0}, ui);
 			releaseTypedKeys(app, now, true);
 		}
 		app.clickPulse *= expf(-dt * 7.0f);

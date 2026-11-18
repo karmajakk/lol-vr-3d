@@ -31,7 +31,7 @@ struct UiPlacement {
 const float kSplitViewHeight = 0.54f;
 const float kSplitViewLift = 0.16f;
 
-enum UiAction { kUiActionNone = 0, kUiActionToggleFire, kUiActionToggleDetach, kUiActionResetLayout, kUiActionCloseKeyboard, kUiActionToggleHelp, kUiActionCloseHelp, kUiActionToggleLanguage, kUiActionToggleKeyboard, kUiActionToggleDungeon };
+enum UiAction { kUiActionNone = 0, kUiActionToggleFire, kUiActionToggleDetach, kUiActionResetLayout, kUiActionCloseKeyboard, kUiActionToggleHelp, kUiActionCloseHelp, kUiActionToggleLanguage, kUiActionToggleKeyboard, kUiActionToggleDungeon, kUiActionToggleScreenAlways, kUiActionChooseClassic, kUiActionChooseImmersive };
 
 enum UiLanguage { kLangEnglish = 0, kLangFrench = 1 };
 
@@ -64,6 +64,8 @@ struct UiFrameInput {
 	bool split = false;       // l'interface détachée est affichée
 	bool keyboardOpen = false;
 	bool helpOpen = false;
+	// Premier lancement : la fenêtre « vue classique ou immersive » (à la place de l'aide).
+	bool chooserOpen = false;
 	// Menu du poignet : un petit engrenage apparaît sur la main gauche quand on la regarde.
 	bool wristValid = false;
 	Vec3 wristPos = {0, 0, 0};

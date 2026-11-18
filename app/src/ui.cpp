@@ -141,8 +141,8 @@ struct Ui::Impl {
 
 	// Poignée tenue : -1 aucune, 0..kUiPanelCount-1 un panneau, kScreenTarget l'écran.
 	static const int kScreenTarget = 100;
-	GLuint helpTex = 0, gearTex = 0, menuTex = 0, hintTex = 0;
-	bool helpDirty = true, menuDirty = true, hintDirty = true;
+	GLuint helpTex = 0, gearTex = 0, menuTex = 0, hintTex = 0, chooserTex = 0;
+	bool helpDirty = true, menuDirty = true, hintDirty = true, chooserDirty = true;
 	bool menuKeyboard = false; // état montré dans le menu
 	int dungeonMode = 1;
 	void renderHint();
@@ -150,6 +150,7 @@ struct Ui::Impl {
 	bool hintPlaced = false;
 	Vec3 hintPos = {0, 0, 0};
 	void renderHelp();
+	void renderChooser();
 	void renderGear();
 	void renderMenu();
 	void upload(GLuint &tex, const std::vector<uint8_t> &px, int w, int h);
@@ -158,6 +159,7 @@ struct Ui::Impl {
 	Vec3 menuPos = {0, 0, 0}, menuRight = {1, 0, 0}, menuUp = {0, 1, 0};
 	int menuHot = -1;
 	// Colonne du groupe recomposée
+	int chooserHot = -1; // bouton visé dans la fenêtre du choix de la vue
 	GLuint partyTex = 0;
 	std::vector<uint8_t> partyPx;
 	std::vector<Piece> pieces;
@@ -341,6 +343,43 @@ void Ui::Impl::composeParty(const UiFrameInput &in) {
 	upload(partyTex, partyPx, kPartyTexW, kPartyTexH);
 }
 
+// Boutons de la fenêtre du choix de la vue, en pixels de son image (même taille que l'aide).
+const int kChooseY0 = 70, kChooseY1 = 330;
+const int kChooseX[2][2] = {{20, 282}, {302, 564}};
+
+// Premier lancement : vue classique ou mode immersif.
+void Ui::Impl::renderChooser() {
+	const bool fr = language == kLangFrench;
+	Canvas cv{kHelpW, kHelpH, std::vector<uint8_t>((size_t)kHelpW * kHelpH * 4)};
+	cv.rect(0, 0, kHelpW, kHelpH, 140, 108, 72);
+	cv.rect(3, 3, kHelpW - 3, kHelpH - 3, 34, 24, 16);
+	auto centered = [&](const std::string &t, int x0, int x1, int y, int scale, uint8_t r, uint8_t g, uint8_t b) {
+		std::string l = latin1(t.c_str());
+		cv.text(l, x0 + (x1 - x0 - (int)l.size() * 8 * scale) / 2, y, scale, r, g, b);
+	};
+	centered(fr ? "Choisis ta vue" : "Choose your view", 0, kHelpW, 22, 2, 255, 205, 110);
+	static const char *const labels[2][2] = {{"Classic", "Immersive"}, {"Classique", "Immersif"}};
+	static const char *const lines[2][2][4] = {
+		{{"The game screen in a", "medieval library, in your", "room (mixed reality) or on", "an old 486 PC."},
+		 {"Walk inside the dungeon", "rebuilt in 3D around you.", "The game screen appears", "when needed (shops, map)."}},
+		{{"L'écran du jeu dans une", "bibliothèque médiévale, dans", "ta pièce (réalité mixte) ou", "sur un vieux PC 486."},
+		 {"Marche dans le donjon", "reconstruit en 3D autour", "de toi. L'écran du jeu vient", "au besoin (boutiques, carte)."}}};
+	const int lang = fr ? 1 : 0;
+	for (int b = 0; b < 2; b++) {
+		int x0 = kChooseX[b][0], x1 = kChooseX[b][1];
+		cv.rect(x0, kChooseY0, x1, kChooseY1, 30, 20, 12);
+		cv.rect(x0 + 1, kChooseY0 + 1, x1 - 1, kChooseY1 - 1, 96, 72, 46);
+		cv.rect(x0 + 1, kChooseY0 + 1, x1 - 1, kChooseY0 + 4, 140, 108, 72);
+		centered(labels[lang][b], x0, x1, kChooseY0 + 40, 2, 255, 225, 150);
+		for (int k = 0; k < 4; k++)
+			centered(lines[lang][b][k], x0, x1, kChooseY0 + 110 + k * 26, 1, 250, 236, 200);
+	}
+	centered(fr ? "Tu pourras changer plus tard : regarde ta main gauche," : "You can change this later: look at your left hand,", 0, kHelpW, 370, 1, 250, 236, 200);
+	centered(fr ? "l'engrenage ouvre le menu des réglages." : "the gear opens the settings menu.", 0, kHelpW, 398, 1, 250, 236, 200);
+	upload(chooserTex, cv.px, kHelpW, kHelpH);
+	chooserDirty = false;
+}
+
 void Ui::Impl::renderHelp() {
 	static const char *const english[] = {
 		"#CONTROLLER MAPPING",
@@ -367,7 +406,7 @@ void Ui::Impl::renderHelp() {
 		"Brass bar + hold trigger ........ move",
 		"Corner (bracket) + hold trigger . resize",
 		"Right stick click ........ recenter everything",
-		"Left stick click ......... change scenery",
+		"Left stick click ......... scenery (classic view)",
 		"",
 		"Click this panel to close it.",
 		nullptr,
@@ -397,7 +436,7 @@ void Ui::Impl::renderHelp() {
 		"Barrette de laiton + gâchette tenue ... déplacer",
 		"Coin (équerre) + gâchette tenue ....... agrandir, réduire",
 		"Clic du joystick droit ... tout recentrer devant soi",
-		"Clic du joystick gauche .. changer de décor",
+		"Clic du joystick gauche .. décor (vue classique)",
 		"",
 		"Cliquer ce panneau pour le fermer.",
 		nullptr,
@@ -447,12 +486,12 @@ void Ui::Impl::renderMenu() {
 	Canvas cv{kMenuW, kMenuH, std::vector<uint8_t>((size_t)kMenuW * kMenuH * 4)};
 	cv.rect(0, 0, kMenuW, kMenuH, 34, 24, 16);
 	const std::string rows[kMenuRows] = {
-		"Lands of Lore VR 3D",
+		"Lands of Lore VR",
 		latin1(fr ? "Langue : Français" : "Language: English"),
-		latin1(detached ? (fr ? "Écran classique : non" : "Classic screen: off") : (fr ? "Écran classique : oui" : "Classic screen: on")),
-		latin1(dungeonMode == 1 ? (fr ? "Donjon 3D, écran au besoin" : "3D dungeon, screen if needed")
-		     : dungeonMode == 2 ? (fr ? "Donjon 3D, écran toujours" : "3D dungeon, screen always")
-		                        : (fr ? "Donjon 3D : non" : "3D dungeon: off")),
+		latin1(dungeonMode ? (fr ? "Mode immersif : oui" : "Immersive mode: on") : (fr ? "Mode immersif : non" : "Immersive mode: off")),
+		// Mode immersif : l'écran du jeu au besoin ou toujours ; vue classique : l'écran entier ou en fenêtres.
+		dungeonMode ? latin1(dungeonMode == 2 ? (fr ? "Écran du jeu : toujours" : "Game screen: always") : (fr ? "Écran du jeu : au besoin" : "Game screen: if needed"))
+		            : latin1(detached ? (fr ? "Écran classique : non" : "Classic screen: off") : (fr ? "Écran classique : oui" : "Classic screen: on")),
 		latin1(menuKeyboard ? (fr ? "Cacher le clavier" : "Hide keyboard") : (fr ? "Afficher le clavier" : "Show keyboard")),
 		latin1(fr ? "Manettes et boutons" : "Controller mapping"),
 		latin1(fr ? "Fermer" : "Close"),
@@ -524,6 +563,7 @@ void Ui::setLanguage(int language) {
 		d->helpDirty = true;
 		d->menuDirty = true;
 		d->hintDirty = true;
+		d->chooserDirty = true;
 	}
 }
 
@@ -635,6 +675,8 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 		d->renderMenu();
 	if (in.gearHint && (d->hintDirty || !d->hintTex))
 		d->renderHint();
+	if (in.chooserOpen && (d->chooserDirty || !d->chooserTex))
+		d->renderChooser();
 	d->pressFlash -= in.dt;
 
 	// Tant que la disposition n'est pas établie (écran pas encore placé), aucun panneau.
@@ -644,7 +686,8 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 	if (visible[kPanelParty])
 		d->composeParty(in);
 	visible[kPanelKeyboard] = placed && in.keyboardOpen;
-	visible[kPanelHelp] = placed && in.helpOpen;
+	visible[kPanelHelp] = placed && (in.helpOpen || in.chooserOpen);
+	d->chooserHot = -1;
 	auto isPanel = [](int target) { return target >= 0 && target < kUiPanelCount; };
 
 	Vec3 screenR = rotate(in.screenRot, {1, 0, 0}), screenU = rotate(in.screenRot, {0, 1, 0}), screenN = rotate(in.screenRot, {0, 0, 1});
@@ -1011,9 +1054,9 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 				if (row == 1) {
 					out.action = kUiActionToggleLanguage;
 				} else if (row == 2) {
-					out.action = kUiActionToggleDetach;
-				} else if (row == 3) {
 					out.action = kUiActionToggleDungeon;
+				} else if (row == 3) {
+					out.action = d->dungeonMode ? kUiActionToggleScreenAlways : kUiActionToggleDetach;
 				} else if (row == 4) {
 					out.action = kUiActionToggleKeyboard;
 					d->menuOpen = false;
@@ -1033,7 +1076,17 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 		out.hitUp = q.u;
 		out.hitRadius = 0.010f * bestT;
 		float u = (hx + 1.0f) * 0.5f, v = (1.0f - hy) * 0.5f;
-		if (hitIndex == kPanelHelp) {
+		if (hitIndex == kPanelHelp && in.chooserOpen) {
+			// Choix de la vue : un des deux grands boutons.
+			int px = (int)(u * (float)kHelpW), py = (int)(v * (float)kHelpH);
+			for (int b = 0; b < 2; b++)
+				if (px >= kChooseX[b][0] && px < kChooseX[b][1] && py >= kChooseY0 && py < kChooseY1)
+					d->chooserHot = b;
+			if (in.triggerPressed && d->chooserHot >= 0) {
+				out.action = d->chooserHot == 0 ? kUiActionChooseClassic : kUiActionChooseImmersive;
+				out.clicked = true;
+			}
+		} else if (hitIndex == kPanelHelp) {
 			if (in.triggerPressed) {
 				out.action = kUiActionCloseHelp;
 				out.clicked = true;
@@ -1109,7 +1162,18 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 			p.halfW = q.hw;
 			p.halfH = q.hh;
 			p.border = clampf(0.012f * panelDist[i], 0.004f, 0.012f);
-			if (i == kPanelHelp) {
+			if (i == kPanelHelp && in.chooserOpen) {
+				p.texture = d->chooserTex;
+				p.texW = kHelpW;
+				p.texH = kHelpH;
+				if (d->chooserHot >= 0) {
+					p.hotOutline = true;
+					p.hot[0] = (float)kChooseX[d->chooserHot][0] / (float)kHelpW;
+					p.hot[1] = (float)kChooseY0 / (float)kHelpH;
+					p.hot[2] = (float)kChooseX[d->chooserHot][1] / (float)kHelpW;
+					p.hot[3] = (float)kChooseY1 / (float)kHelpH;
+				}
+			} else if (i == kPanelHelp) {
 				p.texture = d->helpTex;
 				p.texW = kHelpW;
 				p.texH = kHelpH;
