@@ -109,7 +109,7 @@ int main(int argc, char **argv) {
 	Frame f;
 	LevelSnapshot lvl;
 	DungeonTextures tex;
-	uint32_t builtGfx = 0, builtWalls = 0;
+	uint32_t builtGfx = 0, builtWalls = 0, builtCapture = 0;
 	int16_t audio[960];
 	auto pump = [&](double seconds) {
 		int steps = (int)(seconds * 100);
@@ -176,7 +176,16 @@ int main(int argc, char **argv) {
 			g.vcnCount = (int)(lvl.vcn.size() / 32);
 			g.colTable = lvl.colTable;
 			g.palette = lvl.palette;
-			if (lvl.gfxSerial != builtGfx) {
+			if (lvl.wallCaptureSerial == lvl.gfxSerial && lvl.wallSlots > 0) {
+				g.wallSlot = lvl.wallSlot;
+				g.wallPixels = lvl.wallPixels.data();
+				g.wallAlpha = lvl.wallAlpha.data();
+				g.wallSlots = lvl.wallSlots;
+				g.screenPalette = lvl.screenPalette;
+			}
+			printf("  murs dessinés par le moteur : %d (n°%u)\n", lvl.wallSlots, lvl.wallCaptureSerial);
+			if (lvl.gfxSerial != builtGfx || lvl.wallCaptureSerial != builtCapture) {
+				builtCapture = lvl.wallCaptureSerial;
 				decodeDungeonTextures(g, tex);
 				dun.setTextures(tex);
 				builtGfx = lvl.gfxSerial;
@@ -188,6 +197,9 @@ int main(int argc, char **argv) {
 				dun.setMesh(verts);
 				builtWalls = lvl.wallsSerial;
 			}
+			for (int b : {lvl.block - 33, lvl.block - 32, lvl.block - 31, lvl.block - 1, lvl.block, lvl.block + 1})
+				if (b >= 0 && b < 1024)
+					printf("    bloc %d (%d,%d) : %d %d %d %d\n", b, b & 31, b >> 5, lvl.walls[b * 4], lvl.walls[b * 4 + 1], lvl.walls[b * 4 + 2], lvl.walls[b * 4 + 3]);
 			if (isSolidBlock(lvl.walls, lvl.block, g)) {
 				printf("ÉCHEC le groupe est dans un bloc plein\n");
 				failures++;

@@ -14,15 +14,16 @@ a floating screen in a medieval library. Both apps can be installed side by side
 
 Early demo. What works:
 
-- The walls of every level, taken from your own game files, at real size around you.
+- The walls of every level, taken from your own game files, at real size around you, with their
+  decorations and doors drawn by the game engine itself.
 - Floor and ceiling rebuilt from the game's own background.
 - The party's moves and turns glide smoothly; doors that open or close update the walls.
 - Everything from lol-vr: the game screen, the detached party, inventory and compass windows,
   controllers, keyboard, wrist menu (gear on the left hand).
 - "3D dungeon: on/off" in the wrist menu, to compare with the original view.
 
-Not there yet: wall decorations (torches, levers, keyholes), doors drawn as objects, monsters and
-items in 3D, outdoor areas (sky). Until then, the game screen shows them.
+Not there yet: monsters and items in 3D, doors that slide open in 3D (they jump from closed to
+open), outdoor skies. Until then, the game screen shows them.
 
 Version details: [CHANGELOG.md](CHANGELOG.md).
 
@@ -60,9 +61,10 @@ when the party turns, the dungeon turns around you.
 ## How it works (for the curious)
 
 The engine is patched (`patches/0003-niveau-pour-le-donjon-3d.patch`) to publish the current
-level: the wall type of each side of the 32 x 32 blocks, the party's block and direction, and the
-level graphics. Each wall is drawn with the image the game itself uses for a wall seen face on,
-one step away (128 x 96 pixels); the floor and ceiling come from the game's background picture.
+level: the wall type of each side of the 32 x 32 blocks and the party's block and direction. When a
+level loads, the engine also draws each wall type the way it shows a wall right in front of the
+party (128 x 96 pixels, decorations and doors included); those pictures dress the 3D walls. The
+floor and ceiling come from the game's background picture.
 Format notes: [KForestland/lands-of-lore-1-re](https://github.com/KForestland/lands-of-lore-1-re)
 and the ScummVM source (`engines/kyra/engine/scene_rpg.cpp`).
 

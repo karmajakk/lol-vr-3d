@@ -445,7 +445,7 @@ struct App {
 	bool dungeonVisible = false;
 	lolvr::LevelSnapshot level;
 	lolvr::DungeonTextures dunTex;
-	uint32_t builtGfx = 0, builtWalls = 0;
+	uint32_t builtGfx = 0, builtWalls = 0, builtCapture = 0;
 	int shownLevel = 0;
 	float partyX = 0, partyZ = 0, partyYaw = 0; // position affichée du groupe (glisse vers la vraie)
 	SceneState ss;
@@ -2062,8 +2062,16 @@ void updateDungeon(App &app, float dt) {
 	g.vcnCount = (int)(l.vcn.size() / 32);
 	g.colTable = l.colTable;
 	g.palette = l.palette;
-	const bool gfxChanged = l.gfxSerial != app.builtGfx;
+	if (l.wallCaptureSerial == l.gfxSerial && l.wallSlots > 0) {
+		g.wallSlot = l.wallSlot;
+		g.wallPixels = l.wallPixels.data();
+		g.wallAlpha = l.wallAlpha.data();
+		g.wallSlots = l.wallSlots;
+		g.screenPalette = l.screenPalette;
+	}
+	const bool gfxChanged = l.gfxSerial != app.builtGfx || l.wallCaptureSerial != app.builtCapture;
 	if (gfxChanged) {
+		app.builtCapture = l.wallCaptureSerial;
 		lolvr::decodeDungeonTextures(g, app.dunTex);
 		app.dungeon.setTextures(app.dunTex);
 		app.builtGfx = l.gfxSerial;

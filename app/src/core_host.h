@@ -61,6 +61,13 @@ struct LevelSnapshot {
 	std::vector<uint8_t> vcnShift;
 	uint8_t colTable[128] = {0};
 	uint8_t palette[384] = {0};
+	// Chaque type de mur dessiné par le moteur, vu de face à un pas (décors et portes compris) :
+	// 128 x 96 indices de palette par emplacement, et leur couverture (0 ou 255).
+	uint32_t wallCaptureSerial = 0; // égal à gfxSerial quand les dessins correspondent au niveau
+	int16_t wallSlot[256] = {0};
+	int wallSlots = 0;
+	std::vector<uint8_t> wallPixels, wallAlpha;
+	uint8_t screenPalette[768] = {0};
 };
 
 class CoreHost {

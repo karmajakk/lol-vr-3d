@@ -18,6 +18,7 @@ const int kDunTexSize = 128;
 const int kDunWallRows = 96;
 
 // Graphismes du niveau, tels que le moteur les a chargés (voir LolvrLevelData dans le patch du moteur).
+
 struct DungeonGfx {
 	const uint8_t *vmpMap = nullptr;    // 256 : type de mur -> page VMP (0 = rien)
 	const uint8_t *wallFlags = nullptr; // 256
@@ -28,12 +29,19 @@ struct DungeonGfx {
 	int vcnCount = 0;
 	const uint8_t *colTable = nullptr;  // 128
 	const uint8_t *palette = nullptr;   // 128 couleurs, VGA 6 bits
+	// Facultatif : chaque type de mur dessiné par le moteur lui-même (décors et portes compris).
+	const int16_t *wallSlot = nullptr;  // 256 : type -> emplacement (-1 = aucun)
+	const uint8_t *wallPixels = nullptr; // emplacements x 128 x 96, indices de palette
+	const uint8_t *wallAlpha = nullptr;
+	int wallSlots = 0;
+	const uint8_t *screenPalette = nullptr; // 256 couleurs, VGA 6 bits
 };
 
 struct DungeonTextures {
 	int layers = 0;
 	std::vector<uint8_t> rgba; // layers x 128 x 128 x 4, première ligne en haut
 	int pageLayer[64];         // page VMP -> couche (-1 = aucune)
+	int typeLayer[256];        // type de mur -> couche (dessin du moteur ; -1 = aucune)
 	int floorLayer = -1, ceilingLayer = -1;
 };
 

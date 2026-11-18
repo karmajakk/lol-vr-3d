@@ -102,6 +102,8 @@ void decodeDungeonTextures(const DungeonGfx &g, DungeonTextures &out) {
 	out = DungeonTextures();
 	for (int i = 0; i < 64; i++)
 		out.pageLayer[i] = -1;
+	for (int i = 0; i < 256; i++)
+		out.typeLayer[i] = -1;
 	if (!g.vmp || !g.vcn || !g.colTable || !g.palette || !g.vmpMap || g.vmpLen < 330)
 		return;
 	const int pages = (g.vmpLen - 330) / kPageLen;
@@ -134,6 +136,48 @@ void decodeDungeonTextures(const DungeonGfx &g, DungeonTextures &out) {
 						last = c;
 					else
 						c = last;
+				}
+			}
+		}
+	}
+
+	// Les murs dessinés par le moteur : une couche par type, décors et portes compris.
+	if (g.wallSlot && g.wallPixels && g.wallAlpha && g.screenPalette && g.wallSlots > 0) {
+		const int n = kDunTexSize * kDunWallRows;
+		// Le mur de pierre ordinaire du niveau, pour habiller les murs pleins faits d'un seul décor.
+		int plainSlot = g.wallSlot[1];
+		for (int t = 1; t < 256; t++) {
+			int slot = g.wallSlot[t];
+			if (slot < 0 || slot >= g.wallSlots)
+				continue;
+			out.typeLayer[t] = out.layers++;
+			out.rgba.resize(out.layers * layerBytes, 0);
+			Rgba *img = (Rgba *)&out.rgba[(out.layers - 1) * layerBytes];
+			const uint8_t *px = g.wallPixels + (size_t)slot * n, *al = g.wallAlpha + (size_t)slot * n;
+			const bool seeThrough = (g.wallFlags[t] & 8) != 0;
+			const uint8_t *bpx = (!seeThrough && plainSlot >= 0 && plainSlot < g.wallSlots) ? g.wallPixels + (size_t)plainSlot * n : nullptr;
+			const uint8_t *bal = bpx ? g.wallAlpha + (size_t)plainSlot * n : nullptr;
+			for (int y = 0; y < kDunWallRows; y++)
+				for (int x = 0; x < kDunTexSize; x++) {
+					int i = y * kDunTexSize + x;
+					int c = -1;
+					if (al[i])
+						c = px[i];
+					else if (bpx && bal[i])
+						c = bpx[i];
+					if (c >= 0)
+						img[i] = Rgba{vga(g.screenPalette[c * 3]), vga(g.screenPalette[c * 3 + 1]), vga(g.screenPalette[c * 3 + 2]), 255};
+				}
+			if (!seeThrough) {
+				for (int x = 0; x < kDunTexSize; x++) {
+					Rgba last = {0, 0, 0, 255};
+					for (int y = 0; y < kDunWallRows; y++) {
+						Rgba &cc = img[y * kDunTexSize + x];
+						if (cc.a)
+							last = cc;
+						else
+							cc = last;
+					}
 				}
 			}
 		}
@@ -196,7 +240,8 @@ void buildDungeonMesh(const uint8_t *walls, const DungeonGfx &g, const DungeonTe
 			if (!t)
 				continue;
 			int page = g.vmpMap[t];
-			if (page <= 0 || page >= 64 || tex.pageLayer[page] < 0) {
+			float typeLayer = (float)tex.typeLayer[t];
+			if (tex.typeLayer[t] < 0 && (page <= 0 || page >= 64 || tex.pageLayer[page] < 0)) {
 				// Mur que le jeu dessine seulement avec un décor (porte, grille...) : en attendant les
 				// décors, un mur plein prend la pierre ordinaire du niveau ; un mur ajouré n'est pas dessiné.
 				if (g.wallFlags[t] & 8)
@@ -215,7 +260,7 @@ void buildDungeonMesh(const uint8_t *walls, const DungeonGfx &g, const DungeonTe
 			float nx = (float)dx[k], nz = (float)dz[k];
 			float rx = nz, rz = -nx;
 			float fx = cx + nx * S * 0.5f, fz = cz + nz * S * 0.5f;
-			float layer = (float)tex.pageLayer[page];
+			float layer = tex.typeLayer[t] >= 0 ? typeLayer : (float)tex.pageLayer[page];
 			float bl[5] = {fx - rx * S * 0.5f, 0.0f, fz - rz * S * 0.5f, 0.0f, vBottom};
 			float br[5] = {fx + rx * S * 0.5f, 0.0f, fz + rz * S * 0.5f, 1.0f, vBottom};
 			float tr[5] = {fx + rx * S * 0.5f, H, fz + rz * S * 0.5f, 1.0f, 0.0f};

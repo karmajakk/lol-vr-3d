@@ -51,6 +51,12 @@ struct LolvrLevelData {
 	int32_t vcnCount;
 	const uint8_t *vcnColTable;
 	uint8_t palette[384];
+	uint32_t wallCaptureSerial;
+	int16_t wallSlot[256];
+	int32_t wallSlots;
+	const uint8_t *wallPixels;
+	const uint8_t *wallAlpha;
+	uint8_t screenPalette[768];
 };
 const LolvrLevelData *retro_lolvr_level(void);
 }
@@ -349,6 +355,17 @@ void copyLevel() {
 		memcpy(l.walls, s->walls, sizeof(l.walls));
 		l.wallsSerial = s->wallsSerial;
 	}
+	// Les murs dessinés par le moteur (décors et portes compris), une fois par niveau
+	if (s->wallCaptureSerial && s->wallCaptureSerial == s->gfxSerial && l.wallCaptureSerial != s->wallCaptureSerial &&
+	    l.gfxSerial == s->gfxSerial && s->wallPixels && s->wallAlpha && s->wallSlots > 0) {
+		const size_t n = (size_t)s->wallSlots * 128 * 96;
+		l.wallPixels.assign(s->wallPixels, s->wallPixels + n);
+		l.wallAlpha.assign(s->wallAlpha, s->wallAlpha + n);
+		memcpy(l.wallSlot, s->wallSlot, sizeof(l.wallSlot));
+		memcpy(l.screenPalette, s->screenPalette, sizeof(l.screenPalette));
+		l.wallSlots = s->wallSlots;
+		l.wallCaptureSerial = s->wallCaptureSerial;
+	}
 	if (l.gfxSerial != s->gfxSerial && s->vmp && s->vcnBlocks && s->vcnColTable && s->wllVmpMap && s->wllWallFlags &&
 	    s->vmpLen > 0 && s->vcnCount > 0) {
 		l.vmp.assign(s->vmp, s->vmp + s->vmpLen);
@@ -362,6 +379,7 @@ void copyLevel() {
 		memcpy(l.vmpMap, s->wllVmpMap, sizeof(l.vmpMap));
 		memcpy(l.wallFlags, s->wllWallFlags, sizeof(l.wallFlags));
 		l.gfxSerial = s->gfxSerial;
+		l.wallCaptureSerial = 0;
 		// Les murs aussi, au cas où ils n'auraient pas encore changé de numéro
 		memcpy(l.walls, s->walls, sizeof(l.walls));
 		l.wallsSerial = s->wallsSerial;
@@ -576,6 +594,14 @@ bool CoreHost::levelSnapshot(LevelSnapshot &out) const {
 	if (out.wallsSerial != l.wallsSerial || out.gfxSerial != l.gfxSerial) {
 		memcpy(out.walls, l.walls, sizeof(out.walls));
 		out.wallsSerial = l.wallsSerial;
+	}
+	if (out.wallCaptureSerial != l.wallCaptureSerial) {
+		out.wallPixels = l.wallPixels;
+		out.wallAlpha = l.wallAlpha;
+		memcpy(out.wallSlot, l.wallSlot, sizeof(out.wallSlot));
+		memcpy(out.screenPalette, l.screenPalette, sizeof(out.screenPalette));
+		out.wallSlots = l.wallSlots;
+		out.wallCaptureSerial = l.wallCaptureSerial;
 	}
 	if (out.gfxSerial != l.gfxSerial) {
 		out.vmp = l.vmp;

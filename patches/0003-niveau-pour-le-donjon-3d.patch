@@ -1,5 +1,5 @@
 diff --git a/engines/kyra/engine/lol.cpp b/engines/kyra/engine/lol.cpp
-index c4f86a30..0734c863 100644
+index c4f86a30..e46e32eb 100644
 --- a/engines/kyra/engine/lol.cpp
 +++ b/engines/kyra/engine/lol.cpp
 @@ -45,6 +45,11 @@ LolvrGameState g_lolvrState = {1, 0, {0}, 0, 0, 0, 0, 0, 0, 0, {0}, {0}};
@@ -14,10 +14,13 @@ index c4f86a30..0734c863 100644
  }
  
  namespace Kyra {
-@@ -968,6 +973,22 @@ void LoLEngine::runLoop() {
+@@ -968,6 +973,25 @@ void LoLEngine::runLoop() {
  		g_lolvrState.reserved[0]++;
  		g_lolvrState.reserved[1] = _currentControlMode | (_weaponsDisabled ? 0x100 : 0); // 0x100: character sheet
  		g_lolvrState.reserved[3] = countActiveCharacters(); // lol-vr: where the portraits (and their buttons) are
++		// lol-vr-3d: draw every wall type of a newly loaded level, for the 3D dungeon
++		if (g_lolvrLevel.gfxSerial && g_lolvrLevel.wallCaptureSerial != g_lolvrLevel.gfxSerial)
++			lolvrCaptureWalls();
 +		// lol-vr-3d: party position and walls (doors change them)
 +		g_lolvrLevel.level = _currentLevel;
 +		g_lolvrLevel.block = _currentBlock;
@@ -38,10 +41,10 @@ index c4f86a30..0734c863 100644
  		_timer->update();
  
 diff --git a/engines/kyra/engine/lol.h b/engines/kyra/engine/lol.h
-index a9028a26..5d58ca6b 100644
+index a9028a26..55052c96 100644
 --- a/engines/kyra/engine/lol.h
 +++ b/engines/kyra/engine/lol.h
-@@ -50,6 +50,30 @@ struct LolvrGameState {
+@@ -50,6 +50,38 @@ struct LolvrGameState {
  	int32 reserved[4];  // [0] dungeon loop ticks, [1] control mode, [2] bit 0: automap open, bit 1: game menu open
  };
  extern LolvrGameState g_lolvrState;
@@ -67,13 +70,29 @@ index a9028a26..5d58ca6b 100644
 +	int32 vcnCount;
 +	const uint8 *vcnColTable; // 128
 +	uint8 palette[384];     // 128 colours, 6-bit VGA
++	// Each wall type drawn by the engine itself, seen face on one step away (128 x 96 pixels),
++	// with its decorations and doors: palette indices, and 0/255 coverage.
++	uint32 wallCaptureSerial;  // incremented each time the captures below are redone
++	int16 wallSlot[256];       // wall type -> capture slot (-1 = none)
++	int32 wallSlots;
++	const uint8 *wallPixels;   // wallSlots * 128 * 96
++	const uint8 *wallAlpha;    // wallSlots * 128 * 96
++	uint8 screenPalette[768];  // 256 colours, 6-bit VGA, at capture time
 +};
 +extern LolvrLevelData g_lolvrLevel;
  }
  
  namespace Audio {
+@@ -335,6 +367,7 @@ private:
+ 
+ 	// main loop
+ 	void runLoop();
++	void lolvrCaptureWalls(); // lol-vr-3d
+ 	void update() override;
+ 
+ 	// mouse
 diff --git a/engines/kyra/engine/scene_lol.cpp b/engines/kyra/engine/scene_lol.cpp
-index 210b4828..d0fbb26b 100644
+index 210b4828..23072bb8 100644
 --- a/engines/kyra/engine/scene_lol.cpp
 +++ b/engines/kyra/engine/scene_lol.cpp
 @@ -405,6 +405,19 @@ void LoLEngine::loadLevelGraphics(const char *file, int specialColor, int weight
@@ -96,3 +115,114 @@ index 210b4828..d0fbb26b 100644
  	Palette tpal(256);
  	if (_flags.use16ColorMode) {
  		uint8 *dst = tpal.getData();
+@@ -1581,6 +1594,110 @@ void LoLEngine::drawSpecialGuiShape(int pageNum) {
+ 		_screen->drawShape(pageNum, _specialGuiShape, _specialGuiShapeX + _specialGuiShape[3], _specialGuiShapeY, 2, 1);
+ }
+ 
++
++// lol-vr-3d: draws each wall type of the level the way the game shows a wall right in front of
++// the party, one step away, with its decorations and door, into a private buffer. The scene is
++// redrawn afterwards, so nothing of this reaches the screen.
++void LoLEngine::lolvrCaptureWalls() {
++	static const int kW = 128, kH = 96, kMaxSlots = 96;
++	static uint8 pixels[kMaxSlots * kW * kH];
++	static uint8 alpha[kMaxSlots * kW * kH];
++	static uint8 shapeA[kW * kH];
++
++	g_lolvrLevel.wallCaptureSerial = g_lolvrLevel.gfxSerial;
++	for (int i = 0; i < 256; i++)
++		g_lolvrLevel.wallSlot[i] = -1;
++	g_lolvrLevel.wallSlots = 0;
++	g_lolvrLevel.wallPixels = pixels;
++	g_lolvrLevel.wallAlpha = alpha;
++	if (!_vmpPtr || !_vcnBlocks || !_blockDrawingBuffer || !_sceneWindowBuffer)
++		return;
++	memcpy(g_lolvrLevel.screenPalette, _screen->getPalette(0).getData(), 768);
++
++	LevelBlockProperty fake[2];
++	memset(fake, 0, sizeof(fake));
++	LevelBlockProperty *savedVis[18];
++	memcpy(savedVis, _visibleBlocks, sizeof(savedVis));
++	int16 savedVisIdx[18];
++	memcpy(savedVisIdx, _visibleBlockIndex, sizeof(savedVisIdx));
++	uint8 savedProcessFlag = _wllProcessFlag;
++	_wllProcessFlag = 0;
++	_sceneDrawVarDown = _dscBlockMap[_currentDirection];
++	_sceneDrawVarRight = _dscBlockMap[_currentDirection + 4];
++	_sceneDrawVarLeft = _dscBlockMap[_currentDirection + 8];
++
++	const uint8 *page = _screen->getCPagePtr(_sceneDrawPage1);
++	const int x0 = 112 + 24, y0 = 8; // the wall right in front, in the 176 x 120 view at x = 112
++
++	for (int t = 1; t < 256 && g_lolvrLevel.wallSlots < kMaxSlots; t++) {
++		if (!_wllVmpMap[t] && _wllShapeMap[t] <= 0 && !(_wllWallFlags[t] & 8))
++			continue;
++		int slot = g_lolvrLevel.wallSlots++;
++		g_lolvrLevel.wallSlot[t] = slot;
++		uint8 *px = pixels + slot * kW * kH;
++		uint8 *al = alpha + slot * kW * kH;
++		memset(px, 0, kW * kH);
++		memset(al, 0, kW * kH);
++
++		for (int i = 0; i < 18; i++) {
++			_visibleBlocks[i] = &fake[0];
++			_visibleBlockIndex[i] = _currentBlock;
++			_lvlShapeLeftRight[i] = _lvlShapeLeftRight[18 + i] = -1;
++		}
++		for (int k = 0; k < 4; k++)
++			fake[1].walls[k] = t;
++		_visibleBlocks[13] = &fake[1];
++
++		// 1. The wall itself, from the VMP/VCN blocks
++		if (_wllVmpMap[t]) {
++			memset(_blockDrawingBuffer, 0, 660 * sizeof(uint16));
++			generateVmpTileData(3, 1, t, _vmpVisOffs[7], 16, 12);
++			drawVcnBlocks();
++			const uint16 *vmp = &_vmpPtr[(_wllVmpMap[t] - 1) * 431 + _vmpVisOffs[7] + 330];
++			for (int y = 0; y < kH; y++)
++				for (int x = 0; x < kW; x++) {
++					uint16 v = vmp[(y >> 3) * 16 + (x >> 3)];
++					bool covered = v != 0;
++					if (v & 0x8000) {
++						// wall block over the background: its colour 0 is see-through
++						uint16 e = v & 0x3FFF;
++						int bx = (v & 0x4000) ? 7 - (x & 7) : (x & 7);
++						uint8 b = _vcnBlocks[e * 32 + (y & 7) * 4 + (bx >> 1)];
++						covered = ((bx & 1) ? (b & 15) : (b >> 4)) != 0;
++					}
++					if (covered) {
++						px[y * kW + x] = page[(y0 + y) * 320 + x0 + x];
++						al[y * kW + x] = 255;
++					}
++				}
++		}
++
++		// 2. Decorations and door, drawn twice over two plain fills: a pixel the shapes cover
++		// keeps the same colour in both.
++		for (int pass = 0; pass < 2; pass++) {
++			uint8 fill = pass ? 0xFE : 0x01;
++			_screen->fillRect(112, 0, 112 + 175, 119, fill, _sceneDrawPage1);
++			drawSceneShapes();
++			for (int y = 0; y < kH; y++)
++				for (int x = 0; x < kW; x++) {
++					uint8 c = page[(y0 + y) * 320 + x0 + x];
++					if (!pass)
++						shapeA[y * kW + x] = c;
++					else if (c == shapeA[y * kW + x] && c != fill) {
++						px[y * kW + x] = c;
++						al[y * kW + x] = 255;
++					}
++				}
++		}
++	}
++
++	memcpy(_visibleBlocks, savedVis, sizeof(savedVis));
++	memcpy(_visibleBlockIndex, savedVisIdx, sizeof(savedVisIdx));
++	_wllProcessFlag = savedProcessFlag;
++	assignVisibleBlocks(_currentBlock, _currentDirection);
++	_sceneUpdateRequired = true;
++}
++
+ } // End of namespace Kyra
+ 
+ #endif // ENABLE_LOL
