@@ -93,4 +93,8 @@ inline void blockCenter(int block, float &x, float &z) {
 // Un bloc dans lequel on ne peut pas entrer (des murs pleins des quatre côtés).
 bool isSolidBlock(const uint8_t *walls, int block, const DungeonGfx &gfx);
 
+// Une case où le groupe est entré en franchissant un mur dessiné : porte d'une boutique, entrée
+// d'une autre région. La vue 3D reste devant (le jeu montre alors la scène, ou change de région).
+bool isHoldBlock(const uint8_t *walls, int block, const DungeonGfx &gfx);
+
 } // namespace lolvr

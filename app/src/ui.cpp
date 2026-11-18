@@ -38,13 +38,19 @@ const int kInfoH = 44; // deux lignes d'information sous les touches
 const int kKbW = kCellW * kCols, kKbH = kCellH * kRows + kInfoH;
 
 const Source kSources[kUiPanelCount] = {
-	{83, 121, 237, 58},  // groupe : ligne de messages + portraits
+	{0, 0, 100, 122},    // colonne du groupe : recomposée (voir composeParty), taille variable
 	{83, 178, 237, 22},  // inventaire
-	{0, 0, 112, 128},    // colonne de gauche (parchemin des sorts)
-	{0, 128, 84, 72},    // flèches, options, repos
-	{288, 0, 32, 122},   // colonne de droite (boussole, atlas, lampe, bourse)
+	{0, 0, 112, 121},    // colonne de gauche (parchemin des sorts), sans la ligne de messages
+	{82, 121, 236, 22},  // lignes de messages
 	{0, 0, (float)kKbW, (float)kKbH},
 	{0, 0, (float)kHelpW, (float)kHelpH},
+};
+
+// Colonne du groupe : morceaux de l'image du jeu recopiés dans une petite image.
+const int kPartyTexW = 104, kPartyTexH = 176;
+const int kPartyGap = 34; // les portraits, à droite de la colonne de la boussole
+struct Piece {
+	int dx, dy, sx, sy, w, h;
 };
 
 // Les pixels du jeu sont 1,2 fois plus hauts que larges ; ceux du clavier sont carrés.
@@ -151,6 +157,15 @@ struct Ui::Impl {
 	bool menuOpen = false;
 	Vec3 menuPos = {0, 0, 0}, menuRight = {1, 0, 0}, menuUp = {0, 1, 0};
 	int menuHot = -1;
+	// Colonne du groupe recomposée
+	GLuint partyTex = 0;
+	std::vector<uint8_t> partyPx;
+	std::vector<Piece> pieces;
+	int partyW = 100, partyH = 122;
+	uint32_t partySerial = 0;
+	int partyChars = -1, partyCompass = -1;
+	bool partyBlank = false;
+	void composeParty(const UiFrameInput &in);
 	int drag = -1;
 	float grabDist = 1.0f;
 	Vec3 grabOffset = {0, 0, 0};
@@ -281,6 +296,51 @@ void Ui::Impl::upload(GLuint &tex, const std::vector<uint8_t> &px, int w, int h)
 	glBindTexture(GL_TEXTURE_2D, 0);
 }
 
+// La colonne du groupe : la colonne de la boussole (atlas, lampe, bourse) à gauche ; à sa droite,
+// les personnages l'un sous l'autre, puis les boutons des options et du repos.
+void Ui::Impl::composeParty(const UiFrameInput &in) {
+	const int n = in.characters < 0 ? 0 : in.characters > 4 ? 4 : in.characters;
+	const bool blank = in.compassBlank;
+	if (partyTex && in.gameSerial == partySerial && n == partyChars && blank == partyBlank)
+		return;
+	partySerial = in.gameSerial;
+	partyChars = n;
+	partyBlank = blank;
+	pieces.clear();
+	pieces.push_back({0, 0, 288, 0, 32, 122});
+	for (int i = 0; i < n; i++)
+		pieces.push_back({kPartyGap, i * 36, in.portraitX[i], 143, 66, 34});
+	const int sysY = n * 36 + (n ? 2 : 0);
+	pieces.push_back({kPartyGap + 10, sysY, 10, 178, 45, 22});
+	partyW = kPartyGap + 66;
+	partyH = sysY + 22 > 122 ? sysY + 22 : 122;
+	partyPx.assign((size_t)kPartyTexW * kPartyTexH * 4, 0);
+	for (int i = 0; i < kPartyTexW * kPartyTexH; i++) {
+		uint8_t *p = &partyPx[(size_t)i * 4];
+		p[0] = 42; p[1] = 28; p[2] = 20; p[3] = 255; // bois sombre entre les morceaux
+	}
+	if (in.gameRgba && in.gameW >= 320 && in.gameH >= 200) {
+		for (size_t k = 0; k < pieces.size(); k++) {
+			const Piece &pc = pieces[k];
+			for (int y = 0; y < pc.h; y++)
+				for (int x = 0; x < pc.w; x++) {
+					int dx = pc.dx + x, dy = pc.dy + y;
+					if (dx >= kPartyTexW || dy >= kPartyTexH)
+						continue;
+					uint8_t *p = &partyPx[((size_t)dy * kPartyTexW + dx) * 4];
+					if (k == 0 && blank) {
+						p[0] = p[1] = p[2] = 0;
+						continue;
+					}
+					int sx = (pc.sx + x) * in.gameW / 320, sy = (pc.sy + y) * in.gameH / 200;
+					const uint8_t *s = in.gameRgba + ((size_t)sy * in.gameW + sx) * 4;
+					p[0] = s[0]; p[1] = s[1]; p[2] = s[2];
+				}
+		}
+	}
+	upload(partyTex, partyPx, kPartyTexW, kPartyTexH);
+}
+
 void Ui::Impl::renderHelp() {
 	static const char *const english[] = {
 		"#CONTROLLER MAPPING",
@@ -288,7 +348,7 @@ void Ui::Impl::renderHelp() {
 		"#Everywhere",
 		"Aim + trigger ............ left click",
 		"Aim + grip, or X ......... right click (drink, use)",
-		"Left stick ............... walk forward, back, strafe",
+		"Left stick ............... walk where you look",
 		"Right stick (sideways) ... turn",
 		"Y ........................ map",
 		"Menu button (left) ....... save, load, quit",
@@ -318,7 +378,7 @@ void Ui::Impl::renderHelp() {
 		"#Partout",
 		"Viser + gâchette ......... clic gauche",
 		"Viser + poignée, ou X .... clic droit (boire, utiliser)",
-		"Joystick gauche .......... avancer, reculer, pas de côté",
+		"Joystick gauche .......... marcher là où l'on regarde",
 		"Joystick droit (côtés) ... tourner",
 		"Y ........................ carte",
 		"Bouton menu (gauche) ..... sauvegarder, charger, quitter",
@@ -448,7 +508,7 @@ Ui::~Ui() {
 }
 
 const char *Ui::panelKey(int id) {
-	static const char *names[kUiPanelCount] = {"groupe", "inventaire", "sorts", "commandes", "boussole", "clavier", "aide"};
+	static const char *names[kUiPanelCount] = {"groupe2", "inventaire", "sorts", "messages", "clavier", "aide"};
 	return id >= 0 && id < kUiPanelCount ? names[id] : "";
 }
 
@@ -512,22 +572,22 @@ void Ui::resetLayout(const UiFrameInput &in) {
 		pl.a = wrapAngle(atan2f(-v.x, -v.z) - in.anchorYaw);
 		pl.scale = clampf(scale * fullW, 0.0004f, 0.02f);
 	};
-	auto halfW = [](int id, float scale) { return kSources[id].w * scale * 0.5f; };
-	auto halfH = [](int id, float scale) { return kSources[id].h * 1.2f * scale * 0.5f; };
+	auto srcW = [&](int id) { return id == kPanelParty ? (float)d->partyW : kSources[id].w; };
+	auto srcH = [&](int id) { return id == kPanelParty ? (float)d->partyH : kSources[id].h; };
+	auto halfW = [&](int id, float scale) { return srcW(id) * scale * 0.5f; };
+	auto halfH = [&](int id, float scale) { return srcH(id) * 1.2f * scale * 0.5f; };
 
-	// À gauche : le parchemin des sorts, et dessous les commandes.
-	const float sSpells = 0.0036f, sCtl = 0.0028f;
+	// À gauche : le parchemin des sorts, et dessous les messages, à la même largeur.
+	const float sSpells = 0.0036f, sText = sSpells * kSources[kPanelSpells].w / kSources[kPanelText].w;
 	float xl = -(viewW * 0.5f + frame + 0.035f + halfW(kPanelSpells, sSpells));
 	set(kPanelSpells, xl, top - halfH(kPanelSpells, sSpells), sSpells);
-	set(kPanelControls, xl, top - 2.0f * halfH(kPanelSpells, sSpells) - 0.05f - halfH(kPanelControls, sCtl), sCtl);
-	// À droite : la colonne de la boussole.
-	const float sCompass = 0.0038f;
-	set(kPanelCompass, viewW * 0.5f + frame + 0.035f + halfW(kPanelCompass, sCompass), top - halfH(kPanelCompass, sCompass), sCompass);
-	// Dessous : le groupe, puis l'inventaire.
+	set(kPanelText, xl, top - 2.0f * halfH(kPanelSpells, sSpells) - 0.03f - halfH(kPanelText, sText), sText);
+	// À droite : la colonne de la boussole et du groupe.
+	const float sParty = 0.0034f;
+	set(kPanelParty, viewW * 0.5f + frame + 0.035f + halfW(kPanelParty, sParty), top - halfH(kPanelParty, sParty), sParty);
+	// Dessous : l'inventaire.
 	const float sRow = 0.0026f;
-	float yParty = bottom - frame - 0.045f - halfH(kPanelParty, sRow);
-	set(kPanelParty, 0.0f, yParty, sRow);
-	set(kPanelInventory, 0.0f, yParty - halfH(kPanelParty, sRow) - 0.040f - halfH(kPanelInventory, sRow), sRow);
+	set(kPanelInventory, 0.0f, bottom - frame - 0.045f - halfH(kPanelInventory, sRow), sRow);
 
 	// Le clavier vient se poser devant soi, par-dessus le reste.
 	Vec3 v = in.basePos - in.anchorPos;
@@ -579,8 +639,10 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 
 	// Tant que la disposition n'est pas établie (écran pas encore placé), aucun panneau.
 	bool visible[kUiPanelCount];
-	for (int i = 0; i <= kPanelCompass; i++)
+	for (int i = 0; i <= kPanelText; i++)
 		visible[i] = placed && in.split;
+	if (visible[kPanelParty])
+		d->composeParty(in);
 	visible[kPanelKeyboard] = placed && in.keyboardOpen;
 	visible[kPanelHelp] = placed && in.helpOpen;
 	auto isPanel = [](int target) { return target >= 0 && target < kUiPanelCount; };
@@ -635,8 +697,9 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 		Quad &q = content[i];
 		q.c = in.anchorPos + directionFor(in.anchorYaw + pl.a, pl.b) * pl.c;
 		float scale = pl.scale;
-		q.hw = kSources[i].w * scale * 0.5f;
-		q.hh = kSources[i].h * pixelAspect(i) * scale * 0.5f;
+		float sw = i == kPanelParty ? (float)d->partyW : kSources[i].w, sh = i == kPanelParty ? (float)d->partyH : kSources[i].h;
+		q.hw = sw * scale * 0.5f;
+		q.hh = sh * pixelAspect(i) * scale * 0.5f;
 		if (in.roomClamp)
 			q.c = clampToRoom(in, q.c, q.hw, q.hh);
 		// Chaque panneau est tourné vers le joueur.
@@ -667,7 +730,7 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 			// Fenêtres du jeu : barrette sur le côté, pour ne jamais se trouver sur le chemin du
 			// pointeur entre l'écran et une fenêtre placée dessous. À droite pour la boussole, à gauche
 			// pour les autres.
-			float side = i == kPanelCompass ? 1.0f : -1.0f;
+			float side = i == kPanelParty ? 1.0f : -1.0f;
 			hq.hw = thick;
 			hq.hh = fminf(q.hh, longSide);
 			hq.c = q.c + q.r * (side * (q.hw + border + hq.hw + 0.002f));
@@ -1004,12 +1067,28 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 				}
 			}
 		} else {
-			const Source &src = kSources[hitIndex];
-			bool off = hitIndex == kPanelCompass && in.compassBlank; // fenêtre éteinte : aucun clic
-			out.pointerValid = !off;
-			out.buttonsToGame = !off;
-			out.gu = (src.x + u * src.w) / 320.0f;
-			out.gv = (src.y + v * src.h) / 200.0f;
+			if (hitIndex == kPanelParty) {
+				// Colonne recomposée : retrouver le morceau visé, et l'endroit du jeu qu'il montre.
+				float cx = u * (float)d->partyW, cy = v * (float)d->partyH;
+				for (size_t k = 0; k < d->pieces.size(); k++) {
+					const Piece &pc = d->pieces[k];
+					if (cx < pc.dx || cy < pc.dy || cx >= pc.dx + pc.w || cy >= pc.dy + pc.h)
+						continue;
+					if (k == 0 && in.compassBlank) // fenêtre éteinte : aucun clic
+						break;
+					out.pointerValid = true;
+					out.buttonsToGame = true;
+					out.gu = ((float)pc.sx + cx - (float)pc.dx) / 320.0f;
+					out.gv = ((float)pc.sy + cy - (float)pc.dy) / 200.0f;
+					break;
+				}
+			} else {
+				const Source &src = kSources[hitIndex];
+				out.pointerValid = true;
+				out.buttonsToGame = true;
+				out.gu = (src.x + u * src.w) / 320.0f;
+				out.gv = (src.y + v * src.h) / 200.0f;
+			}
 		}
 	}
 
@@ -1046,19 +1125,32 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 					p.hot[2] = (float)((key.col + key.span) * kCellW) / (float)kKbW;
 					p.hot[3] = (float)((key.row + 1) * kCellH) / (float)kKbH;
 				}
+			} else if (i == kPanelParty) {
+				p.texture = d->partyTex;
+				p.texW = kPartyTexW;
+				p.texH = kPartyTexH;
+				p.u0 = 0.0f;
+				p.v0 = 0.0f;
+				p.u1 = (float)d->partyW / (float)kPartyTexW;
+				p.v1 = (float)d->partyH / (float)kPartyTexH;
+				// Le personnage choisi pour les boutons d'attaque et de magie : son portrait encadré.
+				if (in.partyMark[2] > 0.0f) {
+					for (size_t k = 1; k < d->pieces.size(); k++) {
+						const Piece &pc = d->pieces[k];
+						if (pc.sy != 143 || pc.sx != (int)in.partyMark[0])
+							continue;
+						p.hotOutline = true;
+						p.hot[0] = (float)pc.dx / (float)kPartyTexW;
+						p.hot[1] = (float)pc.dy / (float)kPartyTexH;
+						p.hot[2] = (float)(pc.dx + pc.w) / (float)kPartyTexW;
+						p.hot[3] = (float)(pc.dy + pc.h) / (float)kPartyTexH;
+					}
+				}
 			} else {
 				p.u0 = src.x / 320.0f;
 				p.u1 = (src.x + src.w) / 320.0f;
 				p.v0 = src.y / 200.0f;
 				p.v1 = (src.y + src.h) / 200.0f;
-				p.blank = i == kPanelCompass && in.compassBlank;
-				if (i == kPanelParty && in.partyMark[2] > 0.0f) {
-					p.hotOutline = true;
-					p.hot[0] = in.partyMark[0] / 320.0f;
-					p.hot[1] = in.partyMark[1] / 200.0f;
-					p.hot[2] = (in.partyMark[0] + in.partyMark[2]) / 320.0f;
-					p.hot[3] = (in.partyMark[1] + in.partyMark[3]) / 200.0f;
-				}
 			}
 		}
 	}

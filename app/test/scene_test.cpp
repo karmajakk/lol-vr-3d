@@ -275,6 +275,9 @@ int main(int argc, char **argv) {
 		in.dispW = in.dispH * 176.0f / 144.0f;
 		in.cropX = 112; in.cropY = 0; in.cropW = 176; in.cropH = 120;
 		in.split = true;
+		in.characters = 2;
+		in.portraitX[0] = 117;
+		in.portraitX[1] = 217;
 		in.roomClamp = true;
 		in.aimValid = true;
 		in.tip = {0.2f, 0.95f, -0.3f};
@@ -289,26 +292,35 @@ int main(int argc, char **argv) {
 		ui.update(in, o, tmp);
 		check(o.pointerValid && fabsf(o.gu * 320 - 200) < 1.5f && fabsf(o.gv * 200 - 60) < 1.5f && o.buttonsToGame && !o.pointerLong, "écran : centre de la vue du donjon (200, 60)");
 		// 2. Le centre de chaque panneau donne le centre de sa zone de l'image
-		const float want[5][2] = {{201.5f, 150}, {201.5f, 189}, {56, 64}, {42, 164}, {304, 61}};
-		const char *names[5] = {"fenêtre du groupe", "fenêtre de l'inventaire", "fenêtre des sorts", "fenêtre des commandes", "fenêtre de la boussole"};
-		for (int i = 0; i < 5; i++) {
+		// (colonne du groupe : au centre, le second personnage, 16 pixels après le bord de son cadre)
+		const float want[4][2] = {{233, 168}, {201.5f, 189}, {56, 60.5f}, {200, 132}};
+		const char *names[4] = {"colonne du groupe : second personnage", "fenêtre de l'inventaire", "fenêtre des sorts", "fenêtre des messages"};
+		for (int i = 0; i < 4; i++) {
 			aimAt(panel(i).center);
 			ui.update(in, o, tmp);
 			check(o.pointerValid && fabsf(o.gu * 320 - want[i][0]) < 1.5f && fabsf(o.gv * 200 - want[i][1]) < 1.5f && o.buttonsToGame, names[i]);
 		}
-		// 3. Tout est dans le plan de l'écran, au-dessus du plancher, sans chevauchement vertical
+		{
+			// Haut de la colonne du groupe : la colonne de la boussole (bourse, lampe...).
+			SceneState::Panel p = panel(0);
+			aimAt(p.center + p.right * (-p.halfW * 0.7f) + p.up * (p.halfH * 0.5f));
+			ui.update(in, o, tmp);
+			check(o.pointerValid && o.gu * 320 > 288 && o.gv * 200 < 122, "colonne du groupe : à gauche, la colonne de la boussole");
+		}
+		// 3. Tout est dans le plan de l'écran, au-dessus du plancher, sans chevauchement
 		{
 			bool planar = true, above = true;
-			for (int i = 0; i < 5; i++) {
+			for (int i = 0; i < 4; i++) {
 				SceneState::Panel p = panel(i);
 				planar = planar && fabsf(p.center.z - in.basePos.z) < 0.02f;
 				above = above && p.center.y - p.halfH > 0.02f;
 			}
-			SceneState::Panel party = panel(0), inv = panel(1);
-			check(planar, "les cinq fenêtres sont dans le plan de l'écran");
+			SceneState::Panel spells = panel(2), text = panel(3), inv = panel(1);
+			check(planar, "les fenêtres sont dans le plan de l'écran");
 			check(above, "aucune fenêtre ne descend sous le plancher");
-			check(party.center.y - party.halfH > inv.center.y + inv.halfH + 0.05f, "le groupe et l'inventaire ne se chevauchent pas");
-			check(party.center.y + party.halfH < in.screenPos.y - in.dispH * 0.5f - 0.10f, "le groupe est sous le cadre de l'écran");
+			check(spells.center.y - spells.halfH > text.center.y + text.halfH + 0.01f, "les messages sous les sorts, sans chevauchement");
+			check(fabsf(spells.halfW - text.halfW) < 0.01f, "les messages ont la largeur des sorts");
+			check(inv.center.y + inv.halfH < in.screenPos.y - in.dispH * 0.5f - 0.10f, "l'inventaire est sous le cadre de l'écran");
 		}
 		// 4. Bas de l'écran : le rayon de la main arrive bien sur l'écran (rien devant), puis glisse
 		//    vers le groupe et l'inventaire sans trou
@@ -316,7 +328,7 @@ int main(int argc, char **argv) {
 			aimAt(in.screenPos + Vec3{0.3f, -in.dispH * 0.5f + 0.03f, 0});
 			ui.update(in, o, tmp);
 			check(o.pointerValid && o.gv * 200 > 110 && o.gv * 200 < 120 && o.gu * 320 > 112 && o.gu * 320 < 288, "bas de l'écran : on vise bien le sol de la vue du donjon");
-			SceneState::Panel party = panel(0);
+			SceneState::Panel party = panel(1);
 			int valid = 0, total = 0;
 			float y0 = in.screenPos.y - in.dispH * 0.5f, y1 = party.center.y + party.halfH;
 			for (float y = y0; y >= y1; y -= 0.01f, total++) {
@@ -326,7 +338,7 @@ int main(int argc, char **argv) {
 			}
 			aimAt({0.3f, y1 + 0.02f, in.basePos.z});
 			ui.update(in, o, tmp);
-			check(valid == total, "entre l'écran et le groupe : toujours un retour visuel");
+			check(valid == total, "entre l'écran et l'inventaire : toujours un retour visuel");
 			// Aucune barrette sur le chemin : de l'écran à l'inventaire, à la verticale, on ne survole
 			// que l'écran, son cadre et les fenêtres.
 			SceneState::Panel inv = panel(1);
@@ -450,7 +462,7 @@ int main(int argc, char **argv) {
 		// 8. Poignée de l'écran
 		{
 			ui.update(in, o, tmp);
-			Vec3 handle = tmp.handles[5].center;
+			Vec3 handle = tmp.handles[4].center;
 			aimAt(handle);
 			in.triggerDown = in.triggerPressed = true;
 			ui.update(in, o, tmp);
@@ -466,7 +478,7 @@ int main(int argc, char **argv) {
 		{
 			in.keyboardOpen = true;
 			ui.update(in, o, tmp);
-			SceneState::Panel kb = tmp.panels[5];
+			SceneState::Panel kb = tmp.panels[4];
 			auto keyPos = [&](float col, float row) {
 				return kb.center + kb.right * ((col - 5.5f) / 5.5f * kb.halfW) + kb.up * ((1.0f - 2.0f * row * 40.0f / 284.0f) * kb.halfH);
 			};
@@ -492,7 +504,7 @@ int main(int argc, char **argv) {
 			// Panneau d'aide : visible, et un clic dessus le ferme
 			in.helpOpen = true;
 			ui.update(in, o, tmp);
-			SceneState::Panel help = tmp.panels[5];
+			SceneState::Panel help = tmp.panels[4];
 			check(help.visible && help.texture != 0, "aide : le panneau est affiché");
 			aimAt(help.center);
 			in.triggerDown = in.triggerPressed = true;

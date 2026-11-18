@@ -3,6 +3,26 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.4.0] — Walking, shop doors, windows, light
+
+- Walking follows your gaze: the left stick points relative to where you look (forward, back,
+  side steps), whatever the party's direction. No more side step when you meant to go forward.
+  When you stand still, the party quietly turns to face where you look (not while you aim at a
+  window).
+- Shop doors and passages to other regions (the pictures at the end of forest paths) are walls
+  with their picture: the view stays in front of them when the game takes the party through. No
+  more fake room behind a shop door, no more being inside a block of big pixels.
+- The game screen hides again as soon as a shop, conversation or encounter is over.
+- New window layout: the messages sit under the spell scroll, as wide as it, without overlapping
+  it; the characters stand one under the other in a column with the atlas, lamp and purse, with
+  the options and rest buttons under them; the movement arrows are gone (the sticks do that). The
+  windows go back to this layout once.
+- Forest ceiling: back to the picture of the treetops from the game, like in the first version
+  (the sky did not work).
+- Items hidden in a wall (a key in a trapdoor) no longer stick out of the wall; once the hiding
+  place is open, they show in it, where the game shows them.
+- Dark places are dark in 3D too, and the lamp lights them, following the game's own brightness.
+
 ## [0.3.1] — Shops and dialogues
 
 - The game screen now appears in front of you when the game shows something else than the

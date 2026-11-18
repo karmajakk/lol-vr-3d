@@ -3,6 +3,8 @@
 // Indépendant de la plateforme (OpenGL ES 3 pour la texture du clavier seulement).
 #pragma once
 
+#include <stdint.h>
+
 #include <string>
 
 #include "scene.h"
@@ -10,11 +12,10 @@
 namespace lolvr {
 
 enum UiPanelId {
-	kPanelParty = 0, // messages + portraits des personnages
+	kPanelParty = 0, // colonne de droite : atlas, lampe, bourse, puis les personnages, options et repos
 	kPanelInventory, // rangée d'objets
 	kPanelSpells,    // colonne de gauche : parchemin des sorts
-	kPanelControls,  // flèches de déplacement, options, repos
-	kPanelCompass,   // colonne de droite : boussole, atlas, lampe, bourse
+	kPanelText,      // lignes de messages
 	kPanelKeyboard,  // clavier et options
 	kPanelHelp,      // aide : les manettes et les boutons
 	kUiPanelCount
@@ -71,8 +72,15 @@ struct UiFrameInput {
 	// Zone à mettre en valeur dans la fenêtre du groupe (pixels de l'image du jeu ; largeur 0 = aucune) :
 	// le personnage choisi pour les boutons d'attaque et de magie.
 	float partyMark[4] = {0, 0, 0, 0};
-	// La fiche d'un personnage occupe l'écran : la fenêtre de la boussole est éteinte.
+	// La fiche d'un personnage occupe l'écran : la colonne de la boussole est éteinte.
 	bool compassBlank = false;
+	// L'image du jeu (RGBA, première ligne en haut) et son numéro : la colonne du groupe en est
+	// recomposée (portraits empilés sous la colonne de la boussole).
+	const uint8_t *gameRgba = nullptr;
+	int gameW = 0, gameH = 0;
+	uint32_t gameSerial = 0;
+	int characters = 0;
+	int portraitX[4] = {0, 0, 0, 0};
 	// Premier lancement : un petit mot invite à regarder l'engrenage du poignet, qui bat doucement,
 	// tant que le menu n'a jamais été ouvert.
 	bool gearHint = false;

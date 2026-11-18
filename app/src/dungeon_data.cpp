@@ -88,11 +88,19 @@ float clampDepth(float r) {
 	return r < 1.0f ? 1.0f : r > 3.0f ? 3.0f : r;
 }
 
+// Un type fait d'un seul dessin, sans mur : un objet au milieu de la case (fontaine, statue,
+// buisson...), qu'on contourne ou qu'on voit à travers, ou une image qui couvre tout le côté
+// (l'entrée d'une autre région, une maison au bout du chemin) et ferme la case.
+bool isPictureType(const DungeonGfx &g, uint8_t t) {
+	return !(g.wallFlags[t] & 0x89);
+}
+
 bool hasSolidWall(const DungeonGfx &g, uint8_t t) {
-	// Un type fait d'un seul dessin, sans mur (fontaine, statue...), ne ferme pas la case.
-	if (g.wallSlot && g.wallSlot[t] >= 0 && !g.vmpMap[t])
+	if (t == 0 || (g.wallFlags[t] & 8))
 		return false;
-	return t != 0 && !(g.wallFlags[t] & 8);
+	if (g.wallSlot && g.wallSlot[t] >= 0 && !g.vmpMap[t])
+		return isPictureType(g, t);
+	return true;
 }
 
 } // namespace
@@ -120,6 +128,18 @@ bool isSolidBlock(const uint8_t *walls, int block, const DungeonGfx &gfx) {
 		if (!hasSolidWall(gfx, w[k]))
 			return false;
 	return true;
+}
+
+bool isHoldBlock(const uint8_t *walls, int block, const DungeonGfx &gfx) {
+	// Une case où l'on peut se tenir n'a pas de mur à elle (les murs qui la bordent appartiennent aux
+	// cases voisines). Si l'un de ses côtés porte un mur dessiné, c'est que le groupe vient de le
+	// franchir : porte d'une boutique, image d'une autre région. Un faux mur qu'on traverse (le jeu y
+	// montre les objets : drapeau 0x80) reste un passage.
+	const uint8_t *w = walls + (block & 1023) * 4;
+	for (int k = 0; k < 4; k++)
+		if (hasSolidWall(gfx, w[k]) && !(gfx.wallFlags[w[k]] & 0x80))
+			return true;
+	return false;
 }
 
 void decodeDungeonTextures(const DungeonGfx &g, DungeonTextures &out) {
@@ -217,7 +237,8 @@ void decodeDungeonTextures(const DungeonGfx &g, DungeonTextures &out) {
 					}
 					continue;
 				}
-				out.kind[t] = kWallObject;
+				if (!isPictureType(g, t))
+					out.kind[t] = kWallObject;
 			}
 			out.typeLayer[t] = out.layers;
 			// Un cadre de porte (mur ajouré) est dessiné par le jeu à la profondeur de sa porte : son
@@ -357,7 +378,9 @@ void buildDungeonMesh(const uint8_t *walls, const DungeonGfx &g, const DungeonTe
 	static const int dx[4] = {0, 1, 0, -1}, dz[4] = {-1, 0, 1, 0};
 	// Comme dans les jeux de l'époque, les murs est-ouest sont un peu plus sombres.
 	static const float faceShade[4] = {1.0f, 0.82f, 1.0f, 0.82f};
-	const bool sky = g.outdoor && tex.skyLayer >= 0;
+	// Dehors aussi, un plafond tiré de l'image de fond du jeu (les cimes des arbres) : le ciel d'une
+	// grande boîte autour du niveau ne rendait pas bien.
+	const bool sky = false;
 
 	for (int b = 0; b < 1024; b++) {
 		float cx, cz;

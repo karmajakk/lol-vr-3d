@@ -62,6 +62,8 @@ static unsigned keyCode(const std::string &k) {
 	if (k == "left") return RETROK_LEFT;
 	if (k == "right") return RETROK_RIGHT;
 	if (k == "space") return RETROK_SPACE;
+	if (k == "turnl") return RETROK_HOME;
+	if (k == "turnr") return RETROK_PAGEUP;
 	if (k.size() == 1) return (unsigned)k[0];
 	return 0;
 }
@@ -157,7 +159,7 @@ int main(int argc, char **argv) {
 			LevelSnapshot ls;
 			bool hasL = host.levelSnapshot(ls);
 			if (host.gameState(gs))
-				printf("  état : niveau=%d boucle=%u mode=%d menu=%d scène=%d\n", gs.level, gs.loopSerial, gs.controlMode, (int)gs.menuOpen, hasL ? (int)ls.sceneBusy : -1);
+				printf("  état : niveau=%d boucle=%u mode=%d menu=%d scène=%d lumière=%d case=%d dir=%d\n", gs.level, gs.loopSerial, gs.controlMode, (int)gs.menuOpen, hasL ? (int)ls.sceneBusy : -1, hasL ? ls.light : -1, hasL ? ls.block : -1, hasL ? ls.direction : -1);
 		} else if (op == "dungeon" || op == "dungeonat") {
 			std::string name;
 			cs >> name;
@@ -257,12 +259,17 @@ int main(int argc, char **argv) {
 					fclose(fp);
 				}
 			}
-			if (atBlock < 0 && isSolidBlock(lvl.walls, lvl.block, g)) {
+			if (atBlock < 0 && isHoldBlock(lvl.walls, lvl.block, g)) {
+				printf("  le groupe est dans une porte ou une entrée : la vue reste devant\n");
+				atBlock = -2;
+			}
+			if (atBlock == -1 && isSolidBlock(lvl.walls, lvl.block, g)) {
 				printf("ÉCHEC le groupe est dans un bloc plein\n");
 				failures++;
 			}
 			float px, pz;
-			int vb = atBlock >= 0 ? atBlock : lvl.block, vd = atBlock >= 0 ? atDir : lvl.direction;
+			static const int bdx[4] = {0, 1, 0, -1}, bdz[4] = {-32, 0, 32, 0};
+			int vb = atBlock >= 0 ? atBlock : atBlock == -2 ? lvl.block - bdx[lvl.direction & 3] - bdz[lvl.direction & 3] : lvl.block, vd = atBlock >= 0 ? atDir : lvl.direction;
 			blockCenter(vb, px, pz);
 			Mat4 model = dungeonModel({0, 0, 0}, 0.0f, px, pz, (float)vd * 1.5707963f);
 			Vec3 eye{0, 1.35f, 0};

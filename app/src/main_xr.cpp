@@ -451,6 +451,8 @@ struct App {
 	float turnFade = 0, turnTarget = 0; // virage : bref fondu au noir, la pièce pivote au plus sombre
 	int alignTurn = 0, alignExpect = -1; // le groupe se tourne vers le regard du joueur
 	double alignUntil = 0, moveBlockUntil = 0;
+	int moveAbs = -1;        // direction du donjon (0 nord .. 3 ouest) où le joueur marche
+	double gazeOffSince = 0; // depuis quand le regard s'écarte de la direction du groupe
 	float wallDim = 0;              // la tête du joueur entre dans un mur : on assombrit
 	float dungeonLight = 1.0f;
 	bool dungeonVisible = false;
@@ -507,6 +509,11 @@ struct App {
 	bool helpOpen = false;  // panneau d'aide (ouvert depuis le menu du poignet)
 	int language = lolvr::kLangEnglish; // langue des textes de l'application
 	int moveDir = 0;       // direction tenue au joystick gauche
+	uint32_t frameSerial = 0; // numéro de la dernière image du jeu reçue
+	uint32_t spriteWalls = 0; // murs pour lesquels les objets ont été placés
+	bool aimOnUi = false;     // le doigt vise une fenêtre ou l'écran
+	int visBlock = -1;        // case où se tient la vue 3D (elle ne suit pas le groupe dans une porte de boutique)
+	float lightLevel = 1.0f;  // clarté du jeu (pénombre, lampe), adoucie
 	double imagesCheckedAt = -100.0;
 	bool imageLoaded[kImageSlots] = {false, false, false, false, false, false};
 	std::string imageFile[kImageSlots];                    // fichier affiché dans chaque emplacement
@@ -996,8 +1003,10 @@ void updateGame(App &app) {
 		}
 		return;
 	}
-	if (host.fetchFrame(app.frame))
+	if (host.fetchFrame(app.frame)) {
 		app.frameDirty = true;
+		app.frameSerial++;
+	}
 	// Le son est ouvert dès le lancement (ambiance) ; on le rouvre si le jeu utilise une autre fréquence.
 	if (host.sampleRate() != app.audioRate) {
 		stopAudio(app.audio);
@@ -1677,6 +1686,15 @@ void releaseTypedKeys(App &app, double now, bool all) {
 }
 
 // Interface : pointeur, panneaux, poignées, clavier. pointer = faux quand l'application n'a pas la main.
+// Angle ramené entre -pi et pi.
+float wrapAngle(float a) {
+	while (a > 3.14159265f)
+		a -= 6.2831853f;
+	while (a < -3.14159265f)
+		a += 6.2831853f;
+	return a;
+}
+
 // Bord gauche du cadre d'un personnage dans l'image du jeu (même calcul que le jeu).
 int portraitX(int count, int index) {
 	int t = (235 - count * 66) / (count + 1);
@@ -1807,6 +1825,15 @@ void updateUi(App &app, float dt, double now, bool pointer, bool triggerPressed,
 	in.headDir = rotate(app.headRot, {0, 0, -1});
 	in.helpOpen = app.helpOpen;
 	in.compassBlank = app.split && app.charSheet;
+	if (!app.frame.rgba.empty()) {
+		in.gameRgba = app.frame.rgba.data();
+		in.gameW = app.frame.width;
+		in.gameH = app.frame.height;
+	}
+	in.gameSerial = app.frameSerial;
+	in.characters = app.inDungeon ? app.characters : 0;
+	for (int i = 0; i < in.characters && i < 4; i++)
+		in.portraitX[i] = portraitX(in.characters, i);
 	in.gearHint = !app.gearKnown;
 	in.screenHidden = !app.screenShown;
 	in.time = now;
@@ -1817,6 +1844,7 @@ void updateUi(App &app, float dt, double now, bool pointer, bool triggerPressed,
 	// Donjon 3D : le doigt qui ne vise ni l'écran ni une fenêtre peut viser le mur droit devant le
 	// groupe (boutons, leviers, serrures, portes) ou le sol devant lui (objets à ramasser). Le clic
 	// part dans le jeu, là où le jeu dessinerait ce point.
+	app.aimOnUi = out.pointerValid || out.hitValid || out.dragging;
 	if (in.aimValid && !out.pointerValid && !out.hitValid && !out.dragging && app.dungeonVisible) {
 		float gu = 0, gv = 0;
 		Vec3 hit, hr, hu;
@@ -1983,12 +2011,34 @@ void updateInput(App &app, XrTime time, float dt, double now) {
 	bool zoomMode = getBool(app, app.stickClickAction, kLeft);
 	bool stickBusy = zoomMode || ui.dragging; // le joystick droit règle l'écran ou un panneau
 	// Une seule direction à la fois : celle où le joystick penche le plus. La direction tenue garde
-	// l'avantage, pour qu'un pas de côté un peu en biais ne se transforme pas en marche avant.
+	// l'avantage, pour qu'un pas un peu en biais ne change pas de direction en route.
 	{
 		float ax = fabsf(left.x), ay = fabsf(left.y);
 		float m = ax > ay ? ax : ay;
-		int dir = 0; // 1 avant, 2 arrière, 3 gauche, 4 droite
-		if (m > (app.moveDir ? 0.35f : 0.55f)) {
+		bool pushed = m > (app.moveDir ? 0.35f : 0.55f);
+		int dir = 0; // 1 avant, 2 arrière, 3 gauche, 4 droite (par rapport au groupe)
+		// Donjon 3D : on marche vers là où l'on regarde. Le joystick indique une direction par rapport
+		// au regard ; on prend la direction du donjon (nord, est, sud, ouest) la plus proche, et on
+		// envoie au jeu le pas correspondant (avant, arrière ou de côté) selon l'orientation du groupe.
+		const bool gaze3d = app.dungeonVisible && app.headValid;
+		const int pdir = app.level.direction & 3;
+		float gaze = 0.0f;
+		if (gaze3d) {
+			Vec3 f = rotate(app.headRot, {0, 0, -1});
+			gaze = atan2f(-f.x, -f.z);
+		}
+		if (!pushed) {
+			app.moveAbs = -1;
+		} else if (gaze3d) {
+			float want = gaze + atan2f(-left.x, left.y); // angle positif : vers la gauche
+			auto roomYawOf = [&](int d) { return app.dunYaw - (float)((d - pdir) & 3) * 1.5707963f; };
+			if (app.moveAbs < 0 || fabsf(wrapAngle(want - roomYawOf(app.moveAbs))) > 1.05f) {
+				int r = (int)lroundf(wrapAngle(want - app.dunYaw) / 1.5707963f); // +1 : à gauche du groupe
+				app.moveAbs = (pdir - r) & 3;
+			}
+			int rel = (app.moveAbs - pdir) & 3; // 0 devant, 1 à droite, 2 derrière, 3 à gauche
+			dir = rel == 0 ? 1 : rel == 1 ? 4 : rel == 2 ? 2 : 3;
+		} else {
 			bool horizontal = ax > ay;
 			if (app.moveDir == 1 || app.moveDir == 2)
 				horizontal = ax > ay * 1.5f;
@@ -1996,24 +2046,29 @@ void updateInput(App &app, XrTime time, float dt, double now) {
 				horizontal = ax * 1.5f > ay;
 			dir = horizontal ? (left.x < 0 ? 3 : 4) : (left.y > 0 ? 1 : 2);
 		}
-		// Donjon 3D : on marche vers là où l'on regarde. Si le regard s'écarte de plus de 45° de la
-		// direction du groupe, le groupe se tourne d'abord de ce côté (sans que la pièce bouge).
-		if (dir != 0 && app.moveDir == 0 && app.dungeonVisible && app.headValid && app.alignTurn == 0) {
-			Vec3 f = rotate(app.headRot, {0, 0, -1});
-			float rel = atan2f(-f.x, -f.z) - app.dunYaw;
-			while (rel > 3.14159265f) rel -= 6.2831853f;
-			while (rel < -3.14159265f) rel += 6.2831853f;
-			if (fabsf(rel) > 0.80f && fabsf(rel) < 2.35f) {
-				bool leftTurn = rel > 0.0f;
+		// À l'arrêt, le groupe se tourne de lui-même vers l'endroit que le joueur regarde (sans que la
+		// pièce bouge) : les clics, les attaques et le mur « devant » sont ainsi ceux qu'il voit. Pas
+		// quand il vise une fenêtre ou l'écran (il consulte l'inventaire, il ne se détourne pas).
+		bool canAlign = gaze3d && !pushed && !app.aimOnUi && app.alignTurn == 0 && !app.level.sceneBusy && !app.charSheet && !app.automapOpen &&
+		                app.turnFade <= 0.0f && !stickBusy && fabsf(right.x) < 0.3f;
+		float off = gaze3d ? wrapAngle(gaze - app.dunYaw) : 0.0f;
+		if (canAlign && fabsf(off) > 0.87f) {
+			if (app.gazeOffSince <= 0.0)
+				app.gazeOffSince = now;
+			if (now - app.gazeOffSince > 0.35) {
+				bool leftTurn = off > 0.0f;
 				typeKey(app, leftTurn ? RETROK_HOME : RETROK_PAGEUP, 0, now);
 				app.alignTurn = leftTurn ? 1 : -1;
-				app.alignExpect = (app.level.direction + (leftTurn ? 3 : 1)) & 3;
+				app.alignExpect = (pdir + (leftTurn ? 3 : 1)) & 3;
 				app.alignUntil = now + 1.0;
 				app.moveBlockUntil = now + 0.30;
+				app.gazeOffSince = 0.0;
 			}
+		} else {
+			app.gazeOffSince = 0.0;
 		}
 		app.moveDir = dir;
-		bool moveOk = now >= app.moveBlockUntil;
+		bool moveOk = now >= app.moveBlockUntil && app.alignTurn == 0;
 		setKey(app.kUp, dir == 1 && moveOk, RETROK_UP);
 		setKey(app.kDown, dir == 2 && moveOk, RETROK_DOWN);
 		setKey(app.kSlideL, dir == 3 && moveOk, RETROK_LEFT);
@@ -2235,8 +2290,9 @@ void updateDungeon(App &app, float dt) {
 		app.builtWalls = l.wallsSerial;
 	}
 	// Monstres et objets proches : des images tournées vers le joueur.
-	if (l.spriteSerial != app.builtSprites) {
+	if (l.spriteSerial != app.builtSprites || l.wallsSerial != app.spriteWalls) {
 		app.builtSprites = l.spriteSerial;
+		app.spriteWalls = l.wallsSerial;
 		static std::vector<uint8_t> rgba((size_t)lolvr::kSpriteTexW * lolvr::kSpriteTexH * 4);
 		std::vector<lolvr::DungeonSprite> list;
 		const size_t one = (size_t)lolvr::kSpriteW * lolvr::kSpriteH;
@@ -2262,6 +2318,50 @@ void updateDungeon(App &app, float dt) {
 			d.width = (float)(s.x1 - s.x0) * lolvr::kSpritePixel;
 			d.height = (float)(s.y1 - s.y0) * lolvr::kSpritePixel * 1.2f;
 			d.offset = ((float)(s.x0 + s.x1) * 0.5f - 88.0f) * lolvr::kSpritePixel;
+			// Un objet rangé dans un mur (niche, cachette) : le jeu ne le montre que si ce côté du mur
+			// laisse voir les objets (drapeau 0x80), comme vu depuis la case voisine. On le pose alors
+			// contre le mur, là où il apparaît dans le jeu ; sinon il reste caché.
+			const int ob = ((s.y >> 8) & 31) * 32 + ((s.x >> 8) & 31);
+			if (s.kind == 1 && lolvr::isSolidBlock(l.walls, ob, g)) {
+				static const int sdx[4] = {0, 1, 0, -1}, sdz[4] = {-1, 0, 1, 0};
+				int best = -1;
+				float bestD = 1e9f;
+				for (int k = 0; k < 4; k++) {
+					int nx = (ob & 31) + sdx[k], nz = (ob >> 5) + sdz[k];
+					if (nx < 0 || nx > 31 || nz < 0 || nz > 31 || lolvr::isSolidBlock(l.walls, nz * 32 + nx, g))
+						continue;
+					if (!(l.wallFlags[l.walls[ob * 4 + k]] & 0x80))
+						continue;
+					float cx, cz;
+					lolvr::blockCenter(nz * 32 + nx, cx, cz);
+					float dd = (cx - app.partyX) * (cx - app.partyX) + (cz - app.partyZ) * (cz - app.partyZ);
+					if (dd < bestD) {
+						bestD = dd;
+						best = k;
+					}
+				}
+				if (best < 0)
+					continue;
+				const float S = lolvr::kBlockSize, eyeY = lolvr::kWallHeight * 0.5f;
+				float vx, vz;
+				lolvr::blockCenter(ob + sdz[best] * 32 + sdx[best], vx, vz);
+				// Distances au mur et à l'objet, le long de la normale du mur.
+				float nx = (float)sdx[best], nz = (float)sdz[best];
+				float faceD = S * 0.5f;
+				float itemD = (vx - d.x) * nx + (vz - d.z) * nz;
+				if (itemD < faceD + 0.01f)
+					itemD = faceD + 0.01f;
+				// Le point du mur où l'œil, au centre de la case voisine, voit le pied de l'objet ; un
+				// peu en avant du mur.
+				float r = faceD / itemD;
+				d.x = vx + (d.x - vx) * r + nx * 0.04f;
+				d.z = vz + (d.z - vz) * r + nz * 0.04f;
+				d.base = eyeY * (1.0f - r);
+				d.width *= r;
+				d.height *= r;
+				d.offset *= r;
+				d.ceiling = false;
+			}
 			list.push_back(d);
 		}
 		app.dungeon.setSprites(list);
@@ -2274,8 +2374,12 @@ void updateDungeon(App &app, float dt) {
 		app.dunYaw = app.anchorYaw;
 		app.dunYawSet = true;
 	}
+	// Porte d'une boutique, entrée d'une autre région : le jeu fait entrer le groupe dans un bloc
+	// plein. La vue reste devant, face à l'image ; le jeu montre la scène ou change de région.
+	if (gfxChanged || app.shownLevel != l.level || app.visBlock < 0 || !lolvr::isHoldBlock(l.walls, l.block, g))
+		app.visBlock = l.block;
 	float tx, tz;
-	lolvr::blockCenter(l.block, tx, tz);
+	lolvr::blockCenter(app.visBlock, tx, tz);
 	const int dir = l.direction & 3;
 	float dx = tx - app.partyX, dz = tz - app.partyZ;
 	bool snap = gfxChanged || app.shownLevel != l.level || app.shownDir < 0 ||
@@ -2336,6 +2440,9 @@ void updateDungeon(App &app, float dt) {
 		app.wallDim += ((inWall ? 1.0f : 0.0f) - app.wallDim) * clampf(dt * 8.0f, 0.0f, 1.0f);
 		light *= 1.0f - 0.92f * app.wallDim;
 	}
+	// Pénombre du jeu (lieux sombres, lampe, fondus) : la clarté de la palette à l'écran.
+	app.lightLevel += ((float)l.light / 256.0f - app.lightLevel) * clampf(dt * 6.0f, 0.0f, 1.0f);
+	light *= app.lightLevel;
 	app.dungeonLight = light;
 	app.shownLevel = l.level;
 	app.dungeonVisible = app.dungeon.hasContent();
@@ -2349,7 +2456,7 @@ void updateScreenShown(App &app, double now) {
 	            app.level.sceneBusy;
 	if (need)
 		app.screenNeededAt = now;
-	bool show = need || now - app.screenNeededAt < 1.5;
+	bool show = need || now - app.screenNeededAt < 0.25;
 	if (show && !app.screenShown && app.dungeonVisible && app.headValid && app.screenPlaced) {
 		// Il revient là où le joueur regarde, à sa distance et à sa hauteur habituelles.
 		Vec3 f = rotate(app.headRot, {0, 0, -1});

@@ -24,6 +24,7 @@ struct DungeonSprite {
 	float u0 = 0, v0 = 0, u1 = 1, v1 = 1;
 	float width = 1, height = 1;   // mètres
 	float offset = 0;              // décalage latéral de l'image, mètres
+	float base = 0;                // hauteur du pied (objet dans une niche du mur)
 };
 
 class Dungeon {

@@ -251,7 +251,7 @@ void Dungeon::render(const Mat4 &viewProj, const Mat4 &model, Vec3 eye, float li
 			float rx = tz / tl, rz = -tx / tl;
 			float cx = s.x + rx * s.offset, cz = s.z + rz * s.offset;
 			float hw = s.width * 0.5f;
-			float y0 = s.ceiling ? kWallHeight - s.height : 0.0f, y1 = y0 + s.height;
+			float y0 = s.ceiling ? kWallHeight - s.height : s.base, y1 = y0 + s.height;
 			float L = (float)s.layer;
 			float ax = cx - rx * hw, az = cz - rz * hw, bx = cx + rx * hw, bz = cz + rz * hw;
 			put(ax, y0, az, s.u0, s.v1, L);

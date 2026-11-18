@@ -1,5 +1,5 @@
 diff --git a/engines/kyra/engine/lol.cpp b/engines/kyra/engine/lol.cpp
-index c4f86a30..330578f5 100644
+index c4f86a30..127052f0 100644
 --- a/engines/kyra/engine/lol.cpp
 +++ b/engines/kyra/engine/lol.cpp
 @@ -45,6 +45,11 @@ LolvrGameState g_lolvrState = {1, 0, {0}, 0, 0, 0, 0, 0, 0, 0, {0}, {0}};
@@ -14,7 +14,7 @@ index c4f86a30..330578f5 100644
  }
  
  namespace Kyra {
-@@ -968,6 +973,39 @@ void LoLEngine::runLoop() {
+@@ -968,6 +973,49 @@ void LoLEngine::runLoop() {
  		g_lolvrState.reserved[0]++;
  		g_lolvrState.reserved[1] = _currentControlMode | (_weaponsDisabled ? 0x100 : 0); // 0x100: character sheet
  		g_lolvrState.reserved[3] = countActiveCharacters(); // lol-vr: where the portraits (and their buttons) are
@@ -30,6 +30,16 @@ index c4f86a30..330578f5 100644
 +		g_lolvrLevel.direction = _currentDirection;
 +		g_lolvrLevel.inDungeon = 1;
 +		g_lolvrLevel.sceneBusy = (_needSceneRestore || _dialogueField) ? 1 : 0;
++		{
++			const Palette &cur = _screen->lolvrScreenPalette();
++			const Palette &base = _screen->getPalette(0);
++			uint32 lit = 0, full = 0;
++			for (int i = 3; i < 384; i++) {
++				lit += cur[i];
++				full += base[i];
++			}
++			g_lolvrLevel.light = full ? (int32)MIN<uint32>(256, lit * 256 / full) : 256;
++		}
 +		{
 +			int nearObj = 0;
 +			uint16 nb = _currentBlock;
@@ -54,7 +64,7 @@ index c4f86a30..330578f5 100644
  
  		_timer->update();
  
-@@ -1049,6 +1087,7 @@ void LoLEngine::readSettings() {
+@@ -1049,6 +1097,7 @@ void LoLEngine::readSettings() {
  }
  
  void LoLEngine::update() {
@@ -62,7 +72,7 @@ index c4f86a30..330578f5 100644
  	updateSequenceBackgroundAnimations();
  
  	if (_updateCharNum != -1 && _system->getMillis() > _updatePortraitNext)
-@@ -1633,6 +1672,7 @@ void LoLEngine::initSceneWindowDialogue(int controlMode) {
+@@ -1633,6 +1682,7 @@ void LoLEngine::initSceneWindowDialogue(int controlMode) {
  	_txt->expandField();
  	setupScreenDims();
  	gui_disableControls(controlMode);
@@ -70,7 +80,7 @@ index c4f86a30..330578f5 100644
  }
  
  void LoLEngine::toggleSelectedCharacterFrame(bool mode) {
-@@ -1711,6 +1751,7 @@ void LoLEngine::restoreAfterSceneWindowDialogue(int redraw) {
+@@ -1711,6 +1761,7 @@ void LoLEngine::restoreAfterSceneWindowDialogue(int redraw) {
  
  	_needSceneRestore = 0;
  	enableSysTimer(2);
@@ -78,7 +88,7 @@ index c4f86a30..330578f5 100644
  }
  
  void LoLEngine::initDialogueSequence(int controlMode, int pageNum) {
-@@ -1758,6 +1799,7 @@ void LoLEngine::initDialogueSequence(int controlMode, int pageNum) {
+@@ -1758,6 +1809,7 @@ void LoLEngine::initDialogueSequence(int controlMode, int pageNum) {
  
  	_currentControlMode = controlMode;
  	_dialogueField = true;
@@ -86,7 +96,7 @@ index c4f86a30..330578f5 100644
  }
  
  void LoLEngine::restoreAfterDialogueSequence(int controlMode) {
-@@ -1780,6 +1822,7 @@ void LoLEngine::restoreAfterDialogueSequence(int controlMode) {
+@@ -1780,6 +1832,7 @@ void LoLEngine::restoreAfterDialogueSequence(int controlMode) {
  	}
  
  	_dialogueField = false;
@@ -95,10 +105,10 @@ index c4f86a30..330578f5 100644
  
  void LoLEngine::resetPortraitsAndDisableSysTimer() {
 diff --git a/engines/kyra/engine/lol.h b/engines/kyra/engine/lol.h
-index a9028a26..a2dc98f7 100644
+index a9028a26..f8715d97 100644
 --- a/engines/kyra/engine/lol.h
 +++ b/engines/kyra/engine/lol.h
-@@ -50,6 +50,62 @@ struct LolvrGameState {
+@@ -50,6 +50,65 @@ struct LolvrGameState {
  	int32 reserved[4];  // [0] dungeon loop ticks, [1] control mode, [2] bit 0: automap open, bit 1: game menu open
  };
  extern LolvrGameState g_lolvrState;
@@ -156,12 +166,15 @@ index a9028a26..a2dc98f7 100644
 +	const uint8 *spriteAlpha;
 +	// 1 while the scene window shows something else than the dungeon (shop, dialogue, special scene)
 +	int32 sceneBusy;
++	// Brightness of the palette on screen compared to the level palette (256 = full light): dark
++	// places, the lamp, fades.
++	int32 light;
 +};
 +extern LolvrLevelData g_lolvrLevel;
  }
  
  namespace Audio {
-@@ -335,6 +391,9 @@ private:
+@@ -335,6 +394,9 @@ private:
  
  	// main loop
  	void runLoop();
@@ -526,3 +539,15 @@ index 055e4f8c..830a8a4c 100644
  } // End of namespace Kyra
  
  #endif // ENABLE_LOL
+diff --git a/engines/kyra/graphics/screen.h b/engines/kyra/graphics/screen.h
+index 92605cda..627378d4 100644
+--- a/engines/kyra/graphics/screen.h
++++ b/engines/kyra/graphics/screen.h
+@@ -713,6 +713,7 @@ public:
+ 
+ 	virtual void getRealPalette(int num, uint8 *dst);
+ 	Palette &getPalette(int num);
++	const Palette &lolvrScreenPalette() const { return *_screenPalette; } // lol-vr-3d: the palette on screen now
+ 	void copyPalette(const int dst, const int src);
+ 
+ 	// gui specific (processing on _curPage)

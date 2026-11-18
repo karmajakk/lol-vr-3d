@@ -18,8 +18,14 @@ Early demo. What works:
   decorations and doors drawn by the game engine itself.
 - Floor and ceiling rebuilt from the game's own background.
 - The party's moves and turns glide smoothly; doors that open or close update the walls.
-- Everything from lol-vr: the game screen, the detached party, inventory and compass windows,
-  controllers, keyboard, wrist menu (gear on the left hand).
+- Everything from lol-vr: the game screen, the detached windows, controllers, keyboard, wrist
+  menu (gear on the left hand). The windows are arranged for the 3D dungeon: the spell scroll with
+  the messages under it on the left, a column on the right with the compass column (atlas, lamp,
+  purse), the characters one under the other and the options and rest buttons, and the inventory
+  below.
+- Shop doors and passages to other regions stay in front of you, like a wall with their picture:
+  walk into them and the game screen shows the shop, or the new region appears.
+- Dark places stay dark until you light the lamp.
 - "3D dungeon: on/off" in the wrist menu, to compare with the original view.
 
 - Monsters and items near the party, drawn by the game itself and always facing you.
@@ -59,9 +65,10 @@ potion, use an item), left stick to walk, right stick to turn, A to attack, B fo
 map. Look at your left hand and click the gear for the menu (language, classic screen, 3D dungeon
 with the game screen "if needed" or "always", keyboard, controller mapping).
 
-In the dungeon, the party's position is under your feet. You walk where you look: push the stick
-and the party first turns toward your gaze if needed. Turning with the right stick is instant,
-with a very short fade, to stay comfortable.
+In the dungeon, the party's position is under your feet. You walk where you look: the left stick
+points relative to your gaze (forward is where you look, sideways is a side step), and when you
+stand still the party quietly turns to face where you look. Turning with the right stick is
+instant, with a very short fade, to stay comfortable.
 
 ## How it works (for the curious)
 
