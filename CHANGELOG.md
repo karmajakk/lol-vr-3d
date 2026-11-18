@@ -3,6 +3,14 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.5.1] — Windows joined together
+
+- The message line is part of the spell scroll window, right under it (no longer a window of its
+  own).
+- The right window holds the characters one under the other, the atlas column (lamp, purse) to
+  their right, and below them a strip with the options and rest buttons.
+- The windows go back to this layout once.
+
 ## [0.5.0] — One app, two views
 
 - This is now the main project, and it includes the classic view of lol-vr (whose history and

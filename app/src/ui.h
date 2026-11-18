@@ -12,10 +12,9 @@
 namespace lolvr {
 
 enum UiPanelId {
-	kPanelParty = 0, // colonne de droite : atlas, lampe, bourse, puis les personnages, options et repos
+	kPanelParty = 0, // à droite : les personnages, l'atlas (lampe, bourse), dessous les options et le repos
 	kPanelInventory, // rangée d'objets
-	kPanelSpells,    // colonne de gauche : parchemin des sorts
-	kPanelText,      // lignes de messages
+	kPanelSpells,    // à gauche : parchemin des sorts, et dessous les lignes de messages
 	kPanelKeyboard,  // clavier et options
 	kPanelHelp,      // aide : les manettes et les boutons
 	kUiPanelCount

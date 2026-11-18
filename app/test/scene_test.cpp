@@ -292,34 +292,39 @@ int main(int argc, char **argv) {
 		ui.update(in, o, tmp);
 		check(o.pointerValid && fabsf(o.gu * 320 - 200) < 1.5f && fabsf(o.gv * 200 - 60) < 1.5f && o.buttonsToGame && !o.pointerLong, "écran : centre de la vue du donjon (200, 60)");
 		// 2. Le centre de chaque panneau donne le centre de sa zone de l'image
-		// (colonne du groupe : au centre, le second personnage, 16 pixels après le bord de son cadre)
-		const float want[4][2] = {{233, 168}, {201.5f, 189}, {56, 60.5f}, {200, 132}};
-		const char *names[4] = {"colonne du groupe : second personnage", "fenêtre de l'inventaire", "fenêtre des sorts", "fenêtre des messages"};
-		for (int i = 0; i < 4; i++) {
-			aimAt(panel(i).center);
+		// Fenêtres recomposées : on vise un point donné de leur petite image.
+		auto aimIn = [&](int i, float cx, float cy, float w, float h) {
+			SceneState::Panel p = panel(i);
+			aimAt(p.center + p.right * ((cx / w * 2.0f - 1.0f) * p.halfW) + p.up * ((1.0f - cy / h * 2.0f) * p.halfH));
 			ui.update(in, o, tmp);
-			check(o.pointerValid && fabsf(o.gu * 320 - want[i][0]) < 1.5f && fabsf(o.gv * 200 - want[i][1]) < 1.5f && o.buttonsToGame, names[i]);
-		}
-		{
-			// Haut de la colonne du groupe : la colonne de la boussole (bourse, lampe...).
-			SceneState::Panel p = panel(0);
-			aimAt(p.center + p.right * (-p.halfW * 0.7f) + p.up * (p.halfH * 0.5f));
-			ui.update(in, o, tmp);
-			check(o.pointerValid && o.gu * 320 > 288 && o.gv * 200 < 122, "colonne du groupe : à gauche, la colonne de la boussole");
-		}
-		// 3. Tout est dans le plan de l'écran, au-dessus du plancher, sans chevauchement
+		};
+		auto near = [&](float gu, float gv) { return o.pointerValid && o.buttonsToGame && fabsf(o.gu * 320 - gu) < 1.5f && fabsf(o.gv * 200 - gv) < 1.5f; };
+		// À droite (2 personnages : 100 x 154) : portraits à gauche, atlas à droite, boutons dessous.
+		aimIn(0, 16, 53, 100, 154);
+		check(near(233, 160), "à droite : le second personnage");
+		aimIn(0, 84, 100, 100, 154);
+		check(near(304, 100), "à droite : la colonne de l'atlas, à droite des personnages");
+		aimIn(0, 40, 140, 100, 154);
+		check(near(23, 190), "à droite : dessous, les options et le repos");
+		aimAt(panel(1).center);
+		ui.update(in, o, tmp);
+		check(near(201.5f, 189), "fenêtre de l'inventaire");
+		// À gauche (224 x 265) : le parchemin des sorts, et la ligne de messages dessous.
+		aimIn(2, 112, 100, 224, 265);
+		check(near(56, 50), "à gauche : le parchemin des sorts");
+		aimIn(2, 112, 254, 224, 265);
+		check(near(200, 131.5f), "à gauche : dessous, la ligne de messages");
+		// 3. Tout est dans le plan de l'écran, au-dessus du plancher
 		{
 			bool planar = true, above = true;
-			for (int i = 0; i < 4; i++) {
+			for (int i = 0; i < 3; i++) {
 				SceneState::Panel p = panel(i);
 				planar = planar && fabsf(p.center.z - in.basePos.z) < 0.02f;
 				above = above && p.center.y - p.halfH > 0.02f;
 			}
-			SceneState::Panel spells = panel(2), text = panel(3), inv = panel(1);
+			SceneState::Panel inv = panel(1);
 			check(planar, "les fenêtres sont dans le plan de l'écran");
 			check(above, "aucune fenêtre ne descend sous le plancher");
-			check(spells.center.y - spells.halfH > text.center.y + text.halfH + 0.01f, "les messages sous les sorts, sans chevauchement");
-			check(fabsf(spells.halfW - text.halfW) < 0.01f, "les messages ont la largeur des sorts");
 			check(inv.center.y + inv.halfH < in.screenPos.y - in.dispH * 0.5f - 0.10f, "l'inventaire est sous le cadre de l'écran");
 		}
 		// 4. Bas de l'écran : le rayon de la main arrive bien sur l'écran (rien devant), puis glisse
@@ -462,7 +467,7 @@ int main(int argc, char **argv) {
 		// 8. Poignée de l'écran
 		{
 			ui.update(in, o, tmp);
-			Vec3 handle = tmp.handles[4].center;
+			Vec3 handle = tmp.handles[3].center;
 			aimAt(handle);
 			in.triggerDown = in.triggerPressed = true;
 			ui.update(in, o, tmp);
@@ -478,7 +483,7 @@ int main(int argc, char **argv) {
 		{
 			in.keyboardOpen = true;
 			ui.update(in, o, tmp);
-			SceneState::Panel kb = tmp.panels[4];
+			SceneState::Panel kb = tmp.panels[3];
 			auto keyPos = [&](float col, float row) {
 				return kb.center + kb.right * ((col - 5.5f) / 5.5f * kb.halfW) + kb.up * ((1.0f - 2.0f * row * 40.0f / 284.0f) * kb.halfH);
 			};
@@ -504,7 +509,7 @@ int main(int argc, char **argv) {
 			// Panneau d'aide : visible, et un clic dessus le ferme
 			in.helpOpen = true;
 			ui.update(in, o, tmp);
-			SceneState::Panel help = tmp.panels[4];
+			SceneState::Panel help = tmp.panels[3];
 			check(help.visible && help.texture != 0, "aide : le panneau est affiché");
 			aimAt(help.center);
 			in.triggerDown = in.triggerPressed = true;
@@ -515,7 +520,7 @@ int main(int argc, char **argv) {
 			// Premier lancement : la fenêtre du choix de la vue, deux boutons.
 			in.chooserOpen = true;
 			ui.update(in, o, tmp);
-			SceneState::Panel ch = tmp.panels[4];
+			SceneState::Panel ch = tmp.panels[3];
 			check(ch.visible && ch.texture != 0 && ch.texture != help.texture, "choix de la vue : la fenêtre est affichée");
 			auto pressAt = [&](float px, float py) {
 				aimAt(ch.center + ch.right * ((px / 584.0f * 2.0f - 1.0f) * ch.halfW) + ch.up * ((1.0f - py / 470.0f * 2.0f) * ch.halfH));

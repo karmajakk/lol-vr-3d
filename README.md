@@ -27,10 +27,10 @@ Early demo. What works:
 - Floor and ceiling rebuilt from the game's own background.
 - The party's moves and turns glide smoothly; doors that open or close update the walls.
 - Everything from lol-vr: the game screen, the detached windows, controllers, keyboard, wrist
-  menu (gear on the left hand). The windows are arranged for the 3D dungeon: the spell scroll with
-  the messages under it on the left, a column on the right with the compass column (atlas, lamp,
-  purse), the characters one under the other and the options and rest buttons, and the inventory
-  below.
+  menu (gear on the left hand). The windows are arranged for the 3D dungeon: on the left the spell
+  scroll with the message line joined under it; on the right the characters one under the other,
+  the atlas column (lamp, purse) beside them and the options and rest buttons below, in one window;
+  the inventory below.
 - Shop doors and passages to other regions stay in front of you, like a wall with their picture:
   walk into them and the game screen shows the shop, or the new region appears.
 - Dark places stay dark until you light the lamp.

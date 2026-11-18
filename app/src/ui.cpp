@@ -38,20 +38,30 @@ const int kInfoH = 44; // deux lignes d'information sous les touches
 const int kKbW = kCellW * kCols, kKbH = kCellH * kRows + kInfoH;
 
 const Source kSources[kUiPanelCount] = {
-	{0, 0, 100, 122},    // colonne du groupe : recomposée (voir composeParty), taille variable
+	{0, 0, 100, 150},    // à droite : recomposé (voir compose), taille variable
 	{83, 178, 237, 22},  // inventaire
-	{0, 0, 112, 121},    // colonne de gauche (parchemin des sorts), sans la ligne de messages
-	{82, 121, 236, 22},  // lignes de messages
+	{0, 0, 224, 265},    // à gauche : recomposé, parchemin des sorts et messages
 	{0, 0, (float)kKbW, (float)kKbH},
 	{0, 0, (float)kHelpW, (float)kHelpH},
 };
 
-// Colonne du groupe : morceaux de l'image du jeu recopiés dans une petite image.
-const int kPartyTexW = 104, kPartyTexH = 176;
-const int kPartyGap = 34; // les portraits, à droite de la colonne de la boussole
+// Fenêtres recomposées : des morceaux de l'image du jeu recopiés dans une petite image, chacun à
+// sa place et à sa taille (d* : dans la petite image, s* : dans l'image du jeu 320 x 200).
 struct Piece {
-	int dx, dy, sx, sy, w, h;
+	int dx, dy, dw, dh, sx, sy, sw, sh;
+	bool contains(float x, float y) const { return x >= dx && y >= dy && x < dx + dw && y < dy + dh; }
 };
+struct Composite {
+	int texW = 0, texH = 0;
+	GLuint tex = 0;
+	std::vector<uint8_t> px;
+	std::vector<Piece> pieces;
+	int w = 0, h = 0;      // partie utilisée
+	uint32_t serial = 0;
+	int key = -1;          // nombre de personnages, fenêtre éteinte... : refaire si cela change
+};
+const int kCompParty = 0, kCompSpells = 1;
+const int kCompTexW[2] = {104, 224}, kCompTexH[2] = {200, 272};
 
 // Les pixels du jeu sont 1,2 fois plus hauts que larges ; ceux du clavier sont carrés.
 float pixelAspect(int id) {
@@ -160,14 +170,9 @@ struct Ui::Impl {
 	int menuHot = -1;
 	// Colonne du groupe recomposée
 	int chooserHot = -1; // bouton visé dans la fenêtre du choix de la vue
-	GLuint partyTex = 0;
-	std::vector<uint8_t> partyPx;
-	std::vector<Piece> pieces;
-	int partyW = 100, partyH = 122;
-	uint32_t partySerial = 0;
-	int partyChars = -1, partyCompass = -1;
-	bool partyBlank = false;
-	void composeParty(const UiFrameInput &in);
+	Composite comp[2];
+	void compose(int which, const UiFrameInput &in);
+	int compOf(int panel) const { return panel == kPanelParty ? kCompParty : panel == kPanelSpells ? kCompSpells : -1; }
 	int drag = -1;
 	float grabDist = 1.0f;
 	Vec3 grabOffset = {0, 0, 0};
@@ -298,49 +303,72 @@ void Ui::Impl::upload(GLuint &tex, const std::vector<uint8_t> &px, int w, int h)
 	glBindTexture(GL_TEXTURE_2D, 0);
 }
 
-// La colonne du groupe : la colonne de la boussole (atlas, lampe, bourse) à gauche ; à sa droite,
-// les personnages l'un sous l'autre, puis les boutons des options et du repos.
-void Ui::Impl::composeParty(const UiFrameInput &in) {
+// Les deux fenêtres recomposées :
+//  - à droite, les personnages l'un sous l'autre, à leur droite la colonne de l'atlas (lampe,
+//    bourse) ; dessous, dans un bandeau à part, les boutons des options et du repos ;
+//  - à gauche, le parchemin des sorts (pixels doublés), et dessous la ligne de messages, à sa largeur.
+void Ui::Impl::compose(int which, const UiFrameInput &in) {
+	Composite &c = comp[which];
 	const int n = in.characters < 0 ? 0 : in.characters > 4 ? 4 : in.characters;
 	const bool blank = in.compassBlank;
-	if (partyTex && in.gameSerial == partySerial && n == partyChars && blank == partyBlank)
+	const int key = which == kCompParty ? n * 2 + (blank ? 1 : 0) : 0;
+	if (c.tex && in.gameSerial == c.serial && key == c.key)
 		return;
-	partySerial = in.gameSerial;
-	partyChars = n;
-	partyBlank = blank;
-	pieces.clear();
-	pieces.push_back({0, 0, 288, 0, 32, 122});
-	for (int i = 0; i < n; i++)
-		pieces.push_back({kPartyGap, i * 36, in.portraitX[i], 143, 66, 34});
-	const int sysY = n * 36 + (n ? 2 : 0);
-	pieces.push_back({kPartyGap + 10, sysY, 10, 178, 45, 22});
-	partyW = kPartyGap + 66;
-	partyH = sysY + 22 > 122 ? sysY + 22 : 122;
-	partyPx.assign((size_t)kPartyTexW * kPartyTexH * 4, 0);
-	for (int i = 0; i < kPartyTexW * kPartyTexH; i++) {
-		uint8_t *p = &partyPx[(size_t)i * 4];
+	c.serial = in.gameSerial;
+	c.key = key;
+	c.texW = kCompTexW[which];
+	c.texH = kCompTexH[which];
+	c.pieces.clear();
+	int band = -1; // début du bandeau des boutons (colonne de droite)
+	if (which == kCompParty) {
+		for (int i = 0; i < n; i++)
+			c.pieces.push_back({0, i * 36, 66, 34, in.portraitX[i], 143, 66, 34});
+		c.pieces.push_back({68, 0, 32, 122, 288, 0, 32, 122});
+		int top = n * 36 > 122 ? n * 36 : 122;
+		band = top + 2;
+		c.pieces.push_back({27, band + 4, 45, 22, 10, 178, 45, 22});
+		c.w = 100;
+		c.h = band + 30;
+	} else {
+		c.pieces.push_back({0, 0, 224, 242, 0, 0, 112, 121});
+		c.pieces.push_back({0, 244, 224, 21, 82, 121, 236, 22});
+		c.w = 224;
+		c.h = 265;
+	}
+	c.px.assign((size_t)c.texW * c.texH * 4, 0);
+	for (int i = 0; i < c.texW * c.texH; i++) {
+		uint8_t *p = &c.px[(size_t)i * 4];
 		p[0] = 42; p[1] = 28; p[2] = 20; p[3] = 255; // bois sombre entre les morceaux
 	}
+	// Le bandeau des boutons : un peu plus clair, séparé du reste par un filet.
+	if (band >= 0)
+		for (int y = band; y < c.h && y < c.texH; y++)
+			for (int x = 0; x < c.w; x++) {
+				uint8_t *p = &c.px[((size_t)y * c.texW + x) * 4];
+				bool line = y < band + 1;
+				p[0] = line ? 140 : 62; p[1] = line ? 108 : 44; p[2] = line ? 72 : 30;
+			}
 	if (in.gameRgba && in.gameW >= 320 && in.gameH >= 200) {
-		for (size_t k = 0; k < pieces.size(); k++) {
-			const Piece &pc = pieces[k];
-			for (int y = 0; y < pc.h; y++)
-				for (int x = 0; x < pc.w; x++) {
+		for (const Piece &pc : c.pieces) {
+			const bool off = which == kCompParty && pc.sx == 288 && blank;
+			for (int y = 0; y < pc.dh; y++)
+				for (int x = 0; x < pc.dw; x++) {
 					int dx = pc.dx + x, dy = pc.dy + y;
-					if (dx >= kPartyTexW || dy >= kPartyTexH)
+					if (dx >= c.texW || dy >= c.texH)
 						continue;
-					uint8_t *p = &partyPx[((size_t)dy * kPartyTexW + dx) * 4];
-					if (k == 0 && blank) {
+					uint8_t *p = &c.px[((size_t)dy * c.texW + dx) * 4];
+					if (off) {
 						p[0] = p[1] = p[2] = 0;
 						continue;
 					}
-					int sx = (pc.sx + x) * in.gameW / 320, sy = (pc.sy + y) * in.gameH / 200;
-					const uint8_t *s = in.gameRgba + ((size_t)sy * in.gameW + sx) * 4;
-					p[0] = s[0]; p[1] = s[1]; p[2] = s[2];
+					int gx = pc.sx + x * pc.sw / pc.dw, gy = pc.sy + y * pc.sh / pc.dh;
+					int sx = gx * in.gameW / 320, sy = gy * in.gameH / 200;
+					const uint8_t *src = in.gameRgba + ((size_t)sy * in.gameW + sx) * 4;
+					p[0] = src[0]; p[1] = src[1]; p[2] = src[2];
 				}
 		}
 	}
-	upload(partyTex, partyPx, kPartyTexW, kPartyTexH);
+	upload(c.tex, c.px, c.texW, c.texH);
 }
 
 // Boutons de la fenêtre du choix de la vue, en pixels de son image (même taille que l'aide).
@@ -547,7 +575,7 @@ Ui::~Ui() {
 }
 
 const char *Ui::panelKey(int id) {
-	static const char *names[kUiPanelCount] = {"groupe2", "inventaire", "sorts", "messages", "clavier", "aide"};
+	static const char *names[kUiPanelCount] = {"groupe3", "inventaire", "sorts2", "clavier", "aide"};
 	return id >= 0 && id < kUiPanelCount ? names[id] : "";
 }
 
@@ -612,17 +640,15 @@ void Ui::resetLayout(const UiFrameInput &in) {
 		pl.a = wrapAngle(atan2f(-v.x, -v.z) - in.anchorYaw);
 		pl.scale = clampf(scale * fullW, 0.0004f, 0.02f);
 	};
-	auto srcW = [&](int id) { return id == kPanelParty ? (float)d->partyW : kSources[id].w; };
-	auto srcH = [&](int id) { return id == kPanelParty ? (float)d->partyH : kSources[id].h; };
+	auto srcW = [&](int id) { int c = d->compOf(id); return c >= 0 && d->comp[c].w ? (float)d->comp[c].w : kSources[id].w; };
+	auto srcH = [&](int id) { int c = d->compOf(id); return c >= 0 && d->comp[c].h ? (float)d->comp[c].h : kSources[id].h; };
 	auto halfW = [&](int id, float scale) { return srcW(id) * scale * 0.5f; };
 	auto halfH = [&](int id, float scale) { return srcH(id) * 1.2f * scale * 0.5f; };
 
-	// À gauche : le parchemin des sorts, et dessous les messages, à la même largeur.
-	const float sSpells = 0.0036f, sText = sSpells * kSources[kPanelSpells].w / kSources[kPanelText].w;
-	float xl = -(viewW * 0.5f + frame + 0.035f + halfW(kPanelSpells, sSpells));
-	set(kPanelSpells, xl, top - halfH(kPanelSpells, sSpells), sSpells);
-	set(kPanelText, xl, top - 2.0f * halfH(kPanelSpells, sSpells) - 0.03f - halfH(kPanelText, sText), sText);
-	// À droite : la colonne de la boussole et du groupe.
+	// À gauche : le parchemin des sorts et les messages (pixels doublés dans la fenêtre recomposée).
+	const float sSpells = 0.0018f;
+	set(kPanelSpells, -(viewW * 0.5f + frame + 0.035f + halfW(kPanelSpells, sSpells)), top - halfH(kPanelSpells, sSpells), sSpells);
+	// À droite : les personnages, l'atlas, les options et le repos.
 	const float sParty = 0.0034f;
 	set(kPanelParty, viewW * 0.5f + frame + 0.035f + halfW(kPanelParty, sParty), top - halfH(kPanelParty, sParty), sParty);
 	// Dessous : l'inventaire.
@@ -681,10 +707,12 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 
 	// Tant que la disposition n'est pas établie (écran pas encore placé), aucun panneau.
 	bool visible[kUiPanelCount];
-	for (int i = 0; i <= kPanelText; i++)
+	for (int i = 0; i <= kPanelSpells; i++)
 		visible[i] = placed && in.split;
 	if (visible[kPanelParty])
-		d->composeParty(in);
+		d->compose(kCompParty, in);
+	if (visible[kPanelSpells])
+		d->compose(kCompSpells, in);
 	visible[kPanelKeyboard] = placed && in.keyboardOpen;
 	visible[kPanelHelp] = placed && (in.helpOpen || in.chooserOpen);
 	d->chooserHot = -1;
@@ -740,7 +768,8 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 		Quad &q = content[i];
 		q.c = in.anchorPos + directionFor(in.anchorYaw + pl.a, pl.b) * pl.c;
 		float scale = pl.scale;
-		float sw = i == kPanelParty ? (float)d->partyW : kSources[i].w, sh = i == kPanelParty ? (float)d->partyH : kSources[i].h;
+		const int ci = d->compOf(i);
+		float sw = ci >= 0 && d->comp[ci].w ? (float)d->comp[ci].w : kSources[i].w, sh = ci >= 0 && d->comp[ci].h ? (float)d->comp[ci].h : kSources[i].h;
 		q.hw = sw * scale * 0.5f;
 		q.hh = sh * pixelAspect(i) * scale * 0.5f;
 		if (in.roomClamp)
@@ -1120,19 +1149,19 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 				}
 			}
 		} else {
-			if (hitIndex == kPanelParty) {
-				// Colonne recomposée : retrouver le morceau visé, et l'endroit du jeu qu'il montre.
-				float cx = u * (float)d->partyW, cy = v * (float)d->partyH;
-				for (size_t k = 0; k < d->pieces.size(); k++) {
-					const Piece &pc = d->pieces[k];
-					if (cx < pc.dx || cy < pc.dy || cx >= pc.dx + pc.w || cy >= pc.dy + pc.h)
+			if (d->compOf(hitIndex) >= 0) {
+				// Fenêtre recomposée : retrouver le morceau visé, et l'endroit du jeu qu'il montre.
+				const Composite &c = d->comp[d->compOf(hitIndex)];
+				float cx = u * (float)c.w, cy = v * (float)c.h;
+				for (const Piece &pc : c.pieces) {
+					if (!pc.contains(cx, cy))
 						continue;
-					if (k == 0 && in.compassBlank) // fenêtre éteinte : aucun clic
+					if (hitIndex == kPanelParty && pc.sx == 288 && in.compassBlank) // fenêtre éteinte : aucun clic
 						break;
 					out.pointerValid = true;
 					out.buttonsToGame = true;
-					out.gu = ((float)pc.sx + cx - (float)pc.dx) / 320.0f;
-					out.gv = ((float)pc.sy + cy - (float)pc.dy) / 200.0f;
+					out.gu = ((float)pc.sx + (cx - (float)pc.dx) * (float)pc.sw / (float)pc.dw) / 320.0f;
+					out.gv = ((float)pc.sy + (cy - (float)pc.dy) * (float)pc.sh / (float)pc.dh) / 200.0f;
 					break;
 				}
 			} else {
@@ -1189,25 +1218,25 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 					p.hot[2] = (float)((key.col + key.span) * kCellW) / (float)kKbW;
 					p.hot[3] = (float)((key.row + 1) * kCellH) / (float)kKbH;
 				}
-			} else if (i == kPanelParty) {
-				p.texture = d->partyTex;
-				p.texW = kPartyTexW;
-				p.texH = kPartyTexH;
+			} else if (d->compOf(i) >= 0) {
+				const Composite &c = d->comp[d->compOf(i)];
+				p.texture = c.tex;
+				p.texW = c.texW;
+				p.texH = c.texH;
 				p.u0 = 0.0f;
 				p.v0 = 0.0f;
-				p.u1 = (float)d->partyW / (float)kPartyTexW;
-				p.v1 = (float)d->partyH / (float)kPartyTexH;
+				p.u1 = (float)c.w / (float)c.texW;
+				p.v1 = (float)c.h / (float)c.texH;
 				// Le personnage choisi pour les boutons d'attaque et de magie : son portrait encadré.
-				if (in.partyMark[2] > 0.0f) {
-					for (size_t k = 1; k < d->pieces.size(); k++) {
-						const Piece &pc = d->pieces[k];
+				if (i == kPanelParty && in.partyMark[2] > 0.0f) {
+					for (const Piece &pc : c.pieces) {
 						if (pc.sy != 143 || pc.sx != (int)in.partyMark[0])
 							continue;
 						p.hotOutline = true;
-						p.hot[0] = (float)pc.dx / (float)kPartyTexW;
-						p.hot[1] = (float)pc.dy / (float)kPartyTexH;
-						p.hot[2] = (float)(pc.dx + pc.w) / (float)kPartyTexW;
-						p.hot[3] = (float)(pc.dy + pc.h) / (float)kPartyTexH;
+						p.hot[0] = (float)pc.dx / (float)c.texW;
+						p.hot[1] = (float)pc.dy / (float)c.texH;
+						p.hot[2] = (float)(pc.dx + pc.dw) / (float)c.texW;
+						p.hot[3] = (float)(pc.dy + pc.dh) / (float)c.texH;
 					}
 				}
 			} else {
