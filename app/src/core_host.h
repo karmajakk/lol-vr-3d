@@ -66,6 +66,7 @@ struct LevelSnapshot {
 	int block = 0;            // case du groupe : y * 32 + x
 	int direction = 0;        // 0 nord, 1 est, 2 sud, 3 ouest
 	int nearObjects = 0;      // bit k : monstres ou objets k cases devant le groupe (0 = sa case)
+	bool sceneBusy = false;   // la vue du jeu montre autre chose que le donjon (boutique, dialogue, scène)
 	uint8_t walls[1024 * 4] = {0};
 	uint8_t vmpMap[256] = {0};
 	uint8_t wallFlags[256] = {0};

@@ -3,6 +3,11 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.3.1] — Shops and dialogues
+
+- The game screen now appears in front of you when the game shows something else than the
+  dungeon in its view: shops, conversations, special scenes. Before, it stayed hidden in shops.
+
 ## [0.3.0] — Monsters in 3D, clicks in the dungeon
 
 - Monsters and items near the party appear in the 3D dungeon, drawn by the game itself and always

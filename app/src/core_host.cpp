@@ -75,6 +75,7 @@ struct LolvrLevelData {
 	LolvrSprite sprites[32];
 	const uint8_t *spritePixels;
 	const uint8_t *spriteAlpha;
+	int32_t sceneBusy;
 };
 const LolvrLevelData *retro_lolvr_level(void);
 }
@@ -370,6 +371,7 @@ void copyLevel() {
 	l.block = s->block;
 	l.direction = s->direction;
 	l.nearObjects = s->nearObjects;
+	l.sceneBusy = s->sceneBusy != 0;
 	// Monstres et objets proches, tels que le moteur vient de les dessiner
 	if (s->spriteSerial != l.spriteSerial && s->spritePixels && s->spriteAlpha && s->spriteCount >= 0 && s->spriteCount <= 32) {
 		const size_t one = (size_t)kSpriteW * kSpriteH;
@@ -637,6 +639,7 @@ bool CoreHost::levelSnapshot(LevelSnapshot &out) const {
 	out.block = l.block;
 	out.direction = l.direction;
 	out.nearObjects = l.nearObjects;
+	out.sceneBusy = l.sceneBusy;
 	if (out.spriteSerial != l.spriteSerial) {
 		out.sprites = l.sprites;
 		out.spritePixels = l.spritePixels;

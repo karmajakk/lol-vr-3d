@@ -2342,10 +2342,11 @@ void updateDungeon(App &app, float dt) {
 }
 
 // Donjon 3D : le grand écran n'apparaît que lorsqu'on en a besoin. Le donjon en 3D montre les murs,
-// les monstres et les objets ; l'écran revient pour les scènes, la carte, les menus et la fiche d'un
-// personnage, et reste un moment après.
+// les monstres et les objets ; l'écran revient pour les boutiques, les dialogues et les scènes, la
+// carte, les menus et la fiche d'un personnage, et reste un moment après.
 void updateScreenShown(App &app, double now) {
-	bool need = !app.dungeonVisible || app.dungeonMode == 2 || !app.split || app.charSheet || app.automapOpen;
+	bool need = !app.dungeonVisible || app.dungeonMode == 2 || !app.split || app.charSheet || app.automapOpen ||
+	            app.level.sceneBusy;
 	if (need)
 		app.screenNeededAt = now;
 	bool show = need || now - app.screenNeededAt < 1.5;

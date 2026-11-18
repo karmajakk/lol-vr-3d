@@ -154,8 +154,10 @@ int main(int argc, char **argv) {
 			pump(0.05);
 			saveFrame(f, out + "/" + name + ".ppm");
 			GameState gs;
+			LevelSnapshot ls;
+			bool hasL = host.levelSnapshot(ls);
 			if (host.gameState(gs))
-				printf("  état : niveau=%d boucle=%u mode=%d menu=%d\n", gs.level, gs.loopSerial, gs.controlMode, (int)gs.menuOpen);
+				printf("  état : niveau=%d boucle=%u mode=%d menu=%d scène=%d\n", gs.level, gs.loopSerial, gs.controlMode, (int)gs.menuOpen, hasL ? (int)ls.sceneBusy : -1);
 		} else if (op == "dungeon" || op == "dungeonat") {
 			std::string name;
 			cs >> name;
