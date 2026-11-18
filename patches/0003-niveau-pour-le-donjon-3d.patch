@@ -1,5 +1,5 @@
 diff --git a/engines/kyra/engine/lol.cpp b/engines/kyra/engine/lol.cpp
-index c4f86a30..e46e32eb 100644
+index c4f86a30..bc2f3269 100644
 --- a/engines/kyra/engine/lol.cpp
 +++ b/engines/kyra/engine/lol.cpp
 @@ -45,6 +45,11 @@ LolvrGameState g_lolvrState = {1, 0, {0}, 0, 0, 0, 0, 0, 0, 0, {0}, {0}};
@@ -14,7 +14,7 @@ index c4f86a30..e46e32eb 100644
  }
  
  namespace Kyra {
-@@ -968,6 +973,25 @@ void LoLEngine::runLoop() {
+@@ -968,6 +973,35 @@ void LoLEngine::runLoop() {
  		g_lolvrState.reserved[0]++;
  		g_lolvrState.reserved[1] = _currentControlMode | (_weaponsDisabled ? 0x100 : 0); // 0x100: character sheet
  		g_lolvrState.reserved[3] = countActiveCharacters(); // lol-vr: where the portraits (and their buttons) are
@@ -26,6 +26,16 @@ index c4f86a30..e46e32eb 100644
 +		g_lolvrLevel.block = _currentBlock;
 +		g_lolvrLevel.direction = _currentDirection;
 +		g_lolvrLevel.inDungeon = 1;
++		{
++			int nearObj = 0;
++			uint16 nb = _currentBlock;
++			for (int k = 0; k < 4; k++) {
++				if (_levelBlockProperties[nb].assignedObjects)
++					nearObj |= 1 << k;
++				nb = calcNewBlockPosition(nb, _currentDirection);
++			}
++			g_lolvrLevel.nearObjects = nearObj;
++		}
 +		{
 +			bool changed = false;
 +			for (int i = 0; i < 1024; i++)
@@ -41,10 +51,10 @@ index c4f86a30..e46e32eb 100644
  		_timer->update();
  
 diff --git a/engines/kyra/engine/lol.h b/engines/kyra/engine/lol.h
-index a9028a26..55052c96 100644
+index a9028a26..8cd60c30 100644
 --- a/engines/kyra/engine/lol.h
 +++ b/engines/kyra/engine/lol.h
-@@ -50,6 +50,38 @@ struct LolvrGameState {
+@@ -50,6 +50,43 @@ struct LolvrGameState {
  	int32 reserved[4];  // [0] dungeon loop ticks, [1] control mode, [2] bit 0: automap open, bit 1: game menu open
  };
  extern LolvrGameState g_lolvrState;
@@ -78,12 +88,17 @@ index a9028a26..55052c96 100644
 +	const uint8 *wallPixels;   // wallSlots * 128 * 96
 +	const uint8 *wallAlpha;    // wallSlots * 128 * 96
 +	uint8 screenPalette[768];  // 256 colours, 6-bit VGA, at capture time
++	// Bit k set: monsters or items in the block k steps ahead of the party (0 = its own block).
++	int32 nearObjects;
++	// The door of each wall type alone (doors stand in the middle of their block, not on its face).
++	const uint8 *doorPixels;   // wallSlots * 128 * 96
++	const uint8 *doorAlpha;
 +};
 +extern LolvrLevelData g_lolvrLevel;
  }
  
  namespace Audio {
-@@ -335,6 +367,7 @@ private:
+@@ -335,6 +372,7 @@ private:
  
  	// main loop
  	void runLoop();
@@ -92,7 +107,7 @@ index a9028a26..55052c96 100644
  
  	// mouse
 diff --git a/engines/kyra/engine/scene_lol.cpp b/engines/kyra/engine/scene_lol.cpp
-index 210b4828..23072bb8 100644
+index 210b4828..1e90a658 100644
 --- a/engines/kyra/engine/scene_lol.cpp
 +++ b/engines/kyra/engine/scene_lol.cpp
 @@ -405,6 +405,19 @@ void LoLEngine::loadLevelGraphics(const char *file, int specialColor, int weight
@@ -115,7 +130,7 @@ index 210b4828..23072bb8 100644
  	Palette tpal(256);
  	if (_flags.use16ColorMode) {
  		uint8 *dst = tpal.getData();
-@@ -1581,6 +1594,110 @@ void LoLEngine::drawSpecialGuiShape(int pageNum) {
+@@ -1581,6 +1594,135 @@ void LoLEngine::drawSpecialGuiShape(int pageNum) {
  		_screen->drawShape(pageNum, _specialGuiShape, _specialGuiShapeX + _specialGuiShape[3], _specialGuiShapeY, 2, 1);
  }
  
@@ -128,6 +143,8 @@ index 210b4828..23072bb8 100644
 +	static uint8 pixels[kMaxSlots * kW * kH];
 +	static uint8 alpha[kMaxSlots * kW * kH];
 +	static uint8 shapeA[kW * kH];
++	static uint8 doorPx[kMaxSlots * kW * kH];
++	static uint8 doorAl[kMaxSlots * kW * kH];
 +
 +	g_lolvrLevel.wallCaptureSerial = g_lolvrLevel.gfxSerial;
 +	for (int i = 0; i < 256; i++)
@@ -135,6 +152,8 @@ index 210b4828..23072bb8 100644
 +	g_lolvrLevel.wallSlots = 0;
 +	g_lolvrLevel.wallPixels = pixels;
 +	g_lolvrLevel.wallAlpha = alpha;
++	g_lolvrLevel.doorPixels = doorPx;
++	g_lolvrLevel.doorAlpha = doorAl;
 +	if (!_vmpPtr || !_vcnBlocks || !_blockDrawingBuffer || !_sceneWindowBuffer)
 +		return;
 +	memcpy(g_lolvrLevel.screenPalette, _screen->getPalette(0).getData(), 768);
@@ -163,6 +182,10 @@ index 210b4828..23072bb8 100644
 +		uint8 *al = alpha + slot * kW * kH;
 +		memset(px, 0, kW * kH);
 +		memset(al, 0, kW * kH);
++		uint8 *dpx = doorPx + slot * kW * kH;
++		uint8 *dal = doorAl + slot * kW * kH;
++		memset(dpx, 0, kW * kH);
++		memset(dal, 0, kW * kH);
 +
 +		for (int i = 0; i < 18; i++) {
 +			_visibleBlocks[i] = &fake[0];
@@ -197,22 +220,39 @@ index 210b4828..23072bb8 100644
 +				}
 +		}
 +
-+		// 2. Decorations and door, drawn twice over two plain fills: a pixel the shapes cover
-+		// keeps the same colour in both.
-+		for (int pass = 0; pass < 2; pass++) {
-+			uint8 fill = pass ? 0xFE : 0x01;
-+			_screen->fillRect(112, 0, 112 + 175, 119, fill, _sceneDrawPage1);
-+			drawSceneShapes();
-+			for (int y = 0; y < kH; y++)
-+				for (int x = 0; x < kW; x++) {
-+					uint8 c = page[(y0 + y) * 320 + x0 + x];
-+					if (!pass)
-+						shapeA[y * kW + x] = c;
-+					else if (c == shapeA[y * kW + x] && c != fill) {
-+						px[y * kW + x] = c;
-+						al[y * kW + x] = 255;
++		// 2. Decorations (on the face), then the door (alone), each drawn twice over two plain
++		// fills: a pixel the shapes cover keeps the same colour in both.
++		for (int part = 0; part < 2; part++) {
++			for (int pass = 0; pass < 2; pass++) {
++				uint8 fill = pass ? 0xFE : 0x01;
++				_screen->fillRect(112, 0, 112 + 175, 119, fill, _sceneDrawPage1);
++				_shpDmX1 = 0;
++				_shpDmX2 = 0;
++				setLevelShapesDim(13, _shpDmX1, _shpDmX2, _sceneShpDim);
++				if (_shpDmX2 > _shpDmX1) {
++					if (part == 0) {
++						drawDecorations(13);
++					} else if (_wllWallFlags[t] & 8) {
++						int16 dimY1 = 0, dimY2 = 0;
++						uint16 v = 20 * (t - (t < 23 ? _dscDoorScaleOffs[t] : 0));
++						if (v > 80)
++							v = 80;
++						setDoorShapeDim(13, dimY1, dimY2, _sceneShpDim);
++						drawDoor(_doorShapes[(t < 23 ? _dscDoorShpIndex[t] : 0)], 0, 13, 10, 0, -v, 2);
++						setLevelShapesDim(13, dimY1, dimY2, _sceneShpDim);
 +					}
 +				}
++				for (int y = 0; y < kH; y++)
++					for (int x = 0; x < kW; x++) {
++						uint8 c = page[(y0 + y) * 320 + x0 + x];
++						if (!pass) {
++							shapeA[y * kW + x] = c;
++						} else if (c == shapeA[y * kW + x] && c != fill) {
++							(part ? dpx : px)[y * kW + x] = c;
++							(part ? dal : al)[y * kW + x] = 255;
++						}
++					}
++			}
 +		}
 +	}
 +

@@ -441,7 +441,18 @@ struct App {
 	// Le donjon en 3D (lol-vr-3d)
 	lolvr::Dungeon dungeon;
 	bool dungeonOk = false;
-	bool dungeonOn = true;          // réglage du joueur (menu du poignet)
+	char tileset[16] = {0};         // région du niveau (« KEEP », « FOREST1 »...)
+	int dungeonMode = 1;            // menu du poignet : 0 non, 1 oui (écran au besoin), 2 oui (écran toujours)
+	bool screenShown = true;        // le grand écran est affiché
+	double screenNeededAt = 0;
+	float dunYaw = 0;               // lacet (monde) vers lequel le groupe regarde
+	bool dunYawSet = false;
+	int shownDir = -1;              // direction du groupe déjà prise en compte
+	float turnFade = 0, turnTarget = 0; // virage : bref fondu au noir, la pièce pivote au plus sombre
+	int alignTurn = 0, alignExpect = -1; // le groupe se tourne vers le regard du joueur
+	double alignUntil = 0, moveBlockUntil = 0;
+	float wallDim = 0;              // la tête du joueur entre dans un mur : on assombrit
+	float dungeonLight = 1.0f;
 	bool dungeonVisible = false;
 	lolvr::LevelSnapshot level;
 	lolvr::DungeonTextures dunTex;
@@ -461,8 +472,8 @@ struct App {
 	bool screenPlaced = false;
 	Vec3 screenPos = {0, 0, -2.2f};
 	float screenYaw = 0.0f;
-	float widths[kEnvCount] = {2.4f, 1.8f, 0.62f}; // mètres : largeur de l'image entière (hauteur = 3/4)
-	float distances[kEnvCount] = {2.2f, 2.0f, 0.95f};
+	float widths[kEnvCount] = {1.1f, 1.8f, 0.62f}; // mètres : largeur de l'image entière (hauteur = 3/4)
+	float distances[kEnvCount] = {1.15f, 2.0f, 0.95f};
 	// Ce que l'écran affiche en ce moment : portion de l'image du jeu (pixels) et taille réelle (mètres).
 	float cropX = 0, cropY = 0, cropW = 320, cropH = 200;
 	float dispW = 2.4f, dispH = 1.8f;
@@ -1051,7 +1062,7 @@ struct Limits {
 	float wMin, wMax, dMin, dMax;
 };
 // Dans la bibliothèque, l'écran doit tenir entre les étagères et devant le mur du fond.
-const Limits kLimits[kEnvCount] = {{1.0f, 3.0f, 1.2f, 2.9f}, {0.4f, 5.0f, 0.4f, 5.0f}, {0.25f, 2.0f, 0.35f, 3.0f}};
+const Limits kLimits[kEnvCount] = {{0.5f, 3.0f, 0.6f, 2.9f}, {0.4f, 5.0f, 0.4f, 5.0f}, {0.25f, 2.0f, 0.35f, 3.0f}};
 
 // Fichier de réglages : une ligne par réglage, « nom valeurs… ». Les lignes inconnues sont ignorées.
 void loadSettings(App &app, int &environment) {
@@ -1060,6 +1071,13 @@ void loadSettings(App &app, int &environment) {
 		return;
 	char line[256];
 	int screenIndex = 0, aimIndex = 0, loadedPanels = 0;
+	// La disposition (écran, fenêtres) n'est reprise que si elle a été enregistrée avec la disposition
+	// d'origine actuelle (« disposition 2 » : écran plus petit et plus proche, pour le donjon en 3D).
+	bool layoutCurrent = false;
+	while (fgets(line, sizeof(line), f))
+		if (!strncmp(line, "disposition 2", 13))
+			layoutCurrent = true;
+	rewind(f);
 	while (fgets(line, sizeof(line), f)) {
 		char name[32] = {0};
 		int used = 0;
@@ -1070,6 +1088,8 @@ void loadSettings(App &app, int &environment) {
 		if (!strcmp(name, "decor")) {
 			if (sscanf(rest, "%d", &iv) == 1 && iv >= 0 && iv < kEnvCount)
 				environment = iv;
+		} else if (!layoutCurrent && (!strcmp(name, "ecran") || !strcmp(name, "visee") || !strcmp(name, "panneau"))) {
+			continue;
 		} else if (!strcmp(name, "ecran")) {
 			float w = 0, d = 0;
 			if (screenIndex < kEnvCount && sscanf(rest, "%f %f", &w, &d) == 2) {
@@ -1087,7 +1107,7 @@ void loadSettings(App &app, int &environment) {
 				app.language = iv == 1 ? lolvr::kLangFrench : lolvr::kLangEnglish;
 		} else if (!strcmp(name, "donjon3d")) {
 			if (sscanf(rest, "%d", &iv) == 1)
-				app.dungeonOn = iv != 0;
+				app.dungeonMode = iv >= 0 && iv <= 2 ? iv : 1;
 		} else if (!strcmp(name, "engrenage")) {
 			if (sscanf(rest, "%d", &iv) == 1)
 				app.gearKnown = iv != 0;
@@ -1130,6 +1150,7 @@ void saveSettings(App &app) {
 	FILE *f = fopen(app.settingsPath.c_str(), "w");
 	if (!f)
 		return;
+	fprintf(f, "disposition 2\n");
 	fprintf(f, "decor %d\n", app.environment);
 	for (int i = 0; i < kEnvCount; i++)
 		fprintf(f, "ecran %.3f %.3f\n", app.widths[i], app.distances[i]);
@@ -1137,7 +1158,7 @@ void saveSettings(App &app) {
 	fprintf(f, "panneaux %d\n", app.detached ? 1 : 0);
 	fprintf(f, "langue %d\n", app.language);
 	fprintf(f, "engrenage %d\n", app.gearKnown ? 1 : 0);
-	fprintf(f, "donjon3d %d\n", app.dungeonOn ? 1 : 0);
+	fprintf(f, "donjon3d %d\n", app.dungeonMode);
 	for (int i = 0; i < kEnvCount; i++)
 		fprintf(f, "visee %d %.4f %.4f\n", app.aimSaved[i] ? 1 : 0, app.aimYaw[i], app.aimPitch[i]);
 	if (app.ui.hasLayout())
@@ -1194,9 +1215,10 @@ void placeScreen(App &app, bool newAnchor) {
 			app.anchorDir = rotate(quatYaw(y), {0, 0, -1}) * cosf(p) + Vec3{0, sinf(p), 0};
 			app.screenYaw = y;
 		} else if (library) {
-			// Un peu au-dessus de la ligne des yeux : les fenêtres du jeu se logent dessous.
+			// Un peu sous la ligne des yeux, à portée de main : les fenêtres du jeu se logent dessous,
+			// et le donjon reste dégagé droit devant.
 			float d = screenDistance(app);
-			app.anchorDir = normalize(flat * d + Vec3{0, 0.05f, 0});
+			app.anchorDir = normalize(flat * d + Vec3{0, -0.12f * d, 0});
 		} else {
 			// En réalité mixte, l'écran se pose là où l'on regarde (sur un bureau, par exemple).
 			float pitch = clampf(asinf(clampf(fwd.y, -1.0f, 1.0f)), -0.6f, 0.45f);
@@ -1351,6 +1373,8 @@ void updateGameEvents(App &app, double now) {
 	// L'interface se détache quand la partie est en cours et que l'écran a sa disposition
 	// habituelle : pas de scène sur toute la largeur, pas de carte ni de menu ouverts.
 	app.gameStarted = gs.level > 0;
+	memcpy(app.tileset, gs.tileset, sizeof(app.tileset));
+	app.tileset[sizeof(app.tileset) - 1] = 0;
 	if (gs.automapOpen && !app.automapOpen)
 		app.automapSince = now;
 	app.automapOpen = gs.automapOpen;
@@ -1693,7 +1717,7 @@ void updateUi(App &app, float dt, double now, bool pointer, bool triggerPressed,
 		in.partyMark[3] = 34.0f;
 	}
 	app.ui.setOptions(app.fireOn, app.detached);
-	app.ui.setDungeonOption(app.dungeonOn);
+	app.ui.setDungeonOption(app.dungeonMode);
 	app.ui.setLanguage(app.language);
 	// Menu du poignet : sur la main gauche, quand on la regarde.
 	in.wristValid = app.aimValid[kLeft];
@@ -1706,6 +1730,7 @@ void updateUi(App &app, float dt, double now, bool pointer, bool triggerPressed,
 	in.helpOpen = app.helpOpen;
 	in.compassBlank = app.split && app.charSheet;
 	in.gearHint = !app.gearKnown;
+	in.screenHidden = !app.screenShown;
 	in.time = now;
 	app.ui.setInfo(app.imageInfo[0], app.imageInfo[1]);
 	if (!app.ui.hasLayout() && app.screenPlaced)
@@ -1746,7 +1771,7 @@ void updateUi(App &app, float dt, double now, bool pointer, bool triggerPressed,
 		app.keyboardOpen = false;
 		break;
 	case lolvr::kUiActionToggleDungeon:
-		app.dungeonOn = !app.dungeonOn;
+		app.dungeonMode = (app.dungeonMode + 1) % 3;
 		app.settingsDirty = true;
 		break;
 	case lolvr::kUiActionToggleKeyboard:
@@ -1796,6 +1821,7 @@ void updateInput(App &app, XrTime time, float dt, double now) {
 	if (app.headValid && recenter && !app.recenterDown) {
 		updateFloor(app, time);
 		placeScreen(app, true);
+		app.dunYaw = app.anchorYaw; // le groupe regarde de nouveau droit devant
 	}
 	app.recenterDown = recenter;
 
@@ -1841,7 +1867,14 @@ void updateInput(App &app, XrTime time, float dt, double now) {
 	} else {
 		if (ui.pointerValid)
 			CoreHost::get().setPointer(ui.gu, ui.gv);
-		CoreHost::get().setMouseButtons(app.triggerDown[hand] && toGame, app.squeezeDown[hand] && toGame);
+		// Clic droit : la poignée de la main qui vise, ou le bouton X (boire une potion, utiliser un objet).
+		bool xRight = getBool(app, app.xAction, -1) && ui.pointerValid;
+		CoreHost::get().setMouseButtons(app.triggerDown[hand] && toGame, (app.squeezeDown[hand] && toGame) || xRight);
+		if (xRight && !app.keyboardButtonDown) {
+			app.clickPulse = 1.0f;
+			pulse(app, hand, 0.28f, 0.018f);
+		}
+		app.keyboardButtonDown = xRight;
 	}
 	if (clicked[hand] && toGame) {
 		app.clickPulse = 1.0f;
@@ -1866,11 +1899,28 @@ void updateInput(App &app, XrTime time, float dt, double now) {
 				horizontal = ax * 1.5f > ay;
 			dir = horizontal ? (left.x < 0 ? 3 : 4) : (left.y > 0 ? 1 : 2);
 		}
+		// Donjon 3D : on marche vers là où l'on regarde. Si le regard s'écarte de plus de 45° de la
+		// direction du groupe, le groupe se tourne d'abord de ce côté (sans que la pièce bouge).
+		if (dir != 0 && app.moveDir == 0 && app.dungeonVisible && app.headValid && app.alignTurn == 0) {
+			Vec3 f = rotate(app.headRot, {0, 0, -1});
+			float rel = atan2f(-f.x, -f.z) - app.dunYaw;
+			while (rel > 3.14159265f) rel -= 6.2831853f;
+			while (rel < -3.14159265f) rel += 6.2831853f;
+			if (fabsf(rel) > 0.80f && fabsf(rel) < 2.35f) {
+				bool leftTurn = rel > 0.0f;
+				typeKey(app, leftTurn ? RETROK_HOME : RETROK_PAGEUP, 0, now);
+				app.alignTurn = leftTurn ? 1 : -1;
+				app.alignExpect = (app.level.direction + (leftTurn ? 3 : 1)) & 3;
+				app.alignUntil = now + 1.0;
+				app.moveBlockUntil = now + 0.30;
+			}
+		}
 		app.moveDir = dir;
-		setKey(app.kUp, dir == 1, RETROK_UP);
-		setKey(app.kDown, dir == 2, RETROK_DOWN);
-		setKey(app.kSlideL, dir == 3, RETROK_LEFT);
-		setKey(app.kSlideR, dir == 4, RETROK_RIGHT);
+		bool moveOk = now >= app.moveBlockUntil;
+		setKey(app.kUp, dir == 1 && moveOk, RETROK_UP);
+		setKey(app.kDown, dir == 2 && moveOk, RETROK_DOWN);
+		setKey(app.kSlideL, dir == 3 && moveOk, RETROK_LEFT);
+		setKey(app.kSlideR, dir == 4 && moveOk, RETROK_RIGHT);
 	}
 	setKey(app.kTurnL, !stickBusy && threshold(app.kTurnL.down, -right.x), RETROK_HOME);
 	setKey(app.kTurnR, !stickBusy && threshold(app.kTurnR.down, right.x), RETROK_PAGEUP);
@@ -1933,13 +1983,7 @@ void updateInput(App &app, XrTime time, float dt, double now) {
 	setKey(app.kEnter, aDown && !combat, RETROK_RETURN);
 	setKey(app.kEsc, bDown && !combat, RETROK_ESCAPE);
 	setKey(app.kMap, getBool(app, app.yAction, -1), RETROK_m);
-	// X = clavier et options (pour nommer une sauvegarde, entre autres), bouton menu = menu ScummVM.
-	bool keyboardButton = getBool(app, app.xAction, -1);
-	if (keyboardButton && !app.keyboardButtonDown) {
-		app.keyboardOpen = !app.keyboardOpen;
-		pulse(app, kLeft, 0.3f, 0.03f);
-	}
-	app.keyboardButtonDown = keyboardButton;
+	// X = clic droit (voir plus haut) ; le clavier s'ouvre depuis le menu du poignet. Bouton menu = menu ScummVM.
 	CoreHost::get().setSpecialButtons(false, getBool(app, app.menuAction, -1));
 	releaseTypedKeys(app, now, false);
 }
@@ -2043,11 +2087,16 @@ bool renderQuad(App &app) {
 	return true;
 }
 
+// Les régions à ciel ouvert : pas de plafond, le ciel.
+bool isOutdoorTileset(const char *t) {
+	return !strcmp(t, "FOREST1") || !strcmp(t, "SWAMP") || !strcmp(t, "YVEL1");
+}
+
 // Le donjon en 3D : suit le niveau publié par le moteur, reconstruit les murs quand ils changent
 // (portes) et fait glisser le groupe d'une case à l'autre.
 void updateDungeon(App &app, float dt) {
 	app.dungeonVisible = false;
-	if (!app.dungeonOk || !app.dungeonOn || !app.coreStarted || !app.gameStarted)
+	if (!app.dungeonOk || !app.dungeonMode || !app.coreStarted || !app.gameStarted)
 		return;
 	lolvr::LevelSnapshot &l = app.level;
 	if (!CoreHost::get().levelSnapshot(l) || l.level <= 0 || l.vmp.empty())
@@ -2068,7 +2117,12 @@ void updateDungeon(App &app, float dt) {
 		g.wallAlpha = l.wallAlpha.data();
 		g.wallSlots = l.wallSlots;
 		g.screenPalette = l.screenPalette;
+		if (!l.doorPixels.empty() && !l.doorAlpha.empty()) {
+			g.doorPixels = l.doorPixels.data();
+			g.doorAlpha = l.doorAlpha.data();
+		}
 	}
+	g.outdoor = isOutdoorTileset(app.tileset);
 	const bool gfxChanged = l.gfxSerial != app.builtGfx || l.wallCaptureSerial != app.builtCapture;
 	if (gfxChanged) {
 		app.builtCapture = l.wallCaptureSerial;
@@ -2083,30 +2137,103 @@ void updateDungeon(App &app, float dt) {
 		app.dungeon.setMesh(verts);
 		app.builtWalls = l.wallsSerial;
 	}
-	// Le groupe glisse vers sa case et tourne vers sa direction (quelques dixièmes de seconde) ;
-	// un changement de niveau ou une téléportation le pose directement.
+	// Le groupe glisse vers sa case (quelques dixièmes de seconde). Les virages ne glissent pas (cela
+	// donne mal au cœur) : un bref fondu au noir, et la pièce a pivoté. Quand le groupe se tourne de
+	// lui-même vers l'endroit que le joueur regarde, rien ne bouge. Un changement de niveau ou une
+	// téléportation pose le groupe directement.
+	if (!app.dunYawSet) {
+		app.dunYaw = app.anchorYaw;
+		app.dunYawSet = true;
+	}
 	float tx, tz;
 	lolvr::blockCenter(l.block, tx, tz);
-	float tyaw = (float)(l.direction & 3) * 1.5707963f;
+	const int dir = l.direction & 3;
 	float dx = tx - app.partyX, dz = tz - app.partyZ;
-	bool snap = gfxChanged || app.shownLevel != l.level || dx * dx + dz * dz > 1.6f * lolvr::kBlockSize * 1.6f * lolvr::kBlockSize;
-	float dyaw = tyaw - app.partyYaw;
-	while (dyaw > 3.14159265f) dyaw -= 6.2831853f;
-	while (dyaw < -3.14159265f) dyaw += 6.2831853f;
+	bool snap = gfxChanged || app.shownLevel != l.level || app.shownDir < 0 ||
+	            dx * dx + dz * dz > 1.6f * lolvr::kBlockSize * 1.6f * lolvr::kBlockSize;
+	auto wrapPi = [](float a) {
+		while (a > 3.14159265f) a -= 6.2831853f;
+		while (a < -3.14159265f) a += 6.2831853f;
+		return a;
+	};
+	const float dyaw = wrapPi((float)dir * 1.5707963f - app.partyYaw);
 	if (snap) {
 		app.partyX = tx;
 		app.partyZ = tz;
-		app.partyYaw = tyaw;
+		app.partyYaw += dyaw;
+		app.turnFade = 0;
 	} else {
 		float k = clampf(dt * 12.0f, 0.0f, 1.0f);
 		app.partyX += dx * k;
 		app.partyZ += dz * k;
-		app.partyYaw += dyaw * k;
 		if (fabsf(tx - app.partyX) < 0.002f && fabsf(tz - app.partyZ) < 0.002f)
 			app.partyX = tx, app.partyZ = tz;
+		if (dir != app.shownDir) {
+			if (app.alignTurn != 0 && dir == app.alignExpect) {
+				app.dunYaw -= dyaw; // le monde reste immobile : c'est le groupe qui s'est tourné
+				app.partyYaw += dyaw;
+				app.alignTurn = 0;
+			} else {
+				app.turnTarget = app.partyYaw + dyaw;
+				if (app.turnFade <= 0.0f)
+					app.turnFade = 0.0001f;
+			}
+		}
 	}
+	app.shownDir = dir;
+	if (app.alignTurn != 0 && nowSeconds() > app.alignUntil)
+		app.alignTurn = 0;
+	float light = 1.0f;
+	if (app.turnFade > 0.0f) {
+		app.turnFade += dt / 0.22f;
+		if (app.turnFade >= 0.5f)
+			app.partyYaw = app.turnTarget;
+		if (app.turnFade >= 1.0f)
+			app.turnFade = 0.0f;
+		light = app.turnFade > 0.0f ? clampf(fabsf(app.turnFade - 0.5f) * 2.0f, 0.0f, 1.0f) : 1.0f;
+	}
+	// La tête du joueur entre dans un mur (il s'est penché, ou a marché dans sa pièce) : pénombre.
+	{
+		Vec3 rel = app.headPos - app.roomPos;
+		Vec3 p = rotate(quatYaw(-(app.dunYaw + app.partyYaw)), rel);
+		float lx = p.x + app.partyX, lz = p.z + app.partyZ;
+		const float S = lolvr::kBlockSize, m = 0.20f;
+		bool inWall = false;
+		for (int k = 0; k < 4 && !inWall; k++) {
+			float sx = lx + ((k & 1) ? m : -m), sz = lz + ((k & 2) ? m : -m);
+			int bx = (int)floorf(sx / S), bz = (int)floorf(sz / S);
+			inWall = bx < 0 || bx > 31 || bz < 0 || bz > 31 || lolvr::isSolidBlock(l.walls, bz * 32 + bx, g);
+		}
+		app.wallDim += ((inWall ? 1.0f : 0.0f) - app.wallDim) * clampf(dt * 8.0f, 0.0f, 1.0f);
+		light *= 1.0f - 0.92f * app.wallDim;
+	}
+	app.dungeonLight = light;
 	app.shownLevel = l.level;
 	app.dungeonVisible = app.dungeon.hasContent();
+}
+
+// Donjon 3D : le grand écran n'apparaît que lorsqu'on en a besoin. Le donjon en 3D montre déjà les
+// murs ; l'écran revient pour ce que la 3D ne montre pas encore (monstres et objets proches), pour
+// les scènes, la carte, les menus et la fiche d'un personnage, et reste un moment après.
+void updateScreenShown(App &app, double now) {
+	bool need = !app.dungeonVisible || app.dungeonMode == 2 || !app.split || app.charSheet || app.automapOpen ||
+	            (app.level.nearObjects & 0x7) != 0;
+	if (need)
+		app.screenNeededAt = now;
+	bool show = need || now - app.screenNeededAt < 1.5;
+	if (show && !app.screenShown && app.dungeonVisible && app.headValid && app.screenPlaced) {
+		// Il revient là où le joueur regarde, à sa distance et à sa hauteur habituelles.
+		Vec3 f = rotate(app.headRot, {0, 0, -1});
+		float delta = atan2f(-f.x, -f.z) - app.screenYaw;
+		while (delta > 3.14159265f) delta -= 6.2831853f;
+		while (delta < -3.14159265f) delta += 6.2831853f;
+		if (fabsf(delta) > 0.6f) {
+			app.anchorDir = rotate(quatYaw(delta), app.anchorDir);
+			app.screenYaw += delta;
+			placeScreen(app, false);
+		}
+	}
+	app.screenShown = show;
 }
 
 void fillSceneState(App &app, double now, bool focused) {
@@ -2126,7 +2253,9 @@ void fillSceneState(App &app, double now, bool focused) {
 	s.roomYaw = app.anchorYaw;
 	// Le donjon : la case du groupe sous les pieds du joueur, la direction du groupe droit devant lui.
 	s.dungeonVisible = app.dungeonVisible;
-	s.dungeonModel = lolvr::dungeonModel(app.roomPos, app.anchorYaw, app.partyX, app.partyZ, app.partyYaw);
+	s.dungeonModel = lolvr::dungeonModel(app.roomPos, app.dunYaw, app.partyX, app.partyZ, app.partyYaw);
+	s.dungeonLight = app.dungeonLight;
+	s.screenVisible = app.screenShown;
 	for (int h = 0; h < 2; h++) {
 		lolvr::HandState &hand = s.hands[h];
 		bool pointing = h == app.activeHand;
@@ -2200,6 +2329,7 @@ void renderFrame(App &app, float dt, int savedEnvironment) {
 
 		uploadFrame(app);
 		updateDungeon(app, dt);
+		updateScreenShown(app, now);
 		fillSceneState(app, now, focused);
 		app.scene.prepare(app.ss);
 
@@ -2219,7 +2349,7 @@ void renderFrame(App &app, float dt, int savedEnvironment) {
 			passthroughLayer.layerHandle = app.passthroughLayer;
 			layers.push_back((const XrCompositionLayerBaseHeader *)&passthroughLayer);
 		}
-		if (app.screenPlaced && Scene::usesQuadLayer(app.environment) && renderQuad(app)) {
+		if (app.screenPlaced && app.screenShown && Scene::usesQuadLayer(app.environment) && renderQuad(app)) {
 			quadLayer.space = app.localSpace;
 			quadLayer.eyeVisibility = XR_EYE_VISIBILITY_BOTH;
 			quadLayer.subImage.swapchain = app.quadSwapchain.handle;

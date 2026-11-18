@@ -84,7 +84,14 @@ void sampleTrapezoid(const Rgba *bg, Rgba *dst, float yFar, float yNear, float w
 	}
 }
 
+float clampDepth(float r) {
+	return r < 1.0f ? 1.0f : r > 3.0f ? 3.0f : r;
+}
+
 bool hasSolidWall(const DungeonGfx &g, uint8_t t) {
+	// Un type fait d'un seul dessin, sans mur (fontaine, statue...), ne ferme pas la case.
+	if (g.wallSlot && g.wallSlot[t] >= 0 && !g.vmpMap[t])
+		return false;
 	return t != 0 && !(g.wallFlags[t] & 8);
 }
 
@@ -102,8 +109,11 @@ void decodeDungeonTextures(const DungeonGfx &g, DungeonTextures &out) {
 	out = DungeonTextures();
 	for (int i = 0; i < 64; i++)
 		out.pageLayer[i] = -1;
-	for (int i = 0; i < 256; i++)
-		out.typeLayer[i] = -1;
+	for (int i = 0; i < 256; i++) {
+		out.typeLayer[i] = out.doorLayer[i] = out.decalLayer[i] = -1;
+		out.doorDepth[i] = 1.0f;
+		out.kind[i] = kWallFace;
+	}
 	if (!g.vmp || !g.vcn || !g.colTable || !g.palette || !g.vmpMap || g.vmpLen < 330)
 		return;
 	const int pages = (g.vmpLen - 330) / kPageLen;
@@ -141,34 +151,64 @@ void decodeDungeonTextures(const DungeonGfx &g, DungeonTextures &out) {
 		}
 	}
 
-	// Les murs dessinés par le moteur : une couche par type, décors et portes compris.
+	// Les murs dessinés par le moteur : une couche par type, décors compris ; la porte à part.
 	if (g.wallSlot && g.wallPixels && g.wallAlpha && g.screenPalette && g.wallSlots > 0) {
 		const int n = kDunTexSize * kDunWallRows;
-		// Le mur de pierre ordinaire du niveau, pour habiller les murs pleins faits d'un seul décor.
-		int plainSlot = g.wallSlot[1];
+		auto rgb = [&](int c) {
+			return Rgba{vga(g.screenPalette[c * 3]), vga(g.screenPalette[c * 3 + 1]), vga(g.screenPalette[c * 3 + 2]), 255};
+		};
+		auto newLayer = [&]() {
+			out.layers++;
+			out.rgba.resize(out.layers * layerBytes, 0);
+			return (Rgba *)&out.rgba[(out.layers - 1) * layerBytes];
+		};
 		for (int t = 1; t < 256; t++) {
 			int slot = g.wallSlot[t];
 			if (slot < 0 || slot >= g.wallSlots)
 				continue;
-			out.typeLayer[t] = out.layers++;
-			out.rgba.resize(out.layers * layerBytes, 0);
-			Rgba *img = (Rgba *)&out.rgba[(out.layers - 1) * layerBytes];
 			const uint8_t *px = g.wallPixels + (size_t)slot * n, *al = g.wallAlpha + (size_t)slot * n;
 			const bool seeThrough = (g.wallFlags[t] & 8) != 0;
-			const uint8_t *bpx = (!seeThrough && plainSlot >= 0 && plainSlot < g.wallSlots) ? g.wallPixels + (size_t)plainSlot * n : nullptr;
-			const uint8_t *bal = bpx ? g.wallAlpha + (size_t)plainSlot * n : nullptr;
-			for (int y = 0; y < kDunWallRows; y++)
-				for (int x = 0; x < kDunTexSize; x++) {
-					int i = y * kDunTexSize + x;
-					int c = -1;
-					if (al[i])
-						c = px[i];
-					else if (bpx && bal[i])
-						c = bpx[i];
-					if (c >= 0)
-						img[i] = Rgba{vga(g.screenPalette[c * 3]), vga(g.screenPalette[c * 3 + 1]), vga(g.screenPalette[c * 3 + 2]), 255};
+			int top = kDunWallRows, bottom = -1;
+			for (int i = 0; i < n; i++)
+				if (al[i]) {
+					top = top < i / kDunTexSize ? top : i / kDunTexSize;
+					bottom = i / kDunTexSize;
 				}
-			if (!seeThrough) {
+			if (bottom < 0 && !(g.doorAlpha && seeThrough))
+				continue;
+			// Un type sans mur, fait d'un seul dessin : un objet au milieu de la case, ou, s'il ne
+			// dessine que sous l'horizon (au-delà de la ligne 56), quelque chose au sol.
+			if (!g.vmpMap[t] && bottom >= 0) {
+				if (seeThrough && top >= 56) {
+					out.kind[t] = kWallDecal;
+					// Le sol de la case vue de face occupe les lignes 64 (bord lointain) à 96 (bord
+					// proche) ; on le remet à plat, vu de dessus.
+					Rgba *img = newLayer();
+					out.decalLayer[t] = out.layers - 1;
+					for (int j = 0; j < kDunTexSize; j++) {
+						float k = 3.0f - 2.0f * ((float)j + 0.5f) / kDunTexSize; // 3 au loin, 1 tout près
+						int row = (int)(48.0f + 48.0f / k);
+						if (row >= kDunWallRows)
+							row = kDunWallRows - 1;
+						for (int i = 0; i < kDunTexSize; i++) {
+							int col = (int)(64.0f + (((float)i + 0.5f) / kDunTexSize - 0.5f) * 128.0f / k);
+							int si = row * kDunTexSize + (col < 0 ? 0 : col > 127 ? 127 : col);
+							if (al[si])
+								img[j * kDunTexSize + i] = rgb(px[si]);
+						}
+					}
+					continue;
+				}
+				out.kind[t] = kWallObject;
+			}
+			out.typeLayer[t] = out.layers;
+			Rgba *img = newLayer();
+			for (int i = 0; i < n; i++)
+				if (al[i])
+					img[i] = rgb(px[i]);
+			// Un mur plein ne doit laisser passer aucun jour (le jeu y dessinait le sol, en bas) : chaque
+			// pixel transparent prend la couleur du pixel opaque au-dessus de lui.
+			if (!seeThrough && out.kind[t] == kWallFace) {
 				for (int x = 0; x < kDunTexSize; x++) {
 					Rgba last = {0, 0, 0, 255};
 					for (int y = 0; y < kDunWallRows; y++) {
@@ -178,6 +218,23 @@ void decodeDungeonTextures(const DungeonGfx &g, DungeonTextures &out) {
 						else
 							cc = last;
 					}
+				}
+			}
+			// La porte, à part : dans le jeu, elle se dresse au milieu de sa case. Son pied (le bas
+			// du dessin) dit à quelle profondeur : sur la face, il serait à la ligne 96.
+			if (g.doorPixels && g.doorAlpha) {
+				const uint8_t *dpx = g.doorPixels + (size_t)slot * n, *dal = g.doorAlpha + (size_t)slot * n;
+				int foot = -1;
+				for (int i = 0; i < n; i++)
+					if (dal[i])
+						foot = i / kDunTexSize;
+				if (foot > 50) {
+					out.doorLayer[t] = out.layers;
+					out.doorDepth[t] = clampDepth(48.0f / ((float)foot + 1.0f - 48.0f));
+					Rgba *dimg = newLayer();
+					for (int i = 0; i < n; i++)
+						if (dal[i])
+							dimg[i] = rgb(dpx[i]);
 				}
 			}
 		}
@@ -203,6 +260,35 @@ void decodeDungeonTextures(const DungeonGfx &g, DungeonTextures &out) {
 		// Le plafond : la case devant le joueur, entre le haut du mur à un pas (ligne 8, 128 pixels
 		// de large) et le haut du mur à deux pas (ligne 16, 80 pixels).
 		sampleTrapezoid(bg.data(), ceil, 16.0f, 8.0f, 80.0f, 128.0f);
+		// Dehors : le ciel, de la couleur du haut de l'image de fond (au centre, entre les arbres),
+		// plus clair au zénith, plus sombre vers l'horizon.
+		if (g.outdoor) {
+			float sum[3] = {0, 0, 0}, best = -1.0f;
+			Rgba sky = {40, 50, 90, 255};
+			for (int y = 0; y < 20; y++)
+				for (int x = 60; x < 116; x++) {
+					const Rgba &c = bg[y * kBgW + x];
+					float bl = (float)c.b - 0.5f * ((float)c.r + (float)c.g);
+					if (bl > best) {
+						best = bl;
+						sky = c;
+					}
+					sum[0] += c.r; sum[1] += c.g; sum[2] += c.b;
+				}
+			if (best < 8.0f)
+				sky = Rgba{70, 90, 140, 255};
+			out.skyLayer = out.layers++;
+			out.rgba.resize(out.layers * layerBytes, 0);
+			Rgba *img = (Rgba *)&out.rgba[out.skyLayer * layerBytes];
+			for (int j = 0; j < kDunTexSize; j++) {
+				float t = (float)j / (kDunTexSize - 1); // 0 zénith, 1 horizon
+				float k = 1.25f - 0.75f * t;
+				for (int i = 0; i < kDunTexSize; i++) {
+					int r = (int)(sky.r * k), gg = (int)(sky.g * k), b = (int)(sky.b * k);
+					img[j * kDunTexSize + i] = Rgba{(uint8_t)(r > 255 ? 255 : r), (uint8_t)(gg > 255 ? 255 : gg), (uint8_t)(b > 255 ? 255 : b), 255};
+				}
+			}
+		}
 	}
 }
 
@@ -218,32 +304,75 @@ void buildDungeonMesh(const uint8_t *walls, const DungeonGfx &g, const DungeonTe
 		dv.shade = shade;
 		out.push_back(dv);
 	};
-	// Quad a-b-c-d, sens trigonométrique vu de face.
-	auto quad = [&](const float *a, const float *b, const float *c, const float *d, float layer, float shade) {
+	// Quad a-b-c-d, sens trigonométrique vu de face (twoSided : visible des deux côtés).
+	auto quad = [&](const float *a, const float *b, const float *c, const float *d, float layer, float shade, bool twoSided = false) {
 		put(a[0], a[1], a[2], a[3], a[4], layer, shade);
 		put(b[0], b[1], b[2], b[3], b[4], layer, shade);
 		put(c[0], c[1], c[2], c[3], c[4], layer, shade);
 		put(a[0], a[1], a[2], a[3], a[4], layer, shade);
 		put(c[0], c[1], c[2], c[3], c[4], layer, shade);
 		put(d[0], d[1], d[2], d[3], d[4], layer, shade);
+		if (twoSided) {
+			put(a[0], a[1], a[2], a[3], a[4], layer, shade);
+			put(c[0], c[1], c[2], c[3], c[4], layer, shade);
+			put(b[0], b[1], b[2], b[3], b[4], layer, shade);
+			put(a[0], a[1], a[2], a[3], a[4], layer, shade);
+			put(d[0], d[1], d[2], d[3], d[4], layer, shade);
+			put(c[0], c[1], c[2], c[3], c[4], layer, shade);
+		}
+	};
+	// Une image de mur (128 x 96, horizon au milieu) dressée verticalement : centre au sol (cx, cz),
+	// tournée vers n, agrandie de `scale` autour de la hauteur des yeux du jeu (mi-hauteur).
+	auto upright = [&](float cx, float cz, float nx, float nz, float layer, float shade, float scale, bool twoSided) {
+		float rx = nz, rz = -nx;
+		float hw = S * 0.5f * scale, y0 = H * 0.5f - H * 0.5f * scale, y1 = H * 0.5f + H * 0.5f * scale;
+		float bl[5] = {cx - rx * hw, y0, cz - rz * hw, 0.0f, vBottom};
+		float br[5] = {cx + rx * hw, y0, cz + rz * hw, 1.0f, vBottom};
+		float tr[5] = {cx + rx * hw, y1, cz + rz * hw, 1.0f, 0.0f};
+		float tl[5] = {cx - rx * hw, y1, cz - rz * hw, 0.0f, 0.0f};
+		quad(bl, br, tr, tl, layer, shade, twoSided);
 	};
 	static const int dx[4] = {0, 1, 0, -1}, dz[4] = {-1, 0, 1, 0};
 	// Comme dans les jeux de l'époque, les murs est-ouest sont un peu plus sombres.
 	static const float faceShade[4] = {1.0f, 0.82f, 1.0f, 0.82f};
+	const bool sky = g.outdoor && tex.skyLayer >= 0;
 
 	for (int b = 0; b < 1024; b++) {
 		float cx, cz;
 		blockCenter(b, cx, cz);
 		const bool solid = isSolidBlock(walls, b, g);
+		const uint8_t *w = walls + b * 4;
+		bool objectDone = false, decalDone = false;
 		for (int k = 0; k < 4; k++) {
-			uint8_t t = walls[b * 4 + k];
+			uint8_t t = w[k];
 			if (!t)
 				continue;
+			// Un objet au milieu de la case : deux images croisées, visibles des deux côtés.
+			if (tex.kind[t] == kWallObject) {
+				if (!objectDone && tex.typeLayer[t] >= 0) {
+					objectDone = true;
+					uint8_t tn = w[0] && tex.kind[w[0]] == kWallObject ? w[0] : t;
+					uint8_t te = w[1] && tex.kind[w[1]] == kWallObject ? w[1] : t;
+					upright(cx, cz, 0.0f, 1.0f, (float)tex.typeLayer[tn], 1.0f, 1.0f, true);
+					upright(cx, cz, 1.0f, 0.0f, (float)tex.typeLayer[te], 0.9f, 1.0f, true);
+				}
+				continue;
+			}
+			// Un dessin au sol, posé juste au-dessus des dalles.
+			if (tex.kind[t] == kWallDecal) {
+				if (!decalDone && tex.decalLayer[t] >= 0) {
+					decalDone = true;
+					float x0 = cx - S * 0.5f, x1 = cx + S * 0.5f, z0 = cz - S * 0.5f, z1 = cz + S * 0.5f, y = 0.015f;
+					float a[5] = {x0, y, z0, 0, 0}, bb[5] = {x0, y, z1, 0, 1}, c[5] = {x1, y, z1, 1, 1}, d[5] = {x1, y, z0, 1, 0};
+					quad(a, bb, c, d, (float)tex.decalLayer[t], 0.95f);
+				}
+				continue;
+			}
 			int page = g.vmpMap[t];
 			float typeLayer = (float)tex.typeLayer[t];
 			if (tex.typeLayer[t] < 0 && (page <= 0 || page >= 64 || tex.pageLayer[page] < 0)) {
-				// Mur que le jeu dessine seulement avec un décor (porte, grille...) : en attendant les
-				// décors, un mur plein prend la pierre ordinaire du niveau ; un mur ajouré n'est pas dessiné.
+				// Mur que le jeu dessine seulement avec un décor (porte, grille...), sans dessin du
+				// moteur : un mur plein prend la pierre ordinaire du niveau ; un mur ajouré n'est pas dessiné.
 				if (g.wallFlags[t] & 8)
 					continue;
 				page = g.vmpMap[1];
@@ -258,14 +387,15 @@ void buildDungeonMesh(const uint8_t *walls, const DungeonGfx &g, const DungeonTe
 				continue;
 			// Normale sortante n ; vu de la case voisine, la droite du spectateur est (n.z, 0, -n.x).
 			float nx = (float)dx[k], nz = (float)dz[k];
-			float rx = nz, rz = -nx;
 			float fx = cx + nx * S * 0.5f, fz = cz + nz * S * 0.5f;
 			float layer = tex.typeLayer[t] >= 0 ? typeLayer : (float)tex.pageLayer[page];
-			float bl[5] = {fx - rx * S * 0.5f, 0.0f, fz - rz * S * 0.5f, 0.0f, vBottom};
-			float br[5] = {fx + rx * S * 0.5f, 0.0f, fz + rz * S * 0.5f, 1.0f, vBottom};
-			float tr[5] = {fx + rx * S * 0.5f, H, fz + rz * S * 0.5f, 1.0f, 0.0f};
-			float tl[5] = {fx - rx * S * 0.5f, H, fz - rz * S * 0.5f, 0.0f, 0.0f};
-			quad(bl, br, tr, tl, layer, faceShade[k]);
+			upright(fx, fz, nx, nz, layer, faceShade[k], 1.0f, false);
+			// La porte se dresse plus loin dans la case, à la profondeur où le jeu la dessine.
+			if (tex.doorLayer[t] >= 0) {
+				float r = tex.doorDepth[t];
+				float ddx = fx - nx * (r - 1.0f) * S * 0.5f, ddz = fz - nz * (r - 1.0f) * S * 0.5f;
+				upright(ddx, ddz, nx, nz, (float)tex.doorLayer[t], faceShade[k], r, false);
+			}
 		}
 		if (!solid) {
 			float x0 = cx - S * 0.5f, x1 = cx + S * 0.5f, z0 = cz - S * 0.5f, z1 = cz + S * 0.5f;
@@ -273,11 +403,27 @@ void buildDungeonMesh(const uint8_t *walls, const DungeonGfx &g, const DungeonTe
 				float a[5] = {x0, 0, z0, 0, 0}, bb[5] = {x0, 0, z1, 0, 1}, c[5] = {x1, 0, z1, 1, 1}, d[5] = {x1, 0, z0, 1, 0};
 				quad(a, bb, c, d, (float)tex.floorLayer, 0.9f);
 			}
-			if (tex.ceilingLayer >= 0) {
+			if (tex.ceilingLayer >= 0 && !sky) {
 				float a[5] = {x0, H, z0, 0, 0}, d[5] = {x1, H, z0, 1, 0}, c[5] = {x1, H, z1, 1, 1}, bb[5] = {x0, H, z1, 0, 1};
 				quad(a, d, c, bb, (float)tex.ceilingLayer, 0.9f);
 			}
 		}
+	}
+
+	// Dehors : une grande boîte de ciel autour du niveau, qui échappe à la pénombre (ombre >= 2).
+	if (sky) {
+		const float L = -40.0f, R = 32.0f * S + 40.0f, top = 45.0f, bot = -2.0f, layer = (float)tex.skyLayer, e = 2.0f + 1.0f;
+		// Faces tournées vers l'intérieur. Côtés : haut de la texture (zénith) en haut.
+		float n0[5] = {L, bot, L, 0, 1}, n1[5] = {R, bot, L, 1, 1}, n2[5] = {R, top, L, 1, 0}, n3[5] = {L, top, L, 0, 0};
+		quad(n0, n1, n2, n3, layer, e);
+		float s0[5] = {R, bot, R, 0, 1}, s1[5] = {L, bot, R, 1, 1}, s2[5] = {L, top, R, 1, 0}, s3[5] = {R, top, R, 0, 0};
+		quad(s0, s1, s2, s3, layer, e);
+		float w0[5] = {L, bot, R, 0, 1}, w1[5] = {L, bot, L, 1, 1}, w2[5] = {L, top, L, 1, 0}, w3[5] = {L, top, R, 0, 0};
+		quad(w0, w1, w2, w3, layer, e);
+		float e0[5] = {R, bot, L, 0, 1}, e1[5] = {R, bot, R, 1, 1}, e2[5] = {R, top, R, 1, 0}, e3[5] = {R, top, L, 0, 0};
+		quad(e0, e1, e2, e3, layer, e);
+		float t0[5] = {L, top, L, 0, 0}, t1[5] = {R, top, L, 1, 0}, t2[5] = {R, top, R, 1, 0.02f}, t3[5] = {L, top, R, 0, 0.02f};
+		quad(t0, t1, t2, t3, layer, e);
 	}
 }
 

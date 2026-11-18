@@ -138,7 +138,7 @@ struct Ui::Impl {
 	GLuint helpTex = 0, gearTex = 0, menuTex = 0, hintTex = 0;
 	bool helpDirty = true, menuDirty = true, hintDirty = true;
 	bool menuKeyboard = false; // état montré dans le menu
-	bool dungeonOn = true;
+	int dungeonMode = 1;
 	void renderHint();
 	// Invitation du premier lancement : elle suit doucement le regard.
 	bool hintPlaced = false;
@@ -287,10 +287,10 @@ void Ui::Impl::renderHelp() {
 		"",
 		"#Everywhere",
 		"Aim + trigger ............ left click",
-		"Aim + grip ............... right click",
+		"Aim + grip, or X ......... right click (drink, use)",
 		"Left stick ............... walk forward, back, strafe",
 		"Right stick (sideways) ... turn",
-		"Y : map        X : keyboard and options",
+		"Y ........................ map",
 		"Menu button (left) ....... save, load, quit",
 		"Gear on the left wrist ... settings, keyboard, help",
 		"",
@@ -298,7 +298,7 @@ void Ui::Impl::renderHelp() {
 		"A ........................ attack with the framed character",
 		"B ........................ open their magic, then aim at a spell",
 		"Right stick (up/down) .... change character",
-		"Use an item: click the item, then the portrait",
+		"Drink a potion: aim at it and press X",
 		"",
 		"#Menus and cutscenes",
 		"A : Enter       B : Escape (skip)",
@@ -317,10 +317,10 @@ void Ui::Impl::renderHelp() {
 		"",
 		"#Partout",
 		"Viser + gâchette ......... clic gauche",
-		"Viser + poignée .......... clic droit",
+		"Viser + poignée, ou X .... clic droit (boire, utiliser)",
 		"Joystick gauche .......... avancer, reculer, pas de côté",
 		"Joystick droit (côtés) ... tourner",
-		"Y : carte      X : clavier et options",
+		"Y ........................ carte",
 		"Bouton menu (gauche) ..... sauvegarder, charger, quitter",
 		"Engrenage au poignet gauche : réglages, clavier, aide",
 		"",
@@ -328,7 +328,7 @@ void Ui::Impl::renderHelp() {
 		"A ........................ attaquer avec le personnage encadré",
 		"B ........................ ouvrir sa magie, puis viser le sort",
 		"Joystick droit (haut/bas)  changer de personnage",
-		"Utiliser un objet : cliquer l'objet, puis le portrait",
+		"Boire une potion : la viser et appuyer sur X",
 		"",
 		"#Menus et cinématiques",
 		"A : Entrée      B : Échap (passer)",
@@ -390,7 +390,9 @@ void Ui::Impl::renderMenu() {
 		"Lands of Lore VR 3D",
 		latin1(fr ? "Langue : Français" : "Language: English"),
 		latin1(detached ? (fr ? "Écran classique : non" : "Classic screen: off") : (fr ? "Écran classique : oui" : "Classic screen: on")),
-		latin1(dungeonOn ? (fr ? "Donjon 3D : oui" : "3D dungeon: on") : (fr ? "Donjon 3D : non" : "3D dungeon: off")),
+		latin1(dungeonMode == 1 ? (fr ? "Donjon 3D, écran au besoin" : "3D dungeon, screen if needed")
+		     : dungeonMode == 2 ? (fr ? "Donjon 3D, écran toujours" : "3D dungeon, screen always")
+		                        : (fr ? "Donjon 3D : non" : "3D dungeon: off")),
 		latin1(menuKeyboard ? (fr ? "Cacher le clavier" : "Hide keyboard") : (fr ? "Afficher le clavier" : "Show keyboard")),
 		latin1(fr ? "Manettes et boutons" : "Controller mapping"),
 		latin1(fr ? "Fermer" : "Close"),
@@ -474,9 +476,9 @@ void Ui::setOptions(bool fireOn, bool detached) {
 	d->detached = detached;
 }
 
-void Ui::setDungeonOption(bool on) {
-	if (on != d->dungeonOn) {
-		d->dungeonOn = on;
+void Ui::setDungeonOption(int mode) {
+	if (mode != d->dungeonMode) {
+		d->dungeonMode = mode;
 		d->menuDirty = true;
 	}
 }
@@ -682,7 +684,11 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 		hq.c = in.screenPos + screenU * (top + hq.hh) + screenN * (in.crt ? -0.02f * in.dispW : 0.02f * in.dispW);
 	}
 
-	auto handleShown = [&](int i) { return i == kHandleScreen ? true : visible[i]; };
+	auto handleShown = [&](int i) { return i == kHandleScreen ? !in.screenHidden : visible[i]; };
+	if (in.screenHidden && (d->drag == Impl::kScreenTarget || d->resize == Impl::kScreenTarget)) {
+		d->drag = -1;
+		d->resize = -1;
+	}
 
 	// Menu du poignet : l'engrenage apparaît sur la main gauche quand on la regarde de près.
 	bool gearVisible = false;
@@ -801,7 +807,7 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 			}
 		}
 		// L'écran principal (la dalle du moniteur cathodique est bombée : on affine le point d'impact)
-		{
+		if (!in.screenHidden) {
 			Vec3 origin = rotate(screenInv, in.tip - in.screenPos);
 			Vec3 dir = rotate(screenInv, in.dir);
 			if (dir.z < -1e-4f && origin.z > 0.0f) {
@@ -832,7 +838,7 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 		{
 			float cornerT = 1e9f, cornerBest = 1e9f;
 			for (int i = 0; i <= kUiPanelCount; i++) {
-				if (i < kUiPanelCount && !visible[i])
+				if (i < kUiPanelCount ? !visible[i] : in.screenHidden)
 					continue;
 				const Quad &q = i < kUiPanelCount ? content[i] : screenQuad;
 				float t, x, y;

@@ -52,10 +52,15 @@ void main() {
 #ifdef MANUAL_SRGB
 	c = pow(c, vec3(2.2));
 #endif
-	// Comme dans le jeu : bien éclairé tout près, la pénombre gagne en trois ou quatre pas.
-	float k = clamp(1.15 - vDist / 11.0, 0.0, 1.0);
-	k = k * k * (3.0 - 2.0 * k);
-	c *= vShade * uLight * mix(0.04, 1.0, k);
+	if (vShade > 1.5) {
+		// Le ciel : pas de pénombre.
+		c *= (vShade - 2.0) * uLight;
+	} else {
+		// Comme dans le jeu : bien éclairé tout près, la pénombre gagne en trois ou quatre pas.
+		float k = clamp(1.15 - vDist / 11.0, 0.0, 1.0);
+		k = k * k * (3.0 - 2.0 * k);
+		c *= vShade * uLight * mix(0.04, 1.0, k);
+	}
 #ifdef MANUAL_SRGB
 	c = pow(c, vec3(1.0 / 2.2));
 #endif

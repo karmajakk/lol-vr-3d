@@ -51,6 +51,7 @@ int main(int argc, char **argv) {
 		return 1;
 	}
 	DungeonGfx g = lv.gfx();
+	g.outdoor = lv.area == "FOREST1" || lv.area == "SWAMP" || lv.area == "YVEL1";
 	DungeonTextures tex;
 	decodeDungeonTextures(g, tex);
 	std::vector<DungeonVertex> verts;
@@ -75,8 +76,8 @@ int main(int argc, char **argv) {
 		for (size_t i = 0; i + 2 < verts.size(); i += 3) {
 			Vec3 a{verts[i].pos[0], verts[i].pos[1], verts[i].pos[2]}, b{verts[i + 1].pos[0], verts[i + 1].pos[1], verts[i + 1].pos[2]}, c{verts[i + 2].pos[0], verts[i + 2].pos[1], verts[i + 2].pos[2]};
 			Vec3 n = normalize(cross(b - a, c - a));
-			if (fabsf(n.y) > 0.5f)
-				continue;
+			if (fabsf(n.y) > 0.5f || verts[i].shade > 1.5f)
+				continue; // sols, plafonds, ciel
 			Vec3 m = (a + b + c) * (1.0f / 3.0f) + n * (kBlockSize * 0.5f);
 			int bx = (int)floorf(m.x / kBlockSize), bz = (int)floorf(m.z / kBlockSize);
 			if (bx < 0 || bx > 31 || bz < 0 || bz > 31 || isSolidBlock(lv.walls, bz * 32 + bx, g))

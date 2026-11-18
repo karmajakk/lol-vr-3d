@@ -57,6 +57,9 @@ struct LolvrLevelData {
 	const uint8_t *wallPixels;
 	const uint8_t *wallAlpha;
 	uint8_t screenPalette[768];
+	int32_t nearObjects;
+	const uint8_t *doorPixels;
+	const uint8_t *doorAlpha;
 };
 const LolvrLevelData *retro_lolvr_level(void);
 }
@@ -351,6 +354,7 @@ void copyLevel() {
 	l.level = s->level;
 	l.block = s->block;
 	l.direction = s->direction;
+	l.nearObjects = s->nearObjects;
 	if (l.wallsSerial != s->wallsSerial) {
 		memcpy(l.walls, s->walls, sizeof(l.walls));
 		l.wallsSerial = s->wallsSerial;
@@ -361,6 +365,13 @@ void copyLevel() {
 		const size_t n = (size_t)s->wallSlots * 128 * 96;
 		l.wallPixels.assign(s->wallPixels, s->wallPixels + n);
 		l.wallAlpha.assign(s->wallAlpha, s->wallAlpha + n);
+		if (s->doorPixels && s->doorAlpha) {
+			l.doorPixels.assign(s->doorPixels, s->doorPixels + n);
+			l.doorAlpha.assign(s->doorAlpha, s->doorAlpha + n);
+		} else {
+			l.doorPixels.clear();
+			l.doorAlpha.clear();
+		}
 		memcpy(l.wallSlot, s->wallSlot, sizeof(l.wallSlot));
 		memcpy(l.screenPalette, s->screenPalette, sizeof(l.screenPalette));
 		l.wallSlots = s->wallSlots;
@@ -591,6 +602,7 @@ bool CoreHost::levelSnapshot(LevelSnapshot &out) const {
 	out.level = l.level;
 	out.block = l.block;
 	out.direction = l.direction;
+	out.nearObjects = l.nearObjects;
 	if (out.wallsSerial != l.wallsSerial || out.gfxSerial != l.gfxSerial) {
 		memcpy(out.walls, l.walls, sizeof(out.walls));
 		out.wallsSerial = l.wallsSerial;
@@ -598,6 +610,8 @@ bool CoreHost::levelSnapshot(LevelSnapshot &out) const {
 	if (out.wallCaptureSerial != l.wallCaptureSerial) {
 		out.wallPixels = l.wallPixels;
 		out.wallAlpha = l.wallAlpha;
+		out.doorPixels = l.doorPixels;
+		out.doorAlpha = l.doorAlpha;
 		memcpy(out.wallSlot, l.wallSlot, sizeof(out.wallSlot));
 		memcpy(out.screenPalette, l.screenPalette, sizeof(out.screenPalette));
 		out.wallSlots = l.wallSlots;

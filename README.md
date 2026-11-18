@@ -23,7 +23,8 @@ Early demo. What works:
 - "3D dungeon: on/off" in the wrist menu, to compare with the original view.
 
 Not there yet: monsters and items in 3D, doors that slide open in 3D (they jump from closed to
-open), outdoor skies. Until then, the game screen shows them.
+open). The game screen appears by itself when monsters or items are close ahead, and for scenes,
+dialogues, the map and menus.
 
 Version details: [CHANGELOG.md](CHANGELOG.md).
 
@@ -50,13 +51,14 @@ saves there.
 
 ## Controls
 
-Same as lol-vr: aim and pull the trigger to click, grip for a right click, left stick to walk,
-right stick to turn, A to attack, B for magic, Y for the map, X for the keyboard. Look at your left
-hand and click the gear for the menu (language, classic screen, 3D dungeon, keyboard, controller
-mapping).
+Same as lol-vr: aim and pull the trigger to click, X (or the grip) for a right click (drink a
+potion, use an item), left stick to walk, right stick to turn, A to attack, B for magic, Y for the
+map. Look at your left hand and click the gear for the menu (language, classic screen, 3D dungeon
+with the game screen "if needed" or "always", keyboard, controller mapping).
 
-In the dungeon, the party's position is under your feet and its direction is straight ahead of you:
-when the party turns, the dungeon turns around you.
+In the dungeon, the party's position is under your feet. You walk where you look: push the stick
+and the party first turns toward your gaze if needed. Turning with the right stick is instant,
+with a very short fade, to stay comfortable.
 
 ## How it works (for the curious)
 

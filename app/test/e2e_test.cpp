@@ -156,9 +156,12 @@ int main(int argc, char **argv) {
 			GameState gs;
 			if (host.gameState(gs))
 				printf("  état : niveau=%d boucle=%u mode=%d menu=%d\n", gs.level, gs.loopSerial, gs.controlMode, (int)gs.menuOpen);
-		} else if (op == "dungeon") {
+		} else if (op == "dungeon" || op == "dungeonat") {
 			std::string name;
 			cs >> name;
+			int atBlock = -1, atDir = 0;
+			if (op == "dungeonat")
+				cs >> atBlock >> atDir;
 			if (!host.levelSnapshot(lvl)) {
 				printf("ÉCHEC pas de niveau publié par le moteur\n");
 				failures++;
@@ -182,6 +185,15 @@ int main(int argc, char **argv) {
 				g.wallAlpha = lvl.wallAlpha.data();
 				g.wallSlots = lvl.wallSlots;
 				g.screenPalette = lvl.screenPalette;
+				if (!lvl.doorPixels.empty()) {
+					g.doorPixels = lvl.doorPixels.data();
+					g.doorAlpha = lvl.doorAlpha.data();
+				}
+			}
+			{
+				GameState gs;
+				if (host.gameState(gs))
+					g.outdoor = !strcmp(gs.tileset, "FOREST1") || !strcmp(gs.tileset, "SWAMP") || !strcmp(gs.tileset, "YVEL1");
 			}
 			printf("  murs dessinés par le moteur : %d (n°%u)\n", lvl.wallSlots, lvl.wallCaptureSerial);
 			if (lvl.gfxSerial != builtGfx || lvl.wallCaptureSerial != builtCapture) {
@@ -200,17 +212,18 @@ int main(int argc, char **argv) {
 			for (int b : {lvl.block - 33, lvl.block - 32, lvl.block - 31, lvl.block - 1, lvl.block, lvl.block + 1})
 				if (b >= 0 && b < 1024)
 					printf("    bloc %d (%d,%d) : %d %d %d %d\n", b, b & 31, b >> 5, lvl.walls[b * 4], lvl.walls[b * 4 + 1], lvl.walls[b * 4 + 2], lvl.walls[b * 4 + 3]);
-			if (isSolidBlock(lvl.walls, lvl.block, g)) {
+			if (atBlock < 0 && isSolidBlock(lvl.walls, lvl.block, g)) {
 				printf("ÉCHEC le groupe est dans un bloc plein\n");
 				failures++;
 			}
 			float px, pz;
-			blockCenter(lvl.block, px, pz);
-			Mat4 model = dungeonModel({0, 0, 0}, 0.0f, px, pz, (float)lvl.direction * 1.5707963f);
+			int vb = atBlock >= 0 ? atBlock : lvl.block, vd = atBlock >= 0 ? atDir : lvl.direction;
+			blockCenter(vb, px, pz);
+			Mat4 model = dungeonModel({0, 0, 0}, 0.0f, px, pz, (float)vd * 1.5707963f);
 			Vec3 eye{0, 1.35f, 0};
 			// Champ de vision proche de celui du jeu, pour comparer les deux images.
 			Mat4 view = viewFromPose(eye, quatYaw(0.0f));
-			float th = tanf(30.0f * 3.14159265f / 180.0f), tv = th * (float)H / (float)W;
+			float th = tanf(45.0f * 3.14159265f / 180.0f), tv = th * (float)H / (float)W;
 			Mat4 proj = projectionFromTangents(-th, th, -tv, tv, 0.05f, 200.0f);
 			glViewport(0, 0, W, H);
 			glClearColor(0.02f, 0.0f, 0.04f, 1.0f);

@@ -35,6 +35,17 @@ struct DungeonGfx {
 	const uint8_t *wallAlpha = nullptr;
 	int wallSlots = 0;
 	const uint8_t *screenPalette = nullptr; // 256 couleurs, VGA 6 bits
+	const uint8_t *doorPixels = nullptr; // la porte seule, mêmes emplacements
+	const uint8_t *doorAlpha = nullptr;
+	// Dehors (forêt, marais...) : pas de plafond, le ciel.
+	bool outdoor = false;
+};
+
+// Comment un type de mur est montré en 3D.
+enum WallKind {
+	kWallFace = 0,   // un mur (avec ses décors) sur le côté du bloc
+	kWallObject = 1, // un objet planté au milieu de la case (fontaine, statue...) : rien que le dessin
+	kWallDecal = 2,  // un dessin au sol (flaque, dalle, trappe...)
 };
 
 struct DungeonTextures {
@@ -42,6 +53,11 @@ struct DungeonTextures {
 	std::vector<uint8_t> rgba; // layers x 128 x 128 x 4, première ligne en haut
 	int pageLayer[64];         // page VMP -> couche (-1 = aucune)
 	int typeLayer[256];        // type de mur -> couche (dessin du moteur ; -1 = aucune)
+	int doorLayer[256];        // type de mur -> couche de sa porte (-1 = aucune)
+	float doorDepth[256];      // la porte est à cette fraction de la case (1 = sur la face, 2 = au milieu)
+	int decalLayer[256];       // type de mur -> dessin au sol (-1 = aucun)
+	uint8_t kind[256];         // WallKind
+	int skyLayer = -1;
 	int floorLayer = -1, ceilingLayer = -1;
 };
 

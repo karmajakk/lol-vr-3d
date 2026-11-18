@@ -76,6 +76,8 @@ struct UiFrameInput {
 	// Premier lancement : un petit mot invite à regarder l'engrenage du poignet, qui bat doucement,
 	// tant que le menu n'a jamais été ouvert.
 	bool gearHint = false;
+	// Le grand écran est caché (donjon 3D : il n'apparaît que lorsqu'on en a besoin).
+	bool screenHidden = false;
 	double time = 0.0;
 
 };
@@ -115,8 +117,8 @@ public:
 	void initGl(bool srgb);
 	// Étiquettes des boutons d'options.
 	void setOptions(bool fireOn, bool detached);
-	// Le donjon en 3D est-il affiché (menu du poignet) ?
-	void setDungeonOption(bool on);
+	// Le donjon en 3D (menu du poignet) : 0 non, 1 oui avec l'écran au besoin, 2 oui avec l'écran toujours.
+	void setDungeonOption(int mode);
 	// Langue des textes (UiLanguage).
 	void setLanguage(int language);
 	// Deux lignes d'information affichées sous le clavier (Latin-1).

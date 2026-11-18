@@ -82,6 +82,7 @@ struct SceneState {
 
 	// Donjon en 3D (lol-vr-3d) : remplace la pièce autour du joueur quand il est affiché.
 	bool dungeonVisible = false;
+	bool screenVisible = true; // le grand écran (et son cadre) est affiché
 	Mat4 dungeonModel = identity(); // repère du niveau -> monde
 	float dungeonLight = 1.0f;
 };

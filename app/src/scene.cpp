@@ -1049,7 +1049,7 @@ void Scene::render(const Mat4 &view, const Mat4 &proj, const SceneState &s) {
 			glDrawArrays(GL_TRIANGLES, 0, d->roomSolid.count);
 		}
 		glUniformMatrix4fv(d->lit.model, 1, GL_FALSE, d->screenMat.m);
-		{
+		if (s.screenVisible) {
 			GlMesh &around = crt ? d->crtBody : d->frameMesh;
 			glBindVertexArray(around.vao);
 			glDrawArrays(GL_TRIANGLES, 0, around.count);
@@ -1062,7 +1062,9 @@ void Scene::render(const Mat4 &view, const Mat4 &proj, const SceneState &s) {
 	}
 
 	// --- Écran du jeu ---
-	if (crt) {
+	if (!s.screenVisible) {
+		// Écran caché : ni dalle, ni trou.
+	} else if (crt) {
 		// Dalle bombée du moniteur, avec l'image du jeu.
 		glUseProgram(d->crtProgram);
 		glUniformMatrix4fv(d->crt.viewProj, 1, GL_FALSE, viewProj.m);
@@ -1124,7 +1126,7 @@ void Scene::render(const Mat4 &view, const Mat4 &proj, const SceneState &s) {
 		drawFx(0, fxAmbient);
 	// 2. L'image du jeu doit rester pure : on efface tout ce que les lueurs du décor ont déposé
 	//    sur elle (sauf là où un objet solide, comme un gant, passe devant).
-	if (!crt) {
+	if (!crt && s.screenVisible) {
 		glDisable(GL_BLEND);
 		glUseProgram(d->flatProgram);
 		Mat4 mvp = multiply(viewProj, d->holeMat);
