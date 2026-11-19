@@ -689,3 +689,29 @@ index 92605cda..627378d4 100644
  	void copyPalette(const int dst, const int src);
  
  	// gui specific (processing on _curPage)
+diff --git a/engines/kyra/gui/gui_lol.cpp b/engines/kyra/gui/gui_lol.cpp
+index b2732d26..512f3479 100644
+--- a/engines/kyra/gui/gui_lol.cpp
++++ b/engines/kyra/gui/gui_lol.cpp
+@@ -2212,7 +2212,7 @@ int GUI_LoL::runMenu(Menu &menu) {
+ 	// lol-vr: a game menu covers the middle of the screen while this function runs
+ 	struct LolvrMenuFlag {
+ 		LolvrMenuFlag() { g_lolvrState.reserved[2] |= 2; }
+-		~LolvrMenuFlag() { g_lolvrState.reserved[2] &= ~2; }
++		~LolvrMenuFlag() { g_lolvrState.reserved[2] &= ~(2 | 8); }
+ 	} lolvrMenuFlag;
+ 	_currentMenu = &menu;
+ 	_lastMenu = _currentMenu;
+@@ -2592,6 +2592,12 @@ int GUI_LoL::getInput() {
+ 	_vm->_mouseX = p.x;
+ 	_vm->_mouseY = p.y;
+ 
++	// lol-vr-3d: bit 3: a save name is being typed (the headset shows its keyboard)
++	if (_currentMenu == &_savenameMenu)
++		g_lolvrState.reserved[2] |= 8;
++	else
++		g_lolvrState.reserved[2] &= ~8;
++
+ 	if (_currentMenu == &_savenameMenu) {
+ 		_vm->updateInput();
+ 

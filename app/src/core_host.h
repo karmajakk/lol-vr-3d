@@ -43,6 +43,7 @@ struct GameState {
 	bool charSheet = false;   // la fiche d'un personnage est ouverte (elle couvre la vue et la colonne de droite)
 	int characters = 0;       // nombre de personnages du groupe (0 = inconnu)
 	bool menuOpen = false;    // un menu du jeu est affiché
+	bool nameEntry = false;   // le joueur écrit le nom d'une sauvegarde
 };
 
 // Un monstre ou un objet près du groupe, dessiné par le moteur en grand dans une image de

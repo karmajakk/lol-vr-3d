@@ -504,6 +504,8 @@ struct App {
 	double synthClickUntil = 0;   // clic envoyé au jeu à la place du pointeur (bouton de magie)
 	float synthU = 0, synthV = 0;
 	bool keyboardOpen = false, keyboardButtonDown = false;
+	// Le clavier ouvert tout seul pour écrire le nom d'une sauvegarde : il se referme à la fin.
+	bool nameEntry = false, keyboardAuto = false;
 	bool gearKnown = false;      // le joueur a déjà ouvert le menu du poignet (plus d'invitation)
 	double gearNudgeAt = 0;      // prochaine petite vibration de la main gauche pour l'invitation
 	bool fireOn = false;
@@ -1420,6 +1422,19 @@ void updateGameEvents(App &app, double now) {
 	if (gs.automapOpen && !app.automapOpen)
 		app.automapSince = now;
 	app.automapOpen = gs.automapOpen;
+	// Écrire le nom d'une sauvegarde : le clavier vient tout seul, et repart quand c'est fini (s'il
+	// n'était pas déjà ouvert, et si le joueur ne l'a pas fermé entre-temps).
+	if (gs.nameEntry != app.nameEntry) {
+		app.nameEntry = gs.nameEntry;
+		if (gs.nameEntry && !app.keyboardOpen) {
+			app.keyboardOpen = true;
+			app.keyboardAuto = true;
+		} else if (!gs.nameEntry) {
+			if (app.keyboardAuto && app.keyboardOpen)
+				app.keyboardOpen = false;
+			app.keyboardAuto = false;
+		}
+	}
 	bool wanted = app.gameStarted && gs.controlMode == 0 && !gs.automapOpen && !gs.menuOpen;
 	app.charSheet = gs.charSheet;
 	app.inDungeon = wanted && !gs.charSheet;
@@ -2010,6 +2025,7 @@ void updateUi(App &app, XrTime time, float dt, double now, bool pointer, bool tr
 		break;
 	case lolvr::kUiActionCloseKeyboard:
 		app.keyboardOpen = false;
+		app.keyboardAuto = false;
 		break;
 	case lolvr::kUiActionToggleDungeon:
 		setViewMode(app, app.dungeonMode ? 0 : 1, time);
@@ -2026,6 +2042,7 @@ void updateUi(App &app, XrTime time, float dt, double now, bool pointer, bool tr
 		break;
 	case lolvr::kUiActionToggleKeyboard:
 		app.keyboardOpen = !app.keyboardOpen;
+		app.keyboardAuto = false;
 		break;
 	default:
 		break;

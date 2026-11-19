@@ -25,7 +25,7 @@ Look at your left hand: a small brass gear appears above it. At first launch, a 
 - **Immersive mode**: on, you walk in the dungeon rebuilt in 3D (see [Immersive mode](Immersive-mode.md)); off, the classic view, with the game on a big screen.
 - In immersive mode, **Game screen**: "if needed" (it comes up for shops, conversations, the map, menus) or "always".
 - In the classic view, **Classic screen**: on, the whole game image stays on the big screen, like the original game; off, the interface windows float on their own.
-- **Keyboard**: shown or hidden; the virtual keyboard, to type a save name. On it, **Fire** and **Panels** are pushed in (their name in blue) when they are on.
+- **Keyboard**: shown or hidden; the virtual keyboard. It also opens by itself when the game asks for a save description, and closes when the save is done. On it, **Fire** and **Panels** are pushed in (their name in blue) when they are on.
 - **Controller mapping**: shows a panel summing up every button. Click the panel to close it.
 - **Close**.
 

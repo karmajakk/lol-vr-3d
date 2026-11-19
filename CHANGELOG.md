@@ -3,6 +3,12 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.7.1] — Keyboard for save names
+
+- The keyboard opens by itself when you click a save slot and the game asks for a description, and
+  closes again once the game is saved or cancelled (unless it was already open, or you closed it
+  yourself meanwhile). The game says when a name is being typed (patch 0003).
+
 ## [0.7.0] — The game's own look, conversations
 
 - The app's windows now look like the game's menus: the first-launch choice, the invitation to
