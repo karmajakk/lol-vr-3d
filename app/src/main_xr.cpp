@@ -1753,7 +1753,7 @@ bool dungeonPick(App &app, Vec3 tip, Vec3 dir, float &gu, float &gv, Vec3 &hitW,
 	Vec3 o = toLevel(tip), v = dirLevel(dir);
 	static const int dx[4] = {0, 1, 0, -1}, dz[4] = {-1, 0, 1, 0};
 	const int d = l.direction & 3;
-	Vec3 f{(float)dx[d], 0.0f, (float)dz[d]}, r{-f.z, 0.0f, f.x};
+	Vec3 fAhead{(float)dx[d], 0.0f, (float)dz[d]}, rAhead{-fAhead.z, 0.0f, fAhead.x};
 	float cx, cz;
 	lolvr::blockCenter(l.block, cx, cz);
 	Vec3 center{cx, 0.0f, cz};
@@ -1762,31 +1762,72 @@ bool dungeonPick(App &app, Vec3 tip, Vec3 dir, float &gu, float &gv, Vec3 &hitW,
 	bool faceWall = faceType != 0 && app.dunTex.kind[faceType] == lolvr::kWallFace;
 	// Le mur (ou le cadre de porte) se tient à cette profondeur dans la case devant : 1 = sur sa face.
 	const float fr = faceWall ? app.dunTex.faceDepth[faceType] : 1.0f;
-	Vec3 hit;
-	float px = -1, py = -1;
-	// 1. Le mur droit devant (sa face tournée vers le groupe)
-	if (faceWall) {
-		float den = dot(v, f);
-		if (den > 1e-4f) {
-			Vec3 facePt = center + f * (S * 0.5f * fr);
+	Vec3 hit{0.0f, 0.0f, 0.0f}, finalF = fAhead, finalR = rAhead;
+	float px = -1, py = -1, bestT = 1e30f;
+	// 1. Les murs autour de la case où se tient le groupe : la face devant (le passage bloqué) comme
+	// les côtés (buissons, nids, trous dans les arbres) qu'on ne voit qu'en tournant la tête vers eux.
+	for (int k = 0; k < 4; k++) {
+		int nb = l.block + dz[k] * 32 + dx[k];
+		if (nb < 0 || nb >= 1024)
+			continue;
+		uint8_t backT = l.walls[nb * 4 + ((k + 2) & 3)];
+		if (!backT)
+			continue;
+		Vec3 f{(float)dx[k], 0.0f, (float)dz[k]}, r{-f.z, 0.0f, f.x};
+		if (app.dunTex.kind[backT] == lolvr::kWallFace) {
+			float wfr = app.dunTex.faceDepth[backT];
+			float den = dot(v, f);
+			if (den <= 1e-4f)
+				continue;
+			Vec3 facePt = center + f * (S * 0.5f * wfr);
 			float tt = dot(facePt - o, f) / den;
-			if (tt > 0.0f) {
-				hit = o + v * tt;
-				// L'image du mur (128 x 96, horizon au milieu) est agrandie de fr autour de mi-hauteur.
-				float u = 0.5f + dot(hit - facePt, r) / (S * fr);
-				float row = 48.0f - (hit.y - H * 0.5f) / (H * 0.5f * fr) * 48.0f;
-				if (u >= 0.0f && u <= 1.0f && row >= 0.0f && row <= 96.0f && hit.y >= 0.0f && hit.y <= H) {
-					px = 136.0f + u * 128.0f;
-					py = 8.0f + row;
-				}
+			if (tt <= 0.0f || tt >= bestT)
+				continue;
+			Vec3 hh = o + v * tt;
+			// L'image du mur (128 x 96, horizon au milieu) est agrandie de wfr autour de mi-hauteur.
+			float u = 0.5f + dot(hh - facePt, r) / (S * wfr);
+			float row = 48.0f - (hh.y - H * 0.5f) / (H * 0.5f * wfr) * 48.0f;
+			if (u < 0.0f || u > 1.0f || row < 0.0f || row > 96.0f || hh.y < 0.0f || hh.y > H)
+				continue;
+			bestT = tt;
+			hit = hh;
+			px = 136.0f + u * 128.0f;
+			py = 8.0f + row;
+			finalF = f;
+			finalR = r;
+		} else if (app.dunTex.kind[backT] == lolvr::kWallObject) {
+			// Un objet au milieu de la case voisine (buisson, nid...) : deux images croisées.
+			float ncx, ncz;
+			lolvr::blockCenter(nb, ncx, ncz);
+			Vec3 ocenter{ncx, 0.0f, ncz};
+			const Vec3 planes[2] = {Vec3{0.0f, 0.0f, 1.0f}, Vec3{1.0f, 0.0f, 0.0f}};
+			for (int pi = 0; pi < 2; pi++) {
+				Vec3 pf = planes[pi], pr{-pf.z, 0.0f, pf.x};
+				float den = dot(v, pf);
+				if (fabsf(den) < 1e-4f)
+					continue;
+				float tt = dot(ocenter - o, pf) / den;
+				if (tt <= 0.0f || tt >= bestT)
+					continue;
+				Vec3 hh = o + v * tt;
+				float u = 0.5f + dot(hh - ocenter, pr) / S;
+				float row = 48.0f - (hh.y - H * 0.5f) / (H * 0.5f) * 48.0f;
+				if (u < 0.0f || u > 1.0f || row < 0.0f || row > 96.0f || hh.y < 0.0f || hh.y > H)
+					continue;
+				bestT = tt;
+				hit = hh;
+				px = 136.0f + u * 128.0f;
+				py = 8.0f + row;
+				finalF = pf;
+				finalR = pr;
 			}
 		}
 	}
 	// 2. Le sol, de sous le joueur jusqu'au bout de la case devant (ou jusqu'au mur)
 	if (px < 0.0f && v.y < -1e-4f) {
 		float tt = -o.y / v.y;
-		hit = o + v * tt;
-		float fw = dot(hit - center, f) / S, lat = dot(hit - center, r) / S;
+		Vec3 hh = o + v * tt;
+		float fw = dot(hh - center, fAhead) / S, lat = dot(hh - center, rAhead) / S;
 		float maxF = faceWall ? 0.5f * fr : 1.5f;
 		if (fw >= 0.0f && fw <= maxF && fabsf(lat) <= 0.6f) {
 			float y, w;
@@ -1800,8 +1841,10 @@ bool dungeonPick(App &app, Vec3 tip, Vec3 dir, float &gu, float &gv, Vec3 &hitW,
 			}
 			px = 112.0f + 88.0f + clampf(lat, -0.5f, 0.5f) * w;
 			py = clampf(y, 1.0f, 119.0f);
+			hit = hh;
 			// Le point du sol est montré à plat
-			f = Vec3{0, 1, 0};
+			finalF = Vec3{0, 1, 0};
+			finalR = rAhead;
 		}
 	}
 	// 3. Ailleurs devant le groupe (au loin, en l'air) : la vue du jeu, selon l'angle. C'est là qu'on
@@ -1809,12 +1852,14 @@ bool dungeonPick(App &app, Vec3 tip, Vec3 dir, float &gu, float &gv, Vec3 &hitW,
 	if (px < 0.0f) {
 		Vec3 flat{v.x, 0.0f, v.z};
 		float fl = length(flat);
-		if (fl > 1e-3f && dot(flat, f) / fl > 0.5f) {
-			float side = dot(v, r) / dot(v, f), up = v.y / dot(v, f);
+		if (fl > 1e-3f && dot(flat, fAhead) / fl > 0.5f) {
+			float side = dot(v, rAhead) / dot(v, fAhead), up = v.y / dot(v, fAhead);
 			// Le mur à une case montre 128 x 96 pixels pour S x H mètres, à S/2 du groupe.
 			px = clampf(200.0f + side * 64.0f, 113.0f, 287.0f);
 			py = clampf(56.0f - up * 48.0f * S / H, 2.0f, 100.0f);
 			hit = o + v * 3.0f;
+			finalF = fAhead;
+			finalR = rAhead;
 		}
 	}
 	if (px < 0.0f)
@@ -1822,8 +1867,8 @@ bool dungeonPick(App &app, Vec3 tip, Vec3 dir, float &gu, float &gv, Vec3 &hitW,
 	gu = px / 320.0f;
 	gv = py / 200.0f;
 	hitW = transformPoint(model, hit);
-	rightW = normalize(transformDir(model, r));
-	upW = f.y > 0.5f ? normalize(transformDir(model, Vec3{(float)dx[d], 0.0f, (float)dz[d]})) : normalize(transformDir(model, Vec3{0, 1, 0}));
+	rightW = normalize(transformDir(model, finalR));
+	upW = finalF.y > 0.5f ? normalize(transformDir(model, fAhead)) : normalize(transformDir(model, Vec3{0, 1, 0}));
 	return true;
 }
 

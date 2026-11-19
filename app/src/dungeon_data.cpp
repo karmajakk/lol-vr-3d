@@ -203,6 +203,10 @@ void decodeDungeonTextures(const DungeonGfx &g, DungeonTextures &out) {
 		// Le mur ordinaire du niveau (le premier mur de pierre ou d'arbres plein) : il habille le tour
 		// des images (une maison au bout d'un chemin) et les côtés où le jeu n'en dessine pas.
 		int baseLayer = -1;
+		// Types à rattacher au mur ordinaire une fois celui-ci trouvé : son type peut être décodé
+		// après eux (l'ordre des types n'a aucun rapport avec leur usage dans le niveau), auquel cas
+		// on ne peut pas encore les poser dessus lors de leur propre tour de boucle.
+		std::vector<uint8_t> pendingBase;
 		for (int t = 1; t < 256; t++) {
 			int slot = g.wallSlot[t];
 			if (slot < 0 || slot >= g.wallSlots)
@@ -218,8 +222,12 @@ void decodeDungeonTextures(const DungeonGfx &g, DungeonTextures &out) {
 			const bool picture = !g.vmpMap[t] && isPictureType(g, t);
 			if (bottom < 0 && !(g.doorAlpha && seeThrough)) {
 				// Une image que le jeu ne montre que de loin : de près, c'est le mur ordinaire.
-				if (picture && baseLayer >= 0)
-					out.typeLayer[t] = baseLayer;
+				if (picture) {
+					if (baseLayer >= 0)
+						out.typeLayer[t] = baseLayer;
+					else
+						pendingBase.push_back((uint8_t)t);
+				}
 				continue;
 			}
 			// Un type sans mur, fait d'un seul dessin : un objet au milieu de la case, ou, s'il ne
@@ -299,6 +307,9 @@ void decodeDungeonTextures(const DungeonGfx &g, DungeonTextures &out) {
 				}
 			}
 		}
+		if (baseLayer >= 0)
+			for (uint8_t pt : pendingBase)
+				out.typeLayer[pt] = baseLayer;
 	}
 
 	// Le fond (plafond et sol), comme le jeu le dessine quand aucun mur ne cache la vue.

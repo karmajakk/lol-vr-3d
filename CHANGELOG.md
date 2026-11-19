@@ -3,6 +3,15 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.6.1] — Remaining black wall, clicking on the sides
+
+- A second case of the black wall at the end of a forest path, missed by the 0.5.2 fix: when the
+  ordinary forest wall was decoded after the picture that closes off the path, the picture never
+  got attached to it. It now always does, however the two are decoded.
+- In immersive mode, the pointer now picks the walls around the party's own cell, not just the one
+  blocking the way ahead: bushes, nests, holes in trees and other clickable spots on the walls
+  beside you (or behind) respond to a look and a click, the same as the wall in front.
+
 ## [0.6.0] — Spells in 3D, folding spellbook
 
 - Spell effects in immersive mode: while a spell is cast, what the game draws over its view
