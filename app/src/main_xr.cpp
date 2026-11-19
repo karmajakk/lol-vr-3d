@@ -480,8 +480,8 @@ struct App {
 	bool screenPlaced = false;
 	Vec3 screenPos = {0, 0, -2.2f};
 	float screenYaw = 0.0f;
-	float widths[kEnvCount] = {1.1f, 1.8f, 0.62f}; // mètres : largeur de l'image entière (hauteur = 3/4)
-	float distances[kEnvCount] = {1.15f, 2.0f, 0.95f};
+	float widths[kEnvCount] = {1.1f, 1.8f, 0.62f, 0.62f}; // mètres : largeur de l'image entière (hauteur = 3/4)
+	float distances[kEnvCount] = {1.15f, 2.0f, 0.95f, 0.95f};
 	// Ce que l'écran affiche en ce moment : portion de l'image du jeu (pixels) et taille réelle (mètres).
 	float cropX = 0, cropY = 0, cropW = 320, cropH = 200;
 	float dispW = 2.4f, dispH = 1.8f;
@@ -498,6 +498,7 @@ struct App {
 	double splitWantedSince = 0;
 	bool gameStarted = false, automapOpen = false;
 	bool gameMenuOpen = false;   // un menu du jeu est affiché
+	int viewNotices = 0;         // rappels « L3 change la vue » déjà montrés (1 : classique, 2 : réalité mixte)
 	int vrMenuSerial = -1;       // « Réglages VR » dans le menu du jeu (-1 : pas encore lu)
 	// Combat aux boutons : dans le donjon, A attaque et B ouvre la magie du personnage choisi.
 	bool inDungeon = false;
@@ -533,8 +534,8 @@ struct App {
 	std::map<std::string, long> imageRejected;   // fichiers illisibles (chemin -> taille au moment de l'essai)
 	std::string imageInfo[2];                    // état lisible, affiché sous le clavier
 	// Direction de l'écran choisie par le joueur, par décor (lacet par rapport au regard de départ, tangage)
-	float aimYaw[kEnvCount] = {0, 0, 0}, aimPitch[kEnvCount] = {0, 0, 0};
-	bool aimSaved[kEnvCount] = {false, false, false};
+	float aimYaw[kEnvCount] = {0, 0, 0, 0}, aimPitch[kEnvCount] = {0, 0, 0, 0};
+	bool aimSaved[kEnvCount] = {false, false, false, false};
 	double automapSince = 0;
 	// Touches du clavier virtuel à relâcher
 	struct PendingKey {
@@ -1088,7 +1089,7 @@ struct Limits {
 	float wMin, wMax, dMin, dMax;
 };
 // Dans la bibliothèque, l'écran doit tenir entre les étagères et devant le mur du fond.
-const Limits kLimits[kEnvCount] = {{0.5f, 3.0f, 0.6f, 2.9f}, {0.4f, 5.0f, 0.4f, 5.0f}, {0.25f, 2.0f, 0.35f, 3.0f}};
+const Limits kLimits[kEnvCount] = {{0.5f, 3.0f, 0.6f, 2.9f}, {0.4f, 5.0f, 0.4f, 5.0f}, {0.25f, 2.0f, 0.35f, 3.0f}, {0.25f, 2.0f, 0.35f, 2.9f}};
 
 // Fichier de réglages : une ligne par réglage, « nom valeurs… ». Les lignes inconnues sont ignorées.
 void loadSettings(App &app, int &environment) {
@@ -1137,6 +1138,9 @@ void loadSettings(App &app, int &environment) {
 		} else if (!strcmp(name, "livresorts")) {
 			if (sscanf(rest, "%d", &iv) == 1)
 				app.ui.setSpellsCollapsed(iv != 0);
+		} else if (!strcmp(name, "rappelvue")) {
+			if (sscanf(rest, "%d", &iv) == 1)
+				app.viewNotices = iv & 3;
 		} else if (!strcmp(name, "choixvue")) {
 			if (sscanf(rest, "%d", &iv) == 1)
 				app.viewChosen = iv != 0;
@@ -1192,6 +1196,7 @@ void saveSettings(App &app) {
 	fprintf(f, "engrenage %d\n", app.gearKnown ? 1 : 0);
 	fprintf(f, "donjon3d %d\n", app.dungeonMode);
 	fprintf(f, "choixvue %d\n", app.viewChosen ? 1 : 0);
+	fprintf(f, "rappelvue %d\n", app.viewNotices);
 	fprintf(f, "livresorts %d\n", app.ui.spellsCollapsed() ? 1 : 0);
 	for (int i = 0; i < kEnvCount; i++)
 		fprintf(f, "visee %d %.4f %.4f\n", app.aimSaved[i] ? 1 : 0, app.aimYaw[i], app.aimPitch[i]);
@@ -1235,7 +1240,7 @@ void updateFloor(App &app, XrTime time) {
 // Place l'écran devant le joueur. newAnchor : repart de la position et du regard actuels
 // (premier affichage, recentrage, changement de décor) ; sinon seule la distance a changé.
 void placeScreen(App &app, bool newAnchor) {
-	bool library = app.environment == lolvr::kEnvLibrary;
+	bool library = lolvr::isLibraryEnv(app.environment);
 	if (newAnchor) {
 		Vec3 fwd = rotate(app.headRot, {0, 0, -1});
 		float yaw = atan2f(-fwd.x, -fwd.z);
@@ -1292,7 +1297,7 @@ void dragScreen(App &app, Vec3 center, float zoom) {
 	if (dist < 1e-3f)
 		return;
 	Vec3 dir = v * (1.0f / dist);
-	if (app.environment == lolvr::kEnvLibrary) {
+	if (lolvr::isLibraryEnv(app.environment)) {
 		// Dans la bibliothèque, l'écran reste devant le mur du fond.
 		float yaw = atan2f(-dir.x, -dir.z) - app.anchorYaw;
 		while (yaw > 3.14159265f) yaw -= 6.2831853f;
@@ -1325,16 +1330,6 @@ void resizeScreen(App &app, float zoom) {
 
 bool usesPassthrough(int env) { return env == lolvr::kEnvPassthroughFrame || env == lolvr::kEnvPassthroughCrt; }
 
-// Décor suivant, en sautant ceux qui demandent la réalité mixte quand elle n'est pas disponible.
-int nextEnvironment(const App &app, int env) {
-	for (int i = 0; i < kEnvCount; i++) {
-		env = (env + 1) % kEnvCount;
-		if (!usesPassthrough(env) || app.passthroughSupported)
-			return env;
-	}
-	return lolvr::kEnvLibrary;
-}
-
 void setEnvironment(App &app, int env, XrTime time) {
 	if (env < 0 || env >= kEnvCount)
 		env = lolvr::kEnvLibrary;
@@ -1360,6 +1355,33 @@ void setViewMode(App &app, int mode, XrTime time) {
 	app.dungeonMode = mode;
 	if (immersive != was)
 		setEnvironment(app, immersive ? lolvr::kEnvLibrary : app.classicEnv, time);
+	app.settingsDirty = true;
+}
+
+// Le mode VR, comme le montrent les réglages : immersif, classique (la bibliothèque) ou réalité mixte ;
+// hors immersif, la vue que L3 fait tourner : grand écran, fenêtres, PC 486.
+enum { kVrImmersive = 0, kVrClassic = 1, kVrMixed = 2 };
+int vrModeOf(const App &app) { return app.dungeonMode ? kVrImmersive : usesPassthrough(app.classicEnv) ? kVrMixed : kVrClassic; }
+int classicViewOf(const App &app) { return lolvr::isCrtEnv(app.classicEnv) ? 2 : app.detached ? 1 : 0; }
+
+void setClassic(App &app, int mode, int view, XrTime time) {
+	if (mode == kVrMixed && !app.passthroughSupported)
+		mode = kVrClassic;
+	if (view != 2)
+		app.detached = view == 1;
+	app.classicEnv = mode == kVrMixed ? (view == 2 ? lolvr::kEnvPassthroughCrt : lolvr::kEnvPassthroughFrame)
+	                                  : (view == 2 ? lolvr::kEnvLibraryCrt : lolvr::kEnvLibrary);
+	if (app.dungeonMode)
+		setViewMode(app, 0, time);
+	else
+		setEnvironment(app, app.classicEnv, time);
+	app.classicEnv = app.environment; // (la réalité mixte peut avoir échoué)
+	// La première fois en vue classique ou en réalité mixte : rappeler que L3 change la vue.
+	const int bit = vrModeOf(app) == kVrMixed ? 2 : 1;
+	if (!(app.viewNotices & bit)) {
+		app.viewNotices |= bit;
+		app.ui.openViewNotice();
+	}
 	app.settingsDirty = true;
 }
 
@@ -1425,6 +1447,14 @@ void updateGameEvents(App &app, double now) {
 		app.automapSince = now;
 	app.automapOpen = gs.automapOpen;
 	app.gameMenuOpen = gs.menuOpen;
+	// La langue de l'application suit celle du jeu (son menu des options) ; l'allemand reste en anglais.
+	if (gs.gameLang >= 0) {
+		const int lang = gs.gameLang == 1 ? lolvr::kLangFrench : lolvr::kLangEnglish;
+		if (lang != app.language) {
+			app.language = lang;
+			app.settingsDirty = true;
+		}
+	}
 	// « Réglages VR » choisi dans le menu du jeu : la fenêtre des réglages s'ouvre devant le joueur.
 	if (gs.vrMenuSerial != app.vrMenuSerial) {
 		if (app.vrMenuSerial >= 0)
@@ -1531,7 +1561,7 @@ const float kBoxW = 235, kBoxH = 57;
 void updateLayout(App &app, double now) {
 	const float kViewX = 112, kViewY = 0, kViewW = 176, kViewH = 120; // vue du donjon dans l'image 320x200
 	// On attend que l'état soit stable un court instant, pour ne pas clignoter pendant une transition.
-	bool allowed = (app.detached || app.dungeonMode) && app.environment != lolvr::kEnvPassthroughCrt;
+	bool allowed = (app.detached || app.dungeonMode) && !lolvr::isCrtEnv(app.environment);
 	if (!allowed) {
 		if (app.split && app.screenPlaced) {
 			app.split = false;
@@ -1926,7 +1956,7 @@ void updateUi(App &app, XrTime time, float dt, double now, bool pointer, bool tr
 	in.screenPos = viewCenter(app);
 	in.basePos = app.screenPos;
 	in.fullW = screenWidth(app);
-	in.roomClamp = app.environment == lolvr::kEnvLibrary;
+	in.roomClamp = lolvr::isLibraryEnv(app.environment);
 	in.roomPos = app.roomPos;
 	in.roomYaw = app.anchorYaw;
 	in.screenRot = screenRot(app);
@@ -1936,7 +1966,7 @@ void updateUi(App &app, XrTime time, float dt, double now, bool pointer, bool tr
 	in.bandH = app.bandH;
 	for (int i = 0; i < 4; i++)
 		in.bandRect[i] = app.bandRect[i];
-	in.crt = app.environment == lolvr::kEnvPassthroughCrt;
+	in.crt = lolvr::isCrtEnv(app.environment);
 	in.split = app.split;
 	in.keyboardOpen = app.keyboardOpen;
 	if (app.inDungeon && app.characters > 0) {
@@ -1947,6 +1977,7 @@ void updateUi(App &app, XrTime time, float dt, double now, bool pointer, bool tr
 	}
 	app.ui.setOptions(app.fireOn, app.detached);
 	app.ui.setDungeonOption(app.dungeonMode);
+	app.ui.setVrState(vrModeOf(app), classicViewOf(app));
 	app.ui.setLanguage(app.language);
 	// Menu du poignet : sur la main gauche, quand on la regarde.
 	in.wristValid = app.aimValid[kLeft];
@@ -2025,8 +2056,15 @@ void updateUi(App &app, XrTime time, float dt, double now, bool pointer, bool tr
 		app.settingsDirty = true;
 		break;
 	case lolvr::kUiActionToggleDetach:
-		app.detached = !app.detached;
+		// Le bouton Panneaux du clavier : grand écran ou fenêtres (depuis le PC 486 : les fenêtres)
+		if (app.dungeonMode)
+			app.detached = !app.detached;
+		else
+			setClassic(app, vrModeOf(app), classicViewOf(app) == 1 ? 0 : 1, time);
 		app.settingsDirty = true;
+		break;
+	case lolvr::kUiActionCycleView:
+		setClassic(app, vrModeOf(app), (classicViewOf(app) + 1) % 3, time);
 		break;
 	case lolvr::kUiActionResetLayout:
 		app.ui.resetLayout(in);
@@ -2036,15 +2074,26 @@ void updateUi(App &app, XrTime time, float dt, double now, bool pointer, bool tr
 		app.keyboardOpen = false;
 		app.keyboardAuto = false;
 		break;
-	case lolvr::kUiActionToggleDungeon:
-		setViewMode(app, app.dungeonMode ? 0 : 1, time);
+	case lolvr::kUiActionToggleDungeon: {
+		// Le mode VR suivant : immersif, classique, réalité mixte (si le casque la permet).
+		const int mode = vrModeOf(app);
+		if (mode == kVrImmersive)
+			setClassic(app, kVrClassic, classicViewOf(app), time);
+		else if (mode == kVrClassic && app.passthroughSupported)
+			setClassic(app, kVrMixed, classicViewOf(app), time);
+		else
+			setViewMode(app, 1, time);
 		break;
+	}
 	case lolvr::kUiActionToggleScreenAlways:
 		setViewMode(app, app.dungeonMode == 2 ? 1 : 2, time);
 		break;
 	case lolvr::kUiActionChooseClassic:
 	case lolvr::kUiActionChooseImmersive:
-		setViewMode(app, out.action == lolvr::kUiActionChooseImmersive ? 1 : 0, time);
+		if (out.action == lolvr::kUiActionChooseImmersive)
+			setViewMode(app, 1, time);
+		else
+			setClassic(app, kVrClassic, classicViewOf(app), time);
 		app.viewChosen = true;
 		app.chooserOpen = false;
 		pulse(app, kRight, 0.3f, 0.03f);
@@ -2259,7 +2308,7 @@ void updateInput(App &app, XrTime time, float dt, double now) {
 			placeScreen(app, false);
 	} else if (app.zoomDown) {
 		if (!app.zoomUsed && now - app.zoomSince < 0.6 && !app.dungeonMode) { // le mode immersif n'a qu'une vue
-			setEnvironment(app, nextEnvironment(app, app.environment), time);
+			setClassic(app, vrModeOf(app), (classicViewOf(app) + 1) % 3, time); // la vue suivante
 			pulse(app, kLeft, 0.3f, 0.03f);
 		}
 		app.settingsDirty = true;
@@ -2772,7 +2821,7 @@ void renderFrame(App &app, float dt, int savedEnvironment) {
 		ambience.setScreen(viewCenter(app), screenRot(app), app.dispW);
 		ambience.setRoom(app.roomPos, app.anchorYaw);
 		ambience.setFire(app.fireOn && !app.dungeonVisible);
-		ambience.setMood(visible && app.environment == lolvr::kEnvLibrary && app.scene.ready() && !app.dungeonVisible, app.shownTheme);
+		ambience.setMood(visible && lolvr::isLibraryEnv(app.environment) && app.scene.ready() && !app.dungeonVisible, app.shownTheme);
 
 		// Calques, du fond vers l'avant : vraie pièce (réalité mixte), image du jeu, décor.
 		if (app.passthroughActive) {

@@ -45,6 +45,7 @@ struct GameState {
 	bool menuOpen = false;    // un menu du jeu est affiché
 	bool nameEntry = false;   // le joueur écrit le nom d'une sauvegarde
 	int vrMenuSerial = 0;     // change à chaque clic sur « Réglages VR » dans le menu du jeu
+	int gameLang = -1;        // la langue du jeu (0 anglais, 1 français, 2 allemand ; -1 pas encore connue)
 };
 
 // Un monstre ou un objet près du groupe, dessiné par le moteur en grand dans une image de

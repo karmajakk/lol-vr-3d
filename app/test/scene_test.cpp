@@ -247,6 +247,7 @@ int main(int argc, char **argv) {
 		{"forest_left", kEnvLibrary, kThemeForest, seat, 75, 5, 1.15f, false, 0, 0},
 		{"pt_frame", kEnvPassthroughFrame, kThemeKeep, seat, 0, 0, 1.15f, true, 0.0f, 0.0f},
 		{"pt_crt", kEnvPassthroughCrt, kThemeKeep, seat, 0, -8, 1.15f, true, 0.0f, 0.0f},
+		{"lib_crt", kEnvLibraryCrt, kThemeKeep, seat, 0, -8, 1.15f, true, 0.0f, 0.0f},
 		{"pt_crt_side", kEnvPassthroughCrt, kThemeKeep, {1.1f, 1.45f, -0.5f}, 38, -14, 0.8f, false, 0, 0},
 		{"split_front", kEnvLibrary, kThemeKeep, seat, 0, 2, 1.25f, true, 0.0f, 0.0f, 1},
 		{"split_wide", kEnvLibrary, kThemeKeep, {0, 1.20f, 0.9f}, 0, 2, 1.25f, false, 0.0f, 0.0f, 1},
@@ -598,50 +599,48 @@ int main(int argc, char **argv) {
 				if (tmp.panels[i].visible) { shown4++; menu = i; }
 			SceneState::Panel m = tmp.panels[menu];
 			check(shown4 >= shown + 1 && m.center.z < in.headPos.z - 0.4f && fabsf(m.center.x - in.headPos.x) < 0.05f, "réglages VR : la fenêtre s'ouvre devant le joueur");
-			auto row = [&](int r) { return m.center + m.up * ((1.0f - 2.0f * (r + 0.5f) / 6.0f) * m.halfH); };
+			auto row = [&](int r) { return m.center + m.up * ((1.0f - 2.0f * (r + 0.5f) / 5.0f) * m.halfH); };
 			in.tip = in.headPos + Vec3{0.15f, -0.15f, 0.0f};
-			aimAt(row(1));
-			in.triggerDown = in.triggerPressed = true;
-			ui.update(in, o, tmp);
-			check(o.action == kUiActionToggleLanguage && !o.buttonsToGame, "menu : première ligne, changer de langue");
-			in.triggerDown = in.triggerPressed = false;
-			ui.update(in, o, tmp);
-			aimAt(row(2));
-			in.triggerDown = in.triggerPressed = true;
-			ui.update(in, o, tmp);
-			check(o.action == kUiActionToggleDungeon, "menu : deuxième ligne, le mode immersif");
-			in.triggerDown = in.triggerPressed = false;
-			ui.update(in, o, tmp);
-			aimAt(row(3));
-			in.triggerDown = in.triggerPressed = true;
-			ui.update(in, o, tmp);
-			check(o.action == kUiActionToggleScreenAlways, "menu : troisième ligne, l'écran du jeu (mode immersif)");
-			in.triggerDown = in.triggerPressed = false;
+			auto click = [&](int r) {
+				aimAt(row(r));
+				in.triggerDown = in.triggerPressed = true;
+				ui.update(in, o, tmp);
+				UiFrameOutput r1 = o;
+				in.triggerDown = in.triggerPressed = false;
+				ui.update(in, o, tmp);
+				return r1;
+			};
+			UiFrameOutput c1 = click(1);
+			check(c1.action == kUiActionToggleDungeon && !c1.buttonsToGame, "réglages VR : première ligne, le mode VR suivant");
+			check(click(2).action == kUiActionToggleScreenAlways, "réglages VR : deuxième ligne, l'écran du jeu (mode immersif)");
 			ui.setDungeonOption(0);
+			ui.setVrState(1, 0);
 			ui.update(in, o, tmp);
-			aimAt(row(3));
-			in.triggerDown = in.triggerPressed = true;
-			ui.update(in, o, tmp);
-			check(o.action == kUiActionToggleDetach, "menu : troisième ligne, l'écran classique (vue classique)");
+			check(click(2).action == kUiActionCycleView, "réglages VR : deuxième ligne, la vue (classique, réalité mixte)");
 			ui.setDungeonOption(1);
-			in.triggerDown = in.triggerPressed = false;
 			ui.update(in, o, tmp);
-			aimAt(row(4));
-			in.triggerDown = in.triggerPressed = true;
-			ui.update(in, o, tmp);
-			check(o.action == kUiActionToggleHelp, "menu : quatrième ligne, les manettes (et le menu se ferme)");
-			in.triggerDown = in.triggerPressed = false;
-			ui.update(in, o, tmp);
+			check(click(3).action == kUiActionToggleHelp, "réglages VR : troisième ligne, les manettes (et la fenêtre se ferme)");
 			ui.openMenu();
 			ui.update(in, o, tmp);
-			aimAt(row(5));
+			UiFrameOutput c4 = click(4);
+			int shown5 = 0;
+			for (int i = 0; i < SceneState::kMaxPanels; i++) shown5 += tmp.panels[i].visible ? 1 : 0;
+			check(c4.action == kUiActionNone && shown5 == shown4 - 1, "réglages VR : quatrième ligne, fermer");
+			// Le rappel « L3 change la vue » : devant le joueur, un clic le ferme
+			ui.openViewNotice();
+			ui.update(in, o, tmp);
+			int shown6 = 0, notice = -1;
+			for (int i = 0; i < SceneState::kMaxPanels; i++)
+				if (tmp.panels[i].visible) { shown6++; notice = i; }
+			check(shown6 == shown5 + 1 && tmp.panels[notice].center.z < in.headPos.z - 0.4f, "rappel de la vue : la fenêtre s'ouvre devant le joueur");
+			aimAt(tmp.panels[notice].center);
 			in.triggerDown = in.triggerPressed = true;
 			ui.update(in, o, tmp);
 			in.triggerDown = in.triggerPressed = false;
 			ui.update(in, o, tmp);
-			int shown5 = 0;
-			for (int i = 0; i < SceneState::kMaxPanels; i++) shown5 += tmp.panels[i].visible ? 1 : 0;
-			check(o.action == kUiActionNone && shown5 == shown4 - 1, "menu : cinquième ligne, fermer");
+			int shown7 = 0;
+			for (int i = 0; i < SceneState::kMaxPanels; i++) shown7 += tmp.panels[i].visible ? 1 : 0;
+			check(shown7 == shown5, "rappel de la vue : un clic le ferme");
 			in.triggerDown = in.triggerPressed = false;
 			in.wristValid = false;
 			in.keyboardOpen = false;
@@ -666,6 +665,7 @@ int main(int argc, char **argv) {
 		if (getenv("LOLVR_UI_DUMP")) {
 			ui.setLanguage(kLangFrench);
 			ui.openMenu();
+			ui.openViewNotice();
 			in.split = true;
 			in.chooserOpen = true;
 			ui.update(in, o, tmp);
@@ -691,7 +691,7 @@ int main(int argc, char **argv) {
 		// Écran : image entière (4:3), ou vue du donjon seule à la même hauteur.
 		float fullW = 2.4f;
 		Vec3 screenPos = {0, 1.30f, -2.2f};
-		if (sh.env == kEnvPassthroughCrt) {
+		if (isCrtEnv(sh.env)) {
 			fullW = 0.62f;
 			screenPos = {0, 1.02f, -0.95f};
 		} else if (sh.env == kEnvPassthroughFrame) {
@@ -729,11 +729,11 @@ int main(int argc, char **argv) {
 		in.dispW = quadW;
 		in.dispH = quadH;
 		in.cropX = rect[0] * 320.0f; in.cropY = rect[1] * 200.0f; in.cropW = rect[2] * 320.0f; in.cropH = rect[3] * 200.0f;
-		in.crt = sh.env == kEnvPassthroughCrt;
+		in.crt = isCrtEnv(sh.env);
 		in.split = split;
 		in.basePos = basePos;
 		in.fullW = fullW;
-		in.roomClamp = sh.env == kEnvLibrary;
+		in.roomClamp = isLibraryEnv(sh.env);
 		in.keyboardOpen = sh.mode == 2;
 		in.aimValid = sh.hands;
 		if (sh.hands) {
@@ -826,7 +826,7 @@ int main(int argc, char **argv) {
 			glBindTexture(GL_TEXTURE_2D, game);
 			glDrawArrays(GL_TRIANGLES, 0, 6);
 		}
-		if (sh.env != kEnvLibrary) {
+		if (!isLibraryEnv(sh.env)) {
 			Mat4 full = identity();
 			full.m[0] = 2.0f;
 			full.m[5] = 2.0f / 0.75f;

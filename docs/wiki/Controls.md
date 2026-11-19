@@ -12,9 +12,9 @@
 | Y | Map |
 | **X** | **Right click** where you aim: drink a potion, use an item (same as the grip) |
 | Menu button (left controller) | ScummVM menu: save, load, quit |
-| **Floppy on the left wrist** | The game menu (load, save...), and in it "VR controls": language, immersive mode, game screen, controller mapping |
+| **Floppy on the left wrist** | The game menu (load, save, language...), and in it "VR controls": VR mode, view, controller mapping |
 | Right stick click | Recenter the screen, the room and the windows in front of you |
-| Short left stick click | Classic view: change scenery (library → mixed reality with frame → mixed reality with CRT monitor) |
+| Short left stick click (L3) | Classic and mixed reality: next view (big screen → windows → 486 PC) |
 | Left stick click held + right stick | Up/down: screen size; left/right: distance |
 
 ## Floppy on the wrist, VR controls
@@ -23,10 +23,11 @@ Look at your left hand: a small floppy disk appears above it, like the game's op
 
 At the bottom of that menu, left of "Resume game", **VR controls** opens the headset's settings in front of you, laid out like the game's options (setting on the left, its value on a button):
 
-- **Language**: switches between English and French.
-- **Immersive mode**: on, you walk in the dungeon rebuilt in 3D (see [Immersive mode](Immersive-mode.md)); off, the classic view, with the game on a big screen.
+- **VR mode**: **Immersive** (you walk in the dungeon rebuilt in 3D, see [Immersive mode](Immersive-mode.md)), **Classic** (the game in a medieval library) or **Mixed reality** (the game in your real room). The first time you pick Classic or Mixed reality, a note reminds you that L3 changes the view.
 - In immersive mode, **Game screen**: "if needed" (it comes up for shops, conversations, the map, menus) or "always".
-- In the classic view, **Classic screen**: on, the whole game image stays on the big screen, like the original game; off, the interface windows float on their own.
+- In Classic and Mixed reality, **View (L3)**: **Big screen** (the whole game image, like the original game), **Windows** (the interface windows float on their own) or **486 PC** (the game on a curved 90s monitor standing on a 486 PC). A short click of the left stick does the same.
+
+The app speaks the language chosen in the game's own options ("Language is" in Game controls): French, or English for the others.
 - **Controller mapping**: shows a panel summing up every button. Click the panel to close it.
 - **Close**.
 

@@ -3,6 +3,18 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.9.0] — VR mode, views, the game's language
+
+- "VR controls" has a **VR mode** setting: Immersive, Classic (the medieval library) or Mixed
+  reality (your real room). In Classic and Mixed reality, a **View** setting, also on L3 (short click
+  of the left stick): big screen, windows, or the 486 PC. The 486 PC is now available in the library
+  too, not only in mixed reality.
+- The first time you pick Classic or Mixed reality, a note in front of you says that L3 changes the
+  view (click it to close).
+- The Language row is gone: the app now speaks the language chosen in the game's own options
+  ("Language is", in Game controls). German stays in English. The game tells the app its language
+  (patch 0003).
+
 ## [0.8.0] — Floppy on the wrist, VR controls in the game menu
 
 - The left wrist shows a floppy disk instead of the gear. Clicking it opens the game's own menu

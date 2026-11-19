@@ -14,4 +14,4 @@ The dungeon is rebuilt in true 3D around you, at real size, from your own game f
 
 Not there yet: doors that slide open (they jump from closed to open), thrown objects in flight.
 
-Switch to the classic view in "VR controls" (game menu, floppy on the left wrist): "Immersive mode: off".
+Switch to the classic view in "VR controls" (game menu, floppy on the left wrist): "VR mode", Classic or Mixed reality.

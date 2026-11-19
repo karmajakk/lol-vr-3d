@@ -30,7 +30,7 @@ struct UiPlacement {
 const float kSplitViewHeight = 0.54f;
 const float kSplitViewLift = 0.16f;
 
-enum UiAction { kUiActionNone = 0, kUiActionToggleFire, kUiActionToggleDetach, kUiActionResetLayout, kUiActionCloseKeyboard, kUiActionToggleHelp, kUiActionCloseHelp, kUiActionToggleLanguage, kUiActionToggleKeyboard, kUiActionToggleDungeon, kUiActionToggleScreenAlways, kUiActionChooseClassic, kUiActionChooseImmersive, kUiActionGameMenu };
+enum UiAction { kUiActionNone = 0, kUiActionToggleFire, kUiActionToggleDetach, kUiActionResetLayout, kUiActionCloseKeyboard, kUiActionToggleHelp, kUiActionCloseHelp, kUiActionToggleLanguage, kUiActionToggleKeyboard, kUiActionToggleDungeon, kUiActionToggleScreenAlways, kUiActionChooseClassic, kUiActionChooseImmersive, kUiActionGameMenu, kUiActionCycleView };
 
 enum UiLanguage { kLangEnglish = 0, kLangFrench = 1 };
 
@@ -143,6 +143,11 @@ public:
 	void resetLayout(const UiFrameInput &in);
 	// Les réglages VR (choisis dans le menu du jeu) : la fenêtre s'ouvre devant le joueur.
 	void openMenu();
+	// Le mode VR (0 immersif, 1 classique, 2 réalité mixte) et, hors immersif, la vue (0 grand écran,
+	// 1 fenêtres, 2 PC 486), montrés dans les réglages VR.
+	void setVrState(int mode, int view);
+	// Rappel (la première fois en vue classique ou en réalité mixte) : L3 change la vue.
+	void openViewNotice();
 	// Livre de sorts replié (le bandeau et les messages seulement) ou ouvert.
 	bool spellsCollapsed() const;
 	void setSpellsCollapsed(bool collapsed);

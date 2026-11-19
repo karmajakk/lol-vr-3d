@@ -4,7 +4,7 @@
 Expected at first launch. Copy the CD content into `Android/data/com.karmajakk.lolvr3d/files/lol` (see [Installation](Installation.md)). With the GOG version, open `GAME.DAT` with 7-Zip first.
 
 **The app is in English, I want French (or the other way round).**
-Look at your left hand, click the floppy, then "VR controls" and "Language".
+The app follows the game: floppy on your left wrist, "Game controls", then "Language is".
 
 **I don't remember the buttons.**
 Look at your left hand, click the floppy, then "VR controls" and "Controller mapping". See also [Controls](Controls.md).

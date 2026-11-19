@@ -9,8 +9,14 @@ enum Environment {
 	kEnvLibrary = 0,          // bibliothèque médiévale, écran dans un cadre ouvragé
 	kEnvPassthroughFrame = 1, // la vraie pièce du joueur, écran dans le cadre
 	kEnvPassthroughCrt = 2,   // la vraie pièce du joueur, moniteur cathodique
+	kEnvLibraryCrt = 3,       // la bibliothèque, moniteur cathodique (le PC 486)
 	kEnvCount
 };
+// La bibliothèque est autour (avec l'écran dans son cadre ou le PC 486)
+inline bool isLibraryEnv(int env) { return env == kEnvLibrary || env == kEnvLibraryCrt; }
+// L'écran est un moniteur cathodique (le PC 486)
+inline bool isCrtEnv(int env) { return env == kEnvPassthroughCrt || env == kEnvLibraryCrt; }
+
 
 struct HandState {
 	bool visible = false;
@@ -107,7 +113,7 @@ public:
 	void render(const Mat4 &view, const Mat4 &proj, const SceneState &state);
 
 	// Vrai quand l'image du jeu doit être affichée par un calque « quad » sous le décor.
-	static bool usesQuadLayer(int environment) { return environment != kEnvPassthroughCrt; }
+	static bool usesQuadLayer(int environment) { return !isCrtEnv(environment); }
 	// Vrai quand les textures sont prêtes (le décor apparaît alors en fondu).
 	bool ready() const;
 	// Le donjon en 3D, dessiné à la place de la pièce quand state.dungeonVisible est vrai.

@@ -1,6 +1,6 @@
 # Windows
 
-While exploring, the game interface is spread over windows you place wherever you like (always in immersive mode; in the classic view when "Classic screen" is off):
+While exploring, the game interface is spread over windows you place wherever you like (always in immersive mode; in Classic and Mixed reality with the "Windows" view):
 
 - on the left, the spell scroll, with the message line joined under it; the strip at its top ("Spellbook +/-") folds it away, leaving only the message line, and opens it again to change the spell;
 - on the right, the characters one under the other, the atlas column (lamp, purse) to their right, and the rest button under the purse, all in one window (the options button, the floppy, is on your left wrist);

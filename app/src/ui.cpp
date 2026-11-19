@@ -36,7 +36,7 @@ struct Source {
 // Clavier : grille de 11 colonnes sur 6 rangées.
 const int kCellW = 46, kCellH = 40, kCols = 11, kRows = 6;
 // Menu du poignet : engrenage et petit menu
-const int kGearSize = 64, kHintW = 440, kHintH = 84, kMenuW = 360, kMenuRowH = 44, kMenuRows = 6, kMenuH = kMenuRowH * kMenuRows;
+const int kGearSize = 64, kHintW = 440, kHintH = 84, kMenuW = 360, kMenuRowH = 44, kMenuRows = 5, kMenuH = kMenuRowH * kMenuRows;
 // Panneau d'aide
 const int kHelpW = 640, kHelpH = 470;
 const int kInfoH = 0; // (plus de lignes d'information sous les touches)
@@ -314,7 +314,7 @@ struct Ui::Impl {
 
 	// Poignée tenue : -1 aucune, 0..kUiPanelCount-1 un panneau, kScreenTarget l'écran.
 	static const int kScreenTarget = 100;
-	GLuint helpTex = 0, gearTex = 0, menuTex = 0, hintTex = 0, chooserTex = 0;
+	GLuint helpTex = 0, gearTex = 0, menuTex = 0, hintTex = 0, chooserTex = 0, noticeTex = 0;
 	bool helpDirty = true, menuDirty = true, hintDirty = true, chooserDirty = true;
 	bool menuKeyboard = false; // état montré dans le menu
 	int dungeonMode = 1;
@@ -330,6 +330,11 @@ struct Ui::Impl {
 	// Menu du poignet : ouvert, il reste où il est apparu.
 	bool menuOpen = false;
 	bool menuAhead = false; // à placer devant le joueur à la prochaine image
+	int vrMode = 1, classicView = 0;
+	// Le rappel « L3 change la vue », devant le joueur
+	bool noticeOpen = false, noticeAhead = false, noticeDirty = true;
+	Vec3 noticePos{0, 0, 0}, noticeRight{1, 0, 0}, noticeUp{0, 1, 0};
+	void renderNotice();
 	Vec3 menuPos = {0, 0, 0}, menuRight = {1, 0, 0}, menuUp = {0, 1, 0};
 	int menuHot = -1;
 	// Colonne du groupe recomposée
@@ -620,7 +625,7 @@ void Ui::Impl::renderHelp() {
 		"Brass bar + hold trigger ........ move",
 		"Corner + hold trigger ..... resize",
 		"Right stick click ........ recenter everything",
-		"Left stick click ......... scenery (classic view)",
+		"Left stick click ......... view: big, windows, 486 PC",
 		"",
 		"Click this panel to close it.",
 		nullptr,
@@ -650,7 +655,7 @@ void Ui::Impl::renderHelp() {
 		"Barrette + gâchette tenue ... déplacer",
 		"Coin + gâchette tenue ....... agrandir, réduire",
 		"Clic du joystick droit ... tout recentrer devant soi",
-		"Clic du joystick gauche .. décor (vue classique)",
+		"Clic du joystick gauche .. vue : écran, fenêtres, PC 486",
 		"",
 		"Cliquer ce panneau pour le fermer.",
 		nullptr,
@@ -764,23 +769,23 @@ void Ui::Impl::renderMenu() {
 	// dessous, deux grands boutons.
 	Canvas cv{kMenuW, kMenuH, std::vector<uint8_t>((size_t)kMenuW * kMenuH * 4)};
 	cv.window();
-	const char *names[3] = {fr ? "Langue" : "Language", fr ? "Mode immersif" : "Immersive mode",
-	                        dungeonMode ? (fr ? "Écran du jeu" : "Game screen") : (fr ? "Écran classique" : "Classic screen")};
-	const char *values[4] = {fr ? "Français" : "English", dungeonMode ? (fr ? "Oui" : "On") : (fr ? "Non" : "Off"),
-	                         // Mode immersif : l'écran du jeu au besoin ou toujours ; vue classique : l'écran entier ou en fenêtres.
-	                         dungeonMode ? (dungeonMode == 2 ? (fr ? "Toujours" : "Always") : (fr ? "Au besoin" : "If needed"))
-	                                     : (detached ? (fr ? "Non" : "Off") : (fr ? "Oui" : "On"))};
+	static const char *const modes[2][3] = {{"Immersive", "Classic", "Mixed reality"}, {"Immersif", "Classique", "Réalité mixte"}};
+	static const char *const views[2][3] = {{"Big screen", "Windows", "486 PC"}, {"Grand écran", "Fenêtres", "PC 486"}};
+	const int lg = fr ? 1 : 0, mode = dungeonMode ? 0 : vrMode, view = classicView < 0 || classicView > 2 ? 0 : classicView;
+	const char *names[2] = {fr ? "Mode VR" : "VR mode", mode == 0 ? (fr ? "Écran du jeu" : "Game screen") : (fr ? "Vue (L3)" : "View (L3)")};
+	const char *values[2] = {modes[lg][mode < 0 || mode > 2 ? 1 : mode],
+	                         mode == 0 ? (dungeonMode == 2 ? (fr ? "Toujours" : "Always") : (fr ? "Au besoin" : "If needed")) : views[lg][view]};
 	const int split = 196, th = Canvas::textH(2);
 	cv.gcenter(latin1(fr ? "Réglages VR" : "VR controls"), 0, kMenuW, (kMenuRowH - th) / 2 + 2, 2, kWhite);
 	for (int i = 1; i < kMenuRows; i++) {
 		const int y0 = i * kMenuRowH, by0 = y0 + 5, by1 = y0 + kMenuRowH - 5, ty = (by0 + by1 - th) / 2;
-		if (i <= 3) {
+		if (i <= 2) {
 			const std::string n = latin1(names[i - 1]), v = latin1(values[i - 1]);
 			cv.gtext(n, split - 10 - Canvas::textW(n, Canvas::fit(n, split - 24, 2)), ty, Canvas::fit(n, split - 24, 2), kGold);
 			cv.bevel(split, by0, kMenuW - 12, by1, 2, true);
 			cv.gcenter(v, split, kMenuW - 12, ty, Canvas::fit(v, kMenuW - 24 - split, 2), kGold);
 		} else {
-			const std::string l = latin1(i == 4 ? (fr ? "Manettes et boutons" : "Controller mapping") : (fr ? "Fermer" : "Close"));
+			const std::string l = latin1(i == 3 ? (fr ? "Manettes et boutons" : "Controller mapping") : (fr ? "Fermer" : "Close"));
 			cv.bevel(12, by0, kMenuW - 12, by1, 2, true);
 			cv.gcenter(l, 12, kMenuW - 12, ty, 2, kGold);
 		}
@@ -790,6 +795,30 @@ void Ui::Impl::renderMenu() {
 }
 
 // Invitation du premier lancement : un engrenage et deux lignes.
+// Le rappel de la vue classique : L3 passe du grand écran aux fenêtres et au PC 486.
+const int kNoticeW = 480, kNoticeH = 200;
+
+void Ui::Impl::renderNotice() {
+	const bool fr = language == kLangFrench;
+	Canvas cv{kNoticeW, kNoticeH, std::vector<uint8_t>((size_t)kNoticeW * kNoticeH * 4)};
+	cv.window();
+	cv.gcenter(latin1(fr ? "Changer de vue" : "Change the view"), 0, kNoticeW, 14, 2, kWhite);
+	cv.rect(12, 34, kNoticeW - 12, 35, kDark);
+	cv.rect(12, 35, kNoticeW - 12, 36, kLight);
+	int y = 48;
+	for (const std::string &l : Canvas::wrap(latin1(fr ? "Clique sur le joystick gauche (L3) pour passer du grand écran aux fenêtres, puis au PC 486."
+	                                                   : "Click the left stick (L3) to go from the big screen to the windows, then to the 486 PC."),
+	                                         kNoticeW - 40, 2)) {
+		cv.gcenter(l, 0, kNoticeW, y, 2, kGold);
+		y += 20;
+	}
+	cv.gcenter(latin1(fr ? "Aussi dans le menu du jeu, Réglages VR." : "Also in the game menu, VR controls."), 0, kNoticeW, y + 6, 2, kPale);
+	cv.bevel(kNoticeW / 2 - 50, kNoticeH - 42, kNoticeW / 2 + 50, kNoticeH - 12, 2, true);
+	cv.gcenter("OK", kNoticeW / 2 - 50, kNoticeW / 2 + 50, kNoticeH - 36, 2, kGold);
+	upload(noticeTex, cv.px, kNoticeW, kNoticeH, "rappel");
+	noticeDirty = false;
+}
+
 void Ui::Impl::renderHint() {
 	const bool fr = language == kLangFrench;
 	Canvas cv{kHintW, kHintH, std::vector<uint8_t>((size_t)kHintW * kHintH * 4)};
@@ -839,7 +868,21 @@ void Ui::setLanguage(int language) {
 		d->menuDirty = true;
 		d->hintDirty = true;
 		d->chooserDirty = true;
+		d->noticeDirty = true;
 	}
+}
+
+void Ui::setVrState(int mode, int view) {
+	if (mode != d->vrMode || view != d->classicView) {
+		d->vrMode = mode;
+		d->classicView = view;
+		d->menuDirty = true;
+	}
+}
+
+void Ui::openViewNotice() {
+	d->noticeOpen = true;
+	d->noticeAhead = true;
 }
 
 void Ui::setOptions(bool fireOn, bool detached) {
@@ -1045,6 +1088,8 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 	}
 	if (d->menuDirty || !d->menuTex)
 		d->renderMenu();
+	if (d->noticeOpen && (d->noticeDirty || !d->noticeTex))
+		d->renderNotice();
 	if (in.gearHint && (d->hintDirty || !d->hintTex))
 		d->renderHint();
 	if (in.chooserOpen && (d->chooserDirty || !d->chooserTex))
@@ -1203,6 +1248,22 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 		d->menuUp = {0, 1, 0};
 		d->menuAhead = false;
 	}
+	const float kNoticeScale = 0.0009f;
+	if (d->noticeOpen && d->noticeAhead) {
+		Vec3 f{in.headDir.x, 0.0f, in.headDir.z};
+		float fl = length(f);
+		f = fl > 1e-3f ? f * (1.0f / fl) : Vec3{0, 0, -1};
+		d->noticePos = in.headPos + f * 0.6f + Vec3{0, -0.05f, 0};
+		d->noticeRight = cross({0, 1, 0}, f * -1.0f);
+		d->noticeUp = {0, 1, 0};
+		d->noticeAhead = false;
+	}
+	Quad noticeQ;
+	noticeQ.c = d->noticePos;
+	noticeQ.r = d->noticeRight;
+	noticeQ.u = d->noticeUp;
+	noticeQ.hw = kNoticeW * kNoticeScale * 0.5f;
+	noticeQ.hh = kNoticeH * kNoticeScale * 0.5f;
 	if (d->menuOpen) {
 		menuQ.c = d->menuPos;
 		menuQ.r = d->menuRight;
@@ -1290,11 +1351,11 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 			}
 		}
 		// L'engrenage et le menu du poignet
-		for (int w = 0; w < 2; w++) {
-			if (w == 0 ? !gearVisible : !d->menuOpen)
+		for (int w = 0; w < 3; w++) {
+			if (w == 0 ? !gearVisible : w == 1 ? !d->menuOpen : !d->noticeOpen)
 				continue;
 			float t, x, y;
-			if (rayQuad(in.tip, in.dir, w == 0 ? gearQ : menuQ, t, x, y) && fabsf(x) <= 1.0f && fabsf(y) <= 1.0f && t < bestT) {
+			if (rayQuad(in.tip, in.dir, w == 0 ? gearQ : w == 1 ? menuQ : noticeQ, t, x, y) && fabsf(x) <= 1.0f && fabsf(y) <= 1.0f && t < bestT) {
 				bestT = t; hitKind = kHitWrist; hitIndex = w; hx = x; hy = y;
 			}
 		}
@@ -1421,13 +1482,19 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 			out.dragging = true;
 		}
 	} else if (hitKind == kHitWrist) {
-		const Quad &q = hitIndex == 0 ? gearQ : menuQ;
+		const Quad &q = hitIndex == 0 ? gearQ : hitIndex == 1 ? menuQ : noticeQ;
 		out.hitValid = true;
 		out.hit = q.c + q.r * (hx * q.hw) + q.u * (hy * q.hh) + cross(q.r, q.u) * 0.001f;
 		out.hitRight = q.r;
 		out.hitUp = q.u;
 		out.hitRadius = 0.010f * bestT;
-		if (hitIndex == 0) {
+		if (hitIndex == 2) {
+			// Le rappel : un clic n'importe où le ferme
+			if (in.triggerPressed) {
+				d->noticeOpen = false;
+				out.clicked = true;
+			}
+		} else if (hitIndex == 0) {
 			if (in.triggerPressed) {
 				// La disquette : le menu du jeu (sauvegarder, charger, et les réglages VR).
 				out.action = kUiActionGameMenu;
@@ -1441,12 +1508,10 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 			if (in.triggerPressed && row >= 1) {
 				out.clicked = true;
 				if (row == 1) {
-					out.action = kUiActionToggleLanguage;
+					out.action = kUiActionToggleDungeon; // le mode VR suivant
 				} else if (row == 2) {
-					out.action = kUiActionToggleDungeon;
+					out.action = d->dungeonMode ? kUiActionToggleScreenAlways : kUiActionCycleView;
 				} else if (row == 3) {
-					out.action = d->dungeonMode ? kUiActionToggleScreenAlways : kUiActionToggleDetach;
-				} else if (row == 4) {
 					out.action = kUiActionToggleHelp;
 					d->menuOpen = false;
 				} else {
@@ -1656,10 +1721,10 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 		p.texW = kHintW;
 		p.texH = kHintH;
 	}
-	for (int w = 0; w < 2; w++) {
-		if ((w == 0 ? !gearVisible : !d->menuOpen) || np >= SceneState::kMaxPanels)
+	for (int w = 0; w < 3; w++) {
+		if ((w == 0 ? !gearVisible : w == 1 ? !d->menuOpen : !d->noticeOpen) || np >= SceneState::kMaxPanels)
 			continue;
-		const Quad &q = w == 0 ? gearQ : menuQ;
+		const Quad &q = w == 0 ? gearQ : w == 1 ? menuQ : noticeQ;
 		SceneState::Panel &p = scene.panels[np++];
 		p = SceneState::Panel();
 		p.visible = true;
@@ -1669,9 +1734,9 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 		p.halfW = q.hw;
 		p.halfH = q.hh;
 		p.border = 0.004f;
-		p.texture = w == 0 ? d->gearTex : d->menuTex;
-		p.texW = w == 0 ? kGearSize : kMenuW;
-		p.texH = w == 0 ? kGearSize : kMenuH;
+		p.texture = w == 0 ? d->gearTex : w == 1 ? d->menuTex : d->noticeTex;
+		p.texW = w == 0 ? kGearSize : w == 1 ? kMenuW : kNoticeW;
+		p.texH = w == 0 ? kGearSize : w == 1 ? kMenuH : kNoticeH;
 		if (w == 1 && d->menuHot >= 1) {
 			p.hot[0] = 0.0f;
 			p.hot[1] = (float)d->menuHot / (float)kMenuRows;

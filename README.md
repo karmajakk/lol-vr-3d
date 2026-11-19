@@ -34,8 +34,8 @@ Early demo. What works:
 - Shop doors and passages to other regions stay in front of you, like a wall with their picture:
   walk into them and the game screen shows the shop, or the new region appears.
 - Dark places stay dark until you light the lamp.
-- "Immersive mode: on/off" in "VR controls" (game menu), to switch to the classic view (library, mixed reality,
-  486 PC) and back.
+- "VR mode" in "VR controls" (game menu): Immersive, Classic (library) or Mixed reality; in the last
+  two, L3 switches the view: big screen, windows, 486 PC.
 - Conversations: the game's large text box, with the speaker's portrait, is joined under the game
   screen.
 
@@ -75,9 +75,9 @@ saves there.
 Same as lol-vr: aim and pull the trigger to click, X (or the grip) for a right click (drink a
 potion, use an item), left stick to walk, right stick to turn, A to attack, B for magic, Y for the
 map. Look at your left hand and click the floppy for the game menu; in it, "VR controls" holds the
-headset settings (language, immersive mode on/off, game screen "if needed" or "always" in immersive
-mode, classic screen in the classic view, controller mapping). The keyboard comes up by itself to
-name a save.
+headset settings (VR mode, game screen "if needed" or "always" in immersive mode, the view in Classic
+and Mixed reality, controller mapping). The app speaks the language set in the game's options. The
+keyboard comes up by itself to name a save.
 
 In the dungeon, the party's position is under your feet. You walk where you look: the left stick
 points relative to your gaze (forward is where you look, sideways is a side step), and when you

@@ -730,7 +730,7 @@ void Scene::Impl::buildFx(const SceneState &s) {
 	const ThemeInfo &th = themeInfo(loadedTheme < 0 ? 0 : loadedTheme);
 	Vec3 screenN = rotate(s.screenRot, {0, 0, 1});
 
-	if (s.environment == kEnvLibrary && texturesReady) {
+	if (isLibraryEnv(s.environment) && texturesReady) {
 		auto toWorld = [&](Vec3 p) { return transformPoint(roomMat, p); };
 		// Ombres de contact
 		for (const RoomShadow &sh : roomInfo.shadows) {
@@ -815,7 +815,7 @@ void Scene::Impl::buildFx(const SceneState &s) {
 		}
 	}
 
-	if (s.environment == kEnvPassthroughCrt && texturesReady) {
+	if (isCrtEnv(s.environment) && texturesReady) {
 		Vec3 led = transformPoint(screenMat, crtLedPosition());
 		const float col[4] = {0.2f, 1.0f, 0.3f, 0.5f};
 		fx.sprite(led + screenN * 0.004f, 0.05f * s.screenWidth, 0.05f * s.screenWidth, col, kFxGlow, 1);
@@ -881,7 +881,7 @@ void Scene::prepare(const SceneState &s) {
 	}
 
 	// Le cadre suit le format de l'image affichée (image entière ou vue du donjon seule).
-	float aspect = s.environment == kEnvPassthroughCrt ? 0.75f : clampf(s.screenAspect, 0.3f, 1.5f);
+	float aspect = isCrtEnv(s.environment) ? 0.75f : clampf(s.screenAspect, 0.3f, 1.5f);
 	if (fabsf(aspect - d->frameAspect) > 1e-4f) {
 		d->frameAspect = aspect;
 		MeshBuilder frame;
@@ -906,7 +906,7 @@ void Scene::prepare(const SceneState &s) {
 	const float t = (float)s.time;
 	int n = 0;
 	Vec3 screenN = rotate(s.screenRot, {0, 0, 1});
-	if (s.environment == kEnvLibrary) {
+	if (isLibraryEnv(s.environment)) {
 		const ThemeInfo &th = themeInfo(d->loadedTheme < 0 ? 0 : d->loadedTheme);
 		for (size_t i = 0; i < d->roomInfo.lights.size() && n < kMaxLights - 1; i++, n++) {
 			const RoomLight &l = d->roomInfo.lights[i];
@@ -932,7 +932,7 @@ void Scene::prepare(const SceneState &s) {
 	// La lueur de l'écran éclaire les mains et les objets proches.
 	{
 		Vec3 p = s.screenPos + screenN * (0.30f * s.screenWidth);
-		float k = s.environment == kEnvLibrary ? 1.3f : 0.9f;
+		float k = isLibraryEnv(s.environment) ? 1.3f : 0.9f;
 		d->lightPos[n * 4 + 0] = p.x; d->lightPos[n * 4 + 1] = p.y; d->lightPos[n * 4 + 2] = p.z; d->lightPos[n * 4 + 3] = 0.6f * s.screenWidth;
 		d->lightCol[n * 3 + 0] = s.screenGlow.x * k; d->lightCol[n * 3 + 1] = s.screenGlow.y * k; d->lightCol[n * 3 + 2] = s.screenGlow.z * k;
 	}
@@ -1008,8 +1008,8 @@ void Scene::render(const Mat4 &view, const Mat4 &proj, const SceneState &s) {
 	Vec3 camPos = (camRight * view.m[12] + camUp * view.m[13] + camBack * view.m[14]) * -1.0f;
 	const Mat4 ident = identity();
 	const bool inDungeon = s.dungeonVisible && d->dungeon && d->dungeon->hasContent();
-	bool library = s.environment == kEnvLibrary && !inDungeon;
-	bool crt = s.environment == kEnvPassthroughCrt;
+	bool library = isLibraryEnv(s.environment) && !inDungeon;
+	bool crt = isCrtEnv(s.environment);
 
 	glEnable(GL_DEPTH_TEST);
 	glDepthFunc(GL_LEQUAL);

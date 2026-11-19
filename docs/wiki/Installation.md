@@ -26,7 +26,7 @@ If you used the older `lol-vr` app: this app is installed next to it and has its
 
 ## Language
 
-The app is in English by default. To switch to French, look at your left hand, click the floppy, then "VR controls" and "Language".
+The app follows the language chosen in the game's options: floppy on your left wrist, "Game controls", "Language is". Before the game has started, it uses the last language seen (English at first launch).
 
 ## Updating
 
