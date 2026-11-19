@@ -2,7 +2,7 @@
 
 While exploring, the game interface is spread over windows you place wherever you like (always in immersive mode; in the classic view when "Classic screen" is off):
 
-- on the left, the spell scroll, with the message line joined under it;
+- on the left, the spell scroll, with the message line joined under it; the strip at its top ("Spellbook +/-") folds it away, leaving only the message line, and opens it again to change the spell;
 - on the right, the characters one under the other, the atlas column (lamp, purse) to their right, and under them both a strip with the options (disk) and rest buttons, all in one window;
 - below, the inventory.
 

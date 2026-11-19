@@ -309,11 +309,27 @@ int main(int argc, char **argv) {
 		aimAt(panel(1).center);
 		ui.update(in, o, tmp);
 		check(near(201.5f, 189), "fenêtre de l'inventaire");
-		// À gauche (224 x 265) : le parchemin des sorts, et la ligne de messages dessous.
-		aimIn(2, 112, 100, 224, 265);
-		check(near(56, 50), "à gauche : le parchemin des sorts");
-		aimIn(2, 112, 254, 224, 265);
-		check(near(200, 131.5f), "à gauche : dessous, la ligne de messages");
+		// À gauche, livre de sorts replié (224 x 39) : le bandeau, et la ligne de messages dessous.
+		aimIn(2, 112, 28, 224, 39);
+		check(near(200, 131.5f), "à gauche, replié : la ligne de messages");
+		{
+			SceneState::Panel before = panel(2);
+			aimIn(2, 112, 9, 224, 39);
+			check(!o.pointerValid, "à gauche : le bandeau n'est pas un clic dans le jeu");
+			in.triggerDown = in.triggerPressed = true;
+			ui.update(in, o, tmp);
+			in.triggerDown = in.triggerPressed = false;
+			ui.update(in, o, tmp);
+			SceneState::Panel after = panel(2);
+			check(!ui.spellsCollapsed() && after.halfH > before.halfH * 3.0f, "à gauche : un clic sur le bandeau ouvre le livre de sorts");
+			float b0 = (before.center - before.up * before.halfH).y, b1 = (after.center - after.up * after.halfH).y;
+			check(fabsf(b0 - b1) < 0.01f, "à gauche : les messages restent en place");
+			// Ouvert (224 x 283) : bandeau, parchemin, messages.
+			aimIn(2, 112, 118, 224, 283);
+			check(near(56, 50), "à gauche, ouvert : le parchemin des sorts");
+			aimIn(2, 112, 272, 224, 283);
+			check(near(200, 131.5f), "à gauche, ouvert : dessous, la ligne de messages");
+		}
 		// 3. Tout est dans le plan de l'écran, au-dessus du plancher
 		{
 			bool planar = true, above = true;

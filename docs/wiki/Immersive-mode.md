@@ -10,6 +10,8 @@ The dungeon is rebuilt in true 3D around you, at real size, from your own game f
 - **The game screen** appears by itself for shops, conversations, scenes, the map, menus and character sheets, and hides again when they end. In the wrist menu, "Game screen: always" keeps it shown.
 - **Light**: dark places stay dark until you light the lamp, following the game's own brightness.
 
-Not there yet: doors that slide open (they jump from closed to open), spells and thrown objects in flight.
+- **Spells**: their effects, as the game draws them over its view, appear in the dungeon in front of the party while the spell is cast.
+
+Not there yet: doors that slide open (they jump from closed to open), thrown objects in flight.
 
 Switch to the classic view with the wrist menu: "Immersive mode: off".

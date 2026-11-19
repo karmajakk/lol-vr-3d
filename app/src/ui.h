@@ -135,6 +135,9 @@ public:
 	void setInfo(const std::string &line1, const std::string &line2);
 	// Disposition par défaut : autour de l'écran tel qu'il est placé à cet instant.
 	void resetLayout(const UiFrameInput &in);
+	// Livre de sorts replié (le bandeau et les messages seulement) ou ouvert.
+	bool spellsCollapsed() const;
+	void setSpellsCollapsed(bool collapsed);
 	bool hasLayout() const { return placed; }
 	void setHasLayout(bool v) { placed = v; }
 

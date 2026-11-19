@@ -68,6 +68,11 @@ struct LevelSnapshot {
 	int nearObjects = 0;      // bit k : monstres ou objets k cases devant le groupe (0 = sa case)
 	bool sceneBusy = false;   // la vue du jeu montre autre chose que le donjon (boutique, dialogue, scène)
 	int light = 256;          // clarté de la palette à l'écran (256 = pleine lumière ; pénombre, lampe, fondus)
+	// Sort en cours : ce que le jeu dessine par-dessus sa vue (176 x 120, couleurs de la palette ;
+	// alpha 0 ou 255). spellSerial change à chaque nouvelle image.
+	bool spellBusy = false;
+	uint32_t spellSerial = 0;
+	std::vector<uint8_t> spellPixels, spellAlpha;
 	uint8_t walls[1024 * 4] = {0};
 	uint8_t vmpMap[256] = {0};
 	uint8_t wallFlags[256] = {0};

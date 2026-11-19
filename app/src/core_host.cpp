@@ -77,6 +77,10 @@ struct LolvrLevelData {
 	const uint8_t *spriteAlpha;
 	int32_t sceneBusy;
 	int32_t light;
+	int32_t spellBusy;
+	uint32_t spellSerial;
+	const uint8_t *spellPixels;
+	const uint8_t *spellAlpha;
 };
 const LolvrLevelData *retro_lolvr_level(void);
 }
@@ -374,6 +378,13 @@ void copyLevel() {
 	l.nearObjects = s->nearObjects;
 	l.sceneBusy = s->sceneBusy != 0;
 	l.light = s->light > 256 ? 256 : s->light < 0 ? 0 : s->light;
+	// Les effets d'un sort en cours, dessinés par-dessus la vue du jeu
+	l.spellBusy = s->spellBusy != 0 && s->spellPixels && s->spellAlpha;
+	if (l.spellBusy && s->spellSerial != l.spellSerial) {
+		l.spellPixels.assign(s->spellPixels, s->spellPixels + 176 * 120);
+		l.spellAlpha.assign(s->spellAlpha, s->spellAlpha + 176 * 120);
+	}
+	l.spellSerial = s->spellSerial;
 	// Monstres et objets proches, tels que le moteur vient de les dessiner
 	if (s->spriteSerial != l.spriteSerial && s->spritePixels && s->spriteAlpha && s->spriteCount >= 0 && s->spriteCount <= 32) {
 		const size_t one = (size_t)kSpriteW * kSpriteH;
@@ -643,6 +654,12 @@ bool CoreHost::levelSnapshot(LevelSnapshot &out) const {
 	out.nearObjects = l.nearObjects;
 	out.sceneBusy = l.sceneBusy;
 	out.light = l.light;
+	out.spellBusy = l.spellBusy;
+	if (l.spellBusy && out.spellSerial != l.spellSerial) {
+		out.spellPixels = l.spellPixels;
+		out.spellAlpha = l.spellAlpha;
+	}
+	out.spellSerial = l.spellSerial;
 	if (out.spriteSerial != l.spriteSerial) {
 		out.sprites = l.sprites;
 		out.spritePixels = l.spritePixels;

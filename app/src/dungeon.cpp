@@ -90,6 +90,9 @@ struct Dungeon::Impl {
 	bool srgb = false;
 	GLuint program = 0, vao = 0, vbo = 0, tex = 0;
 	GLuint spriteVao = 0, spriteVbo = 0, spriteTex = 0;
+	bool effectOn = false;
+	float effectX = 0, effectZ = 0;
+	int effectDir = 0;
 	std::vector<DungeonSprite> sprites;
 	GLint uViewProj = -1, uModel = -1, uEye = -1, uLight = -1, uTex = -1;
 	GLsizei count = 0;
@@ -154,7 +157,7 @@ bool Dungeon::init(bool srgbTarget) {
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glGenTextures(1, &d->spriteTex);
 	glBindTexture(GL_TEXTURE_2D_ARRAY, d->spriteTex);
-	glTexStorage3D(GL_TEXTURE_2D_ARRAY, 1, d->srgb ? GL_SRGB8_ALPHA8 : GL_RGBA8, kSpriteTexW, kSpriteTexH, kMaxSprites);
+	glTexStorage3D(GL_TEXTURE_2D_ARRAY, 1, d->srgb ? GL_SRGB8_ALPHA8 : GL_RGBA8, kSpriteTexW, kSpriteTexH, kMaxSprites + 1); // + les effets des sorts
 	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -168,6 +171,18 @@ void Dungeon::setSpriteImage(int layer, const uint8_t *rgba) {
 		return;
 	glBindTexture(GL_TEXTURE_2D_ARRAY, d->spriteTex);
 	glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, layer, kSpriteTexW, kSpriteTexH, 1, GL_RGBA, GL_UNSIGNED_BYTE, rgba);
+	glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
+}
+
+void Dungeon::setEffect(const uint8_t *rgba, float partyX, float partyZ, int dir) {
+	d->effectOn = rgba != nullptr && d->spriteTex;
+	if (!d->effectOn)
+		return;
+	d->effectX = partyX;
+	d->effectZ = partyZ;
+	d->effectDir = dir & 3;
+	glBindTexture(GL_TEXTURE_2D_ARRAY, d->spriteTex);
+	glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, kMaxSprites, kSpriteTexW, kSpriteTexH, 1, GL_RGBA, GL_UNSIGNED_BYTE, rgba);
 	glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
 }
 
@@ -271,6 +286,37 @@ void Dungeon::render(const Mat4 &viewProj, const Mat4 &model, Vec3 eye, float li
 			glDrawArrays(GL_TRIANGLES, 0, (GLsizei)v.size());
 			glEnable(GL_CULL_FACE);
 		}
+	}
+	// Les effets d'un sort : la vue du jeu (176 x 120) remise à sa place, là où le jeu la montre — le
+	// mur d'une case devant (128 x 96 pixels) à une demi-case du groupe. Toujours visibles.
+	if (d->effectOn && d->spriteTex) {
+		static const int dx[4] = {0, 1, 0, -1}, dz[4] = {-1, 0, 1, 0};
+		const float S = kBlockSize, H = kWallHeight;
+		float fx = (float)dx[d->effectDir], fz = (float)dz[d->effectDir], rx = -fz, rz = fx;
+		float cx = d->effectX + fx * S * 0.5f, cz = d->effectZ + fz * S * 0.5f;
+		float l0 = -88.0f / 128.0f * S, l1 = 88.0f / 128.0f * S;
+		float yTop = H * 104.0f / 96.0f, yBot = H * (104.0f - 120.0f) / 96.0f;
+		float vb = 120.0f / (float)kSpriteTexH, L = (float)kMaxSprites;
+		std::vector<DungeonVertex> v;
+		auto put = [&](float lat, float y, float u, float vv) {
+			DungeonVertex dv;
+			dv.pos[0] = cx + rx * lat; dv.pos[1] = y; dv.pos[2] = cz + rz * lat;
+			dv.uvl[0] = u; dv.uvl[1] = vv; dv.uvl[2] = L;
+			dv.shade = 3.0f; // pas de pénombre due à la distance
+			v.push_back(dv);
+		};
+		put(l0, yBot, 0, vb); put(l1, yBot, 1, vb); put(l1, yTop, 1, 0);
+		put(l0, yBot, 0, vb); put(l1, yTop, 1, 0); put(l0, yTop, 0, 0);
+		glBindBuffer(GL_ARRAY_BUFFER, d->spriteVbo);
+		glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)(v.size() * sizeof(DungeonVertex)), v.data(), GL_STREAM_DRAW);
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+		glDisable(GL_CULL_FACE);
+		glDisable(GL_DEPTH_TEST);
+		glBindTexture(GL_TEXTURE_2D_ARRAY, d->spriteTex);
+		glBindVertexArray(d->spriteVao);
+		glDrawArrays(GL_TRIANGLES, 0, 6);
+		glEnable(GL_DEPTH_TEST);
+		glEnable(GL_CULL_FACE);
 	}
 	glBindVertexArray(0);
 	glBindTexture(GL_TEXTURE_2D_ARRAY, 0);

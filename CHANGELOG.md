@@ -3,6 +3,16 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.6.0] — Spells in 3D, folding spellbook
+
+- Spell effects in immersive mode: while a spell is cast, what the game draws over its view
+  (the Spark orb, fireballs, lightning, mist...) appears in the 3D dungeon, in front of the party,
+  where the game shows it.
+- The spellbook folds: the left window now has a strip at the top, "Spellbook +" / "-". Folded,
+  only the strip and the message line remain, so you see more of the dungeon; click the strip to
+  open it and change the spell. The message line stays in place either way, and the choice is
+  remembered.
+
 ## [0.5.2] — Shops, items, forest
 
 - In shops and conversations (immersive mode), the message line with the choices (Yes / No...) is

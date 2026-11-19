@@ -1,5 +1,5 @@
 diff --git a/engines/kyra/engine/lol.cpp b/engines/kyra/engine/lol.cpp
-index c4f86a30..d9984082 100644
+index c4f86a30..ed53af0c 100644
 --- a/engines/kyra/engine/lol.cpp
 +++ b/engines/kyra/engine/lol.cpp
 @@ -21,6 +21,8 @@
@@ -11,19 +11,22 @@ index c4f86a30..d9984082 100644
  #include "kyra/engine/lol.h"
  #include "kyra/graphics/screen_lol.h"
  #include "kyra/resource/resource.h"
-@@ -45,6 +47,11 @@ LolvrGameState g_lolvrState = {1, 0, {0}, 0, 0, 0, 0, 0, 0, 0, {0}, {0}};
+@@ -45,6 +47,14 @@ LolvrGameState g_lolvrState = {1, 0, {0}, 0, 0, 0, 0, 0, 0, 0, {0}, {0}};
  __attribute__((visibility("default"))) const LolvrGameState *retro_lolvr_state(void) {
  	return &g_lolvrState;
  }
 +LolvrLevelData g_lolvrLevel;
++static Kyra::LoLEngine *g_lolvrEngine = nullptr; // set while a spell is being cast
 +__attribute__((visibility("default"))) const LolvrLevelData *retro_lolvr_level(void) {
 +	g_lolvrLevel.version = 1;
++	if (g_lolvrEngine && g_lolvrLevel.spellBusy)
++		g_lolvrEngine->lolvrSpellUpdate();
 +	return &g_lolvrLevel;
 +}
  }
  
  namespace Kyra {
-@@ -964,10 +971,71 @@ void LoLEngine::runLoop() {
+@@ -964,10 +974,71 @@ void LoLEngine::runLoop() {
  			_nextScriptFunc = 0;
  		}
  
@@ -95,7 +98,7 @@ index c4f86a30..d9984082 100644
  
  		_timer->update();
  
-@@ -1049,6 +1117,7 @@ void LoLEngine::readSettings() {
+@@ -1049,6 +1120,7 @@ void LoLEngine::readSettings() {
  }
  
  void LoLEngine::update() {
@@ -103,7 +106,7 @@ index c4f86a30..d9984082 100644
  	updateSequenceBackgroundAnimations();
  
  	if (_updateCharNum != -1 && _system->getMillis() > _updatePortraitNext)
-@@ -1633,6 +1702,7 @@ void LoLEngine::initSceneWindowDialogue(int controlMode) {
+@@ -1633,6 +1705,7 @@ void LoLEngine::initSceneWindowDialogue(int controlMode) {
  	_txt->expandField();
  	setupScreenDims();
  	gui_disableControls(controlMode);
@@ -111,7 +114,7 @@ index c4f86a30..d9984082 100644
  }
  
  void LoLEngine::toggleSelectedCharacterFrame(bool mode) {
-@@ -1690,6 +1760,7 @@ void LoLEngine::gui_specialSceneRestoreControls(int restoreLamp) {
+@@ -1690,6 +1763,7 @@ void LoLEngine::gui_specialSceneRestoreControls(int restoreLamp) {
  }
  
  void LoLEngine::restoreAfterSceneWindowDialogue(int redraw) {
@@ -119,7 +122,7 @@ index c4f86a30..d9984082 100644
  	gui_enableControls();
  	_txt->setupField(false);
  	_updateFlags &= 0xFFDF;
-@@ -1711,6 +1782,7 @@ void LoLEngine::restoreAfterSceneWindowDialogue(int redraw) {
+@@ -1711,6 +1785,7 @@ void LoLEngine::restoreAfterSceneWindowDialogue(int redraw) {
  
  	_needSceneRestore = 0;
  	enableSysTimer(2);
@@ -127,7 +130,7 @@ index c4f86a30..d9984082 100644
  }
  
  void LoLEngine::initDialogueSequence(int controlMode, int pageNum) {
-@@ -1758,11 +1830,13 @@ void LoLEngine::initDialogueSequence(int controlMode, int pageNum) {
+@@ -1758,11 +1833,13 @@ void LoLEngine::initDialogueSequence(int controlMode, int pageNum) {
  
  	_currentControlMode = controlMode;
  	_dialogueField = true;
@@ -141,7 +144,7 @@ index c4f86a30..d9984082 100644
  
  	stopPortraitSpeechAnim();
  	_currentControlMode = controlMode;
-@@ -1780,6 +1854,7 @@ void LoLEngine::restoreAfterDialogueSequence(int controlMode) {
+@@ -1780,6 +1857,7 @@ void LoLEngine::restoreAfterDialogueSequence(int controlMode) {
  	}
  
  	_dialogueField = false;
@@ -149,11 +152,76 @@ index c4f86a30..d9984082 100644
  }
  
  void LoLEngine::resetPortraitsAndDisableSysTimer() {
+@@ -2123,8 +2201,12 @@ int LoLEngine::castSpell(int charNum, int spellType, int spellLevel) {
+ 
+ 	if (charNum < 0) {
+ 		_activeSpell.charNum = (charNum * -1) - 1;
+-		if (_spellProcs[spellType]->isValid())
+-			return (*_spellProcs[spellType])(&_activeSpell);
++		if (_spellProcs[spellType]->isValid()) {
++			lolvrSpellBegin();
++			int res = (*_spellProcs[spellType])(&_activeSpell);
++			lolvrSpellEnd();
++			return res;
++		}
+ 	} else {
+ 		if (_activeSpell.p->mpRequired[spellLevel] > _characters[charNum].magicPointsCur)
+ 			return 0;
+@@ -2136,13 +2218,49 @@ int LoLEngine::castSpell(int charNum, int spellType, int spellLevel) {
+ 		setCharacterMagicOrHitPoints(charNum, 0, -_activeSpell.p->hpRequired[spellLevel], 1);
+ 		gui_drawCharPortraitWithStats(charNum);
+ 
++		lolvrSpellBegin();
+ 		if (_spellProcs[spellType]->isValid())
+ 			(*_spellProcs[spellType])(&_activeSpell);
++		lolvrSpellEnd();
+ 	}
+ 
+ 	return 1;
+ }
+ 
++// lol-vr-3d: spell effects for the 3D dungeon. The scene window as it was when the spell began; while
++// the spell runs, whatever differs from it is the effect (fireball, lightning, mist...).
++static uint8 g_lolvrSpellRef[176 * 120], g_lolvrSpellPx[176 * 120], g_lolvrSpellAl[176 * 120];
++
++void LoLEngine::lolvrSpellBegin() {
++	_screen->copyRegionToBuffer(0, 112, 0, 176, 120, g_lolvrSpellRef);
++	memset(g_lolvrSpellAl, 0, sizeof(g_lolvrSpellAl));
++	g_lolvrLevel.spellPixels = g_lolvrSpellPx;
++	g_lolvrLevel.spellAlpha = g_lolvrSpellAl;
++	g_lolvrLevel.spellBusy = 1;
++	g_lolvrLevel.spellSerial++;
++	g_lolvrEngine = this;
++}
++
++void LoLEngine::lolvrSpellUpdate() {
++	const uint8 *page = _screen->getCPagePtr(0);
++	if (!page)
++		return;
++	for (int y = 0; y < 120; y++)
++		for (int x = 0; x < 176; x++) {
++			uint8 c = page[y * 320 + 112 + x];
++			bool fx = c != g_lolvrSpellRef[y * 176 + x];
++			g_lolvrSpellPx[y * 176 + x] = fx ? c : 0;
++			g_lolvrSpellAl[y * 176 + x] = fx ? 255 : 0;
++		}
++	g_lolvrLevel.spellSerial++;
++}
++
++void LoLEngine::lolvrSpellEnd() {
++	g_lolvrLevel.spellBusy = 0;
++	g_lolvrLevel.spellSerial++;
++	g_lolvrEngine = nullptr;
++}
++
+ int LoLEngine::castSpark(ActiveSpell *a) {
+ 	processMagicSpark(a->charNum, a->level);
+ 	return 1;
 diff --git a/engines/kyra/engine/lol.h b/engines/kyra/engine/lol.h
-index a9028a26..f8715d97 100644
+index a9028a26..5c3748d1 100644
 --- a/engines/kyra/engine/lol.h
 +++ b/engines/kyra/engine/lol.h
-@@ -50,6 +50,65 @@ struct LolvrGameState {
+@@ -50,6 +50,71 @@ struct LolvrGameState {
  	int32 reserved[4];  // [0] dungeon loop ticks, [1] control mode, [2] bit 0: automap open, bit 1: game menu open
  };
  extern LolvrGameState g_lolvrState;
@@ -214,17 +282,28 @@ index a9028a26..f8715d97 100644
 +	// Brightness of the palette on screen compared to the level palette (256 = full light): dark
 +	// places, the lamp, fades.
 +	int32 light;
++	// Spell being cast: what changed in the scene window (176 x 120, palette indices; alpha 0/255)
++	// since the spell began, i.e. its effects drawn over the dungeon. spellSerial changes each update.
++	int32 spellBusy;
++	uint32 spellSerial;
++	const uint8 *spellPixels;
++	const uint8 *spellAlpha;
 +};
 +extern LolvrLevelData g_lolvrLevel;
  }
  
  namespace Audio {
-@@ -335,6 +394,9 @@ private:
+@@ -335,6 +400,14 @@ private:
  
  	// main loop
  	void runLoop();
 +	void lolvrCaptureWalls(); // lol-vr-3d
 +	void lolvrCaptureSprites(); // lol-vr-3d
++	void lolvrSpellBegin(); // lol-vr-3d
++	void lolvrSpellEnd(); // lol-vr-3d
++public:
++	void lolvrSpellUpdate(); // lol-vr-3d: called by retro_lolvr_level()
++private:
 +	bool lolvrDrawSprite(uint16 id, uint8 &ceiling); // lol-vr-3d
  	void update() override;
  

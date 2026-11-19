@@ -160,7 +160,7 @@ int main(int argc, char **argv) {
 			LevelSnapshot ls;
 			bool hasL = host.levelSnapshot(ls);
 			if (host.gameState(gs))
-				printf("  état : niveau=%d boucle=%u mode=%d menu=%d scène=%d lumière=%d case=%d dir=%d\n", gs.level, gs.loopSerial, gs.controlMode, (int)gs.menuOpen, hasL ? (int)ls.sceneBusy : -1, hasL ? ls.light : -1, hasL ? ls.block : -1, hasL ? ls.direction : -1);
+				printf("  état : niveau=%d boucle=%u mode=%d menu=%d scène=%d lumière=%d case=%d dir=%d sort=%d/%u\n", gs.level, gs.loopSerial, gs.controlMode, (int)gs.menuOpen, hasL ? (int)ls.sceneBusy : -1, hasL ? ls.light : -1, hasL ? ls.block : -1, hasL ? ls.direction : -1, hasL ? (int)ls.spellBusy : -1, hasL ? ls.spellSerial : 0);
 		} else if (op == "dungeon" || op == "dungeonat") {
 			std::string name;
 			cs >> name;
@@ -294,6 +294,18 @@ int main(int argc, char **argv) {
 			glViewport(0, 0, W, H);
 			glClearColor(0.02f, 0.0f, 0.04f, 1.0f);
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+			if (lvl.spellBusy && lvl.spellPixels.size() == 176u * 120u) {
+				static std::vector<uint8_t> fx((size_t)kSpriteTexW * kSpriteTexH * 4);
+				spriteToRgba(lvl.spellPixels.data(), lvl.spellAlpha.data(), lvl.screenPalette, fx.data());
+				int on = 0;
+				for (uint8_t a : lvl.spellAlpha) on += a ? 1 : 0;
+				printf("  sort en cours : %d pixels d'effet\n", on);
+				float bx, bz;
+				blockCenter(lvl.block, bx, bz);
+				dun.setEffect(fx.data(), bx, bz, lvl.direction);
+			} else {
+				dun.setEffect(nullptr, 0, 0, 0);
+			}
 			dun.render(multiply(proj, view), model, eye, 1.0f);
 			saveGl(out + "/" + name + "_3d.ppm");
 			saveFrame(f, out + "/" + name + "_jeu.ppm");

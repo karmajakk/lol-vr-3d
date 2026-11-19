@@ -39,6 +39,10 @@ public:
 	// Image d'un monstre ou d'un objet : kSpriteTexW x kSpriteTexH pixels RGBA (alpha 0 = transparent).
 	void setSpriteImage(int layer, const uint8_t *rgba);
 	void setSprites(const std::vector<DungeonSprite> &sprites);
+	// Effets d'un sort, tels que le jeu les dessine par-dessus sa vue (kSpriteTexW x kSpriteTexH, dont
+	// les 120 premières lignes) : posés devant le groupe (case du groupe, direction 0 nord .. 3 ouest)
+	// à la place de la vue du jeu. rgba nul : plus d'effet.
+	void setEffect(const uint8_t *rgba, float partyX, float partyZ, int dir);
 	bool hasContent() const;
 	// model : repère du niveau -> monde. eye : position de l'œil (monde), pour la pénombre.
 	// light : 1 = éclairage normal (le jeu peut assombrir certaines zones).

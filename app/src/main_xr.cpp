@@ -516,6 +516,8 @@ struct App {
 	int moveDir = 0;       // direction tenue au joystick gauche
 	uint32_t frameSerial = 0; // numéro de la dernière image du jeu reçue
 	uint32_t spriteWalls = 0; // murs pour lesquels les objets ont été placés
+	uint32_t builtSpell = 0;  // image des effets du sort déjà posée
+	bool effectShown = false;
 	int builtDir = -1;        // direction du groupe pour laquelle le donjon a été construit (dessins au sol)
 	bool aimOnUi = false;     // le doigt vise une fenêtre ou l'écran
 	int visBlock = -1;        // case où se tient la vue 3D (elle ne suit pas le groupe dans une porte de boutique)
@@ -1125,6 +1127,9 @@ void loadSettings(App &app, int &environment) {
 		} else if (!strcmp(name, "donjon3d")) {
 			if (sscanf(rest, "%d", &iv) == 1)
 				app.dungeonMode = iv >= 0 && iv <= 2 ? iv : 1;
+		} else if (!strcmp(name, "livresorts")) {
+			if (sscanf(rest, "%d", &iv) == 1)
+				app.ui.setSpellsCollapsed(iv != 0);
 		} else if (!strcmp(name, "choixvue")) {
 			if (sscanf(rest, "%d", &iv) == 1)
 				app.viewChosen = iv != 0;
@@ -1180,6 +1185,7 @@ void saveSettings(App &app) {
 	fprintf(f, "engrenage %d\n", app.gearKnown ? 1 : 0);
 	fprintf(f, "donjon3d %d\n", app.dungeonMode);
 	fprintf(f, "choixvue %d\n", app.viewChosen ? 1 : 0);
+	fprintf(f, "livresorts %d\n", app.ui.spellsCollapsed() ? 1 : 0);
 	for (int i = 0; i < kEnvCount; i++)
 		fprintf(f, "visee %d %.4f %.4f\n", app.aimSaved[i] ? 1 : 0, app.aimYaw[i], app.aimPitch[i]);
 	if (app.ui.hasLayout())
@@ -2445,6 +2451,22 @@ void updateDungeon(App &app, float dt) {
 	if (!app.dunYawSet) {
 		app.dunYaw = app.anchorYaw;
 		app.dunYawSet = true;
+	}
+	// Un sort : ses effets (boule de feu, éclair, brume...) tels que le jeu les dessine sur sa vue,
+	// posés devant le groupe dans le donjon.
+	if (l.spellBusy && l.spellPixels.size() == 176u * 120u) {
+		if (l.spellSerial != app.builtSpell || !app.effectShown) {
+			app.builtSpell = l.spellSerial;
+			static std::vector<uint8_t> fx((size_t)lolvr::kSpriteTexW * lolvr::kSpriteTexH * 4);
+			lolvr::spriteToRgba(l.spellPixels.data(), l.spellAlpha.data(), l.screenPalette, fx.data());
+			float bx, bz;
+			lolvr::blockCenter(app.visBlock >= 0 ? app.visBlock : l.block, bx, bz);
+			app.dungeon.setEffect(fx.data(), bx, bz, l.direction);
+			app.effectShown = true;
+		}
+	} else if (app.effectShown) {
+		app.dungeon.setEffect(nullptr, 0, 0, 0);
+		app.effectShown = false;
 	}
 	// Porte d'une boutique, entrée d'une autre région : le jeu fait entrer le groupe dans un bloc
 	// plein. La vue reste devant, face à l'image ; le jeu montre la scène ou change de région.

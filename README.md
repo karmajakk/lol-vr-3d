@@ -41,8 +41,8 @@ Early demo. What works:
 - Clicks in the 3D dungeon: on the wall right in front of the party (door buttons, levers,
   keyholes) and on the floor in front of you (items).
 
-Not there yet: doors that slide open in 3D (they jump from closed to open), spells and thrown
-objects in flight. The game screen appears by itself for scenes, dialogues, the map and menus.
+Not there yet: doors that slide open in 3D (they jump from closed to open), thrown objects in
+flight. Spell effects are shown in 3D, as the game draws them. The game screen appears by itself for scenes, dialogues, the map and menus.
 
 Version details: [CHANGELOG.md](CHANGELOG.md).
 

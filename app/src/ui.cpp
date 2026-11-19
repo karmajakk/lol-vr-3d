@@ -40,7 +40,7 @@ const int kKbW = kCellW * kCols, kKbH = kCellH * kRows + kInfoH;
 const Source kSources[kUiPanelCount] = {
 	{0, 0, 100, 150},    // à droite : recomposé (voir compose), taille variable
 	{83, 178, 237, 22},  // inventaire
-	{0, 0, 224, 265},    // à gauche : recomposé, parchemin des sorts et messages
+	{0, 0, 224, 41},     // à gauche : recomposé, bandeau, (parchemin des sorts,) messages
 	{0, 0, (float)kKbW, (float)kKbH},
 	{0, 0, (float)kHelpW, (float)kHelpH},
 };
@@ -61,7 +61,8 @@ struct Composite {
 	int key = -1;          // nombre de personnages, fenêtre éteinte... : refaire si cela change
 };
 const int kCompParty = 0, kCompSpells = 1;
-const int kCompTexW[2] = {104, 224}, kCompTexH[2] = {200, 272};
+const int kCompTexW[2] = {104, 224}, kCompTexH[2] = {200, 288};
+const int kSpellTabH = 18; // bandeau du haut de la fenêtre de gauche : ouvrir ou replier le livre de sorts
 
 // Les pixels du jeu sont 1,2 fois plus hauts que larges ; ceux du clavier sont carrés.
 float pixelAspect(int id) {
@@ -171,6 +172,8 @@ struct Ui::Impl {
 	// Colonne du groupe recomposée
 	int chooserHot = -1; // bouton visé dans la fenêtre du choix de la vue
 	Composite comp[2];
+	bool spellsCollapsed = true; // livre de sorts replié : seuls le bandeau et les messages restent
+	bool spellTabHot = false;
 	void compose(int which, const UiFrameInput &in);
 	int compOf(int panel) const { return panel == kPanelParty ? kCompParty : panel == kPanelSpells ? kCompSpells : -1; }
 	int drag = -1;
@@ -311,7 +314,7 @@ void Ui::Impl::compose(int which, const UiFrameInput &in) {
 	Composite &c = comp[which];
 	const int n = in.characters < 0 ? 0 : in.characters > 4 ? 4 : in.characters;
 	const bool blank = in.compassBlank;
-	const int key = which == kCompParty ? n * 2 + (blank ? 1 : 0) : 0;
+	const int key = which == kCompParty ? n * 2 + (blank ? 1 : 0) : (spellsCollapsed ? 1 : 0) + language * 2 + (spellTabHot ? 4 : 0);
 	if (c.tex && in.gameSerial == c.serial && key == c.key)
 		return;
 	c.serial = in.gameSerial;
@@ -330,10 +333,15 @@ void Ui::Impl::compose(int which, const UiFrameInput &in) {
 		c.w = 100;
 		c.h = band + 30;
 	} else {
-		c.pieces.push_back({0, 0, 224, 242, 0, 0, 112, 121});
-		c.pieces.push_back({0, 244, 224, 21, 82, 121, 236, 22});
+		// Le bandeau (dessiné plus bas), puis le parchemin s'il est ouvert, puis les messages.
+		int y = kSpellTabH;
+		if (!spellsCollapsed) {
+			c.pieces.push_back({0, y, 224, 242, 0, 0, 112, 121});
+			y += 244;
+		}
+		c.pieces.push_back({0, y, 224, 21, 82, 121, 236, 22});
 		c.w = 224;
-		c.h = 265;
+		c.h = y + 21;
 	}
 	c.px.assign((size_t)c.texW * c.texH * 4, 0);
 	for (int i = 0; i < c.texW * c.texH; i++) {
@@ -367,6 +375,17 @@ void Ui::Impl::compose(int which, const UiFrameInput &in) {
 					p[0] = src[0]; p[1] = src[1]; p[2] = src[2];
 				}
 		}
+	}
+	// Le bandeau du livre de sorts : un clic l'ouvre ou le replie.
+	if (which == kCompSpells) {
+		const bool fr = language == kLangFrench;
+		Canvas cv{c.w, kSpellTabH, std::vector<uint8_t>((size_t)c.w * kSpellTabH * 4)};
+		cv.rect(0, 0, c.w, kSpellTabH, spellTabHot ? 120 : 96, spellTabHot ? 92 : 72, spellTabHot ? 58 : 46);
+		cv.rect(0, kSpellTabH - 1, c.w, kSpellTabH, 140, 108, 72);
+		std::string label = latin1(spellsCollapsed ? (fr ? "Livre de sorts  +" : "Spellbook  +") : (fr ? "Livre de sorts  -" : "Spellbook  -"));
+		cv.text(label, (c.w - (int)label.size() * 8) / 2, 1, 1, 250, 236, 200);
+		for (int y = 0; y < kSpellTabH; y++)
+			memcpy(&c.px[(size_t)y * c.texW * 4], &cv.px[(size_t)y * c.w * 4], (size_t)c.w * 4);
 	}
 	upload(c.tex, c.px, c.texW, c.texH);
 }
@@ -604,6 +623,17 @@ void Ui::setOptions(bool fireOn, bool detached) {
 	d->detached = detached;
 }
 
+bool Ui::spellsCollapsed() const {
+	return d->spellsCollapsed;
+}
+
+void Ui::setSpellsCollapsed(bool collapsed) {
+	if (collapsed != d->spellsCollapsed) {
+		d->spellsCollapsed = collapsed;
+		d->comp[kCompSpells].key = -1;
+	}
+}
+
 void Ui::setDungeonOption(int mode) {
 	if (mode != d->dungeonMode) {
 		d->dungeonMode = mode;
@@ -646,8 +676,10 @@ void Ui::resetLayout(const UiFrameInput &in) {
 	auto halfH = [&](int id, float scale) { return srcH(id) * 1.2f * scale * 0.5f; };
 
 	// À gauche : le parchemin des sorts et les messages (pixels doublés dans la fenêtre recomposée).
-	const float sSpells = 0.0018f;
-	set(kPanelSpells, -(viewW * 0.5f + frame + 0.035f + halfW(kPanelSpells, sSpells)), top - halfH(kPanelSpells, sSpells), sSpells);
+	// Le bas de la fenêtre (les messages) est à la hauteur où il serait, livre de sorts ouvert, sous
+	// le haut de la vue : ouvert ou replié, le livre garde ses messages au même endroit.
+	const float sSpells = 0.0018f, openH = (float)(kSpellTabH + 244 + 21) * 1.2f * sSpells;
+	set(kPanelSpells, -(viewW * 0.5f + frame + 0.035f + halfW(kPanelSpells, sSpells)), top - openH + halfH(kPanelSpells, sSpells), sSpells);
 	// À droite : les personnages, l'atlas, les options et le repos.
 	const float sParty = 0.0034f;
 	set(kPanelParty, viewW * 0.5f + frame + 0.035f + halfW(kPanelParty, sParty), top - halfH(kPanelParty, sParty), sParty);
@@ -891,6 +923,7 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 		}
 	}
 
+	bool tabHot = false; // le doigt est sur le bandeau du livre de sorts
 	// --- 3. Que vise le doigt ? ---
 	enum { kHitNone, kHitHandle, kHitPanel, kHitScreen, kHitCorner, kHitWrist };
 	int hitKind = kHitNone, hitIndex = -1;
@@ -1156,7 +1189,23 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 				}
 			}
 		} else {
-			if (d->compOf(hitIndex) >= 0) {
+			if (hitIndex == kPanelSpells && v * (float)d->comp[kCompSpells].h < (float)kSpellTabH) {
+				// Le bandeau : ouvrir ou replier le livre de sorts. Le bas de la fenêtre (les messages)
+				// ne bouge pas.
+				tabHot = true;
+				if (in.triggerPressed) {
+					Composite &c = d->comp[kCompSpells];
+					const int oldH = c.h;
+					d->spellsCollapsed = !d->spellsCollapsed;
+					c.key = -1;
+					d->compose(kCompSpells, in);
+					UiPlacement &pl = placement[kPanelSpells];
+					float dh = (float)(c.h - oldH) * pixelAspect(kPanelSpells) * pl.scale * 0.5f;
+					pl.b += atan2f(dh, pl.c);
+					out.clicked = true;
+					out.layoutChanged = true;
+				}
+			} else if (d->compOf(hitIndex) >= 0) {
 				// Fenêtre recomposée : retrouver le morceau visé, et l'endroit du jeu qu'il montre.
 				const Composite &c = d->comp[d->compOf(hitIndex)];
 				float cx = u * (float)c.w, cy = v * (float)c.h;
@@ -1179,6 +1228,11 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 				out.gv = (src.y + v * src.h) / 200.0f;
 			}
 		}
+	}
+
+	if (tabHot != d->spellTabHot) {
+		d->spellTabHot = tabHot;
+		d->comp[kCompSpells].key = -1;
 	}
 
 	// --- 4. Ce que la scène doit dessiner ---
