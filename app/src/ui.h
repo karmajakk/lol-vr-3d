@@ -58,6 +58,7 @@ struct UiFrameInput {
 	Quat screenRot = {0, 0, 0, 1};
 	float dispW = 2.4f, dispH = 1.8f;
 	float cropX = 0, cropY = 0, cropW = 320, cropH = 200;
+	float bandH = 0; // ligne de messages collée sous la vue (hauteur en pixels du jeu, à la largeur de la vue)
 	bool crt = false;
 	// État du jeu
 	bool split = false;       // l'interface détachée est affichée

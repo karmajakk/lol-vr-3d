@@ -75,7 +75,9 @@ struct DungeonVertex {
 };
 
 // Construit les murs, le sol et le plafond. walls : 1024 blocs x 4 côtés (N, E, S, O).
-void buildDungeonMesh(const uint8_t *walls, const DungeonGfx &gfx, const DungeonTextures &tex, std::vector<DungeonVertex> &out);
+// viewDir : direction du groupe (0 nord .. 3 ouest). Le jeu montre un dessin au sol toujours de la
+// même façon, d'où qu'on le regarde : il est tourné vers le groupe.
+void buildDungeonMesh(const uint8_t *walls, const DungeonGfx &gfx, const DungeonTextures &tex, std::vector<DungeonVertex> &out, int viewDir = 0);
 
 // Monstres et objets dessinés par le moteur (image de 176 x 120, l'objet centré en x = 88) :
 // conversion en image RGBA de 176 x 128, et taille dans le donjon. Un pixel du jeu dessiné en

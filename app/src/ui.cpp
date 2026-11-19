@@ -1016,8 +1016,15 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 		out.buttonsToGame = true;
 		out.hitValid = true;
 		out.hitRadius = 0.0f;
-		out.gu = (in.cropX + in.cropW * screenU01) / 320.0f;
-		out.gv = (in.cropY + in.cropH * screenV01) / 200.0f;
+		float rowY = screenV01 * (in.cropH + in.bandH);
+		if (in.bandH > 0.0f && rowY > in.cropH) {
+			// La ligne de messages collée sous la vue (83, 122, 234 x 20 dans l'image du jeu)
+			out.gu = (83.0f + 234.0f * screenU01) / 320.0f;
+			out.gv = (122.0f + (rowY - in.cropH) * 20.0f / in.bandH) / 200.0f;
+		} else {
+			out.gu = (in.cropX + in.cropW * screenU01) / 320.0f;
+			out.gv = (in.cropY + rowY) / 200.0f;
+		}
 		Vec3 local{(screenU01 - 0.5f) * in.dispW, (0.5f - screenV01) * in.dispH, screenZ + 0.004f};
 		out.hit = rotate(in.screenRot, local) + in.screenPos;
 	} else if (hitKind == kHitHandle) {

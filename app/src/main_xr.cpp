@@ -485,6 +485,7 @@ struct App {
 	// Ce que l'écran affiche en ce moment : portion de l'image du jeu (pixels) et taille réelle (mètres).
 	float cropX = 0, cropY = 0, cropW = 320, cropH = 200;
 	float dispW = 2.4f, dispH = 1.8f;
+	float bandH = 0;   // hauteur (pixels du jeu, à la largeur de la vue) de la ligne de messages collée sous la scène
 	int quadRectW = 0, quadRectH = 0; // zone du calque quad réellement utilisée
 	float quadScaleX = 1.0f, quadScaleY = 1.0f; // marge noire comprise
 
@@ -515,6 +516,7 @@ struct App {
 	int moveDir = 0;       // direction tenue au joystick gauche
 	uint32_t frameSerial = 0; // numéro de la dernière image du jeu reçue
 	uint32_t spriteWalls = 0; // murs pour lesquels les objets ont été placés
+	int builtDir = -1;        // direction du groupe pour laquelle le donjon a été construit (dessins au sol)
 	bool aimOnUi = false;     // le doigt vise une fenêtre ou l'écran
 	int visBlock = -1;        // case où se tient la vue 3D (elle ne suit pas le groupe dans une porte de boutique)
 	float lightLevel = 1.0f;  // clarté du jeu (pénombre, lampe), adoucie
@@ -1488,6 +1490,9 @@ Vec3 viewCenter(const App &app) {
 // ---------------------------------------------------------------------------
 // Ce que montre l'écran principal : l'image entière, ou la vue du donjon seule
 
+// La ligne de messages dans l'image du jeu (320 x 200)
+const float kBandX = 83, kBandY = 122, kBandW = 234, kBandH = 20;
+
 void updateLayout(App &app, double now) {
 	const float kViewX = 112, kViewY = 0, kViewW = 176, kViewH = 120; // vue du donjon dans l'image 320x200
 	// On attend que l'état soit stable un court instant, pour ne pas clignoter pendant une transition.
@@ -1512,12 +1517,18 @@ void updateLayout(App &app, double now) {
 		// droite pour la montrer en entier, et les fenêtres restent en place.
 		float cw = app.charSheet ? 320.0f - kViewX : kViewW;
 		app.cropX = kViewX; app.cropY = kViewY; app.cropW = cw; app.cropH = kViewH;
-		app.dispH = w * lolvr::kSplitViewHeight;
-		app.dispW = app.dispH * cw / (kViewH * 1.2f);
-		app.viewLift = w * lolvr::kSplitViewLift;
-		app.viewShift = (app.dispW - app.dispH * kViewW / (kViewH * 1.2f)) * 0.5f;
+		// Mode immersif, boutique ou rencontre : la ligne de messages (les choix à faire) est collée
+		// sous la scène, à sa largeur.
+		const bool band = app.dungeonMode && app.level.sceneBusy && !app.charSheet;
+		app.bandH = band ? kBandH * cw / kBandW : 0.0f;
+		const float viewOnlyH = w * lolvr::kSplitViewHeight;
+		app.dispH = viewOnlyH * (kViewH + app.bandH) / kViewH;
+		app.dispW = viewOnlyH * cw / (kViewH * 1.2f);
+		app.viewLift = w * lolvr::kSplitViewLift - (app.dispH - viewOnlyH) * 0.5f;
+		app.viewShift = (app.dispW - viewOnlyH * kViewW / (kViewH * 1.2f)) * 0.5f;
 	} else {
 		app.viewShift = 0.0f;
+		app.bandH = 0.0f;
 		app.cropX = 0; app.cropY = 0; app.cropW = 320; app.cropH = 200;
 		app.dispW = w;
 		app.dispH = w * 0.75f;
@@ -1787,6 +1798,19 @@ bool dungeonPick(App &app, Vec3 tip, Vec3 dir, float &gu, float &gv, Vec3 &hitW,
 			f = Vec3{0, 1, 0};
 		}
 	}
+	// 3. Ailleurs devant le groupe (au loin, en l'air) : la vue du jeu, selon l'angle. C'est là qu'on
+	// lance un objet tenu (on peut ainsi sortir un objet de l'inventaire vers le donjon).
+	if (px < 0.0f) {
+		Vec3 flat{v.x, 0.0f, v.z};
+		float fl = length(flat);
+		if (fl > 1e-3f && dot(flat, f) / fl > 0.5f) {
+			float side = dot(v, r) / dot(v, f), up = v.y / dot(v, f);
+			// Le mur à une case montre 128 x 96 pixels pour S x H mètres, à S/2 du groupe.
+			px = clampf(200.0f + side * 64.0f, 113.0f, 287.0f);
+			py = clampf(56.0f - up * 48.0f * S / H, 2.0f, 100.0f);
+			hit = o + v * 3.0f;
+		}
+	}
 	if (px < 0.0f)
 		return false;
 	gu = px / 320.0f;
@@ -1823,6 +1847,7 @@ void updateUi(App &app, XrTime time, float dt, double now, bool pointer, bool tr
 	in.dispW = app.dispW;
 	in.dispH = app.dispH;
 	in.cropX = app.cropX; in.cropY = app.cropY; in.cropW = app.cropW; in.cropH = app.cropH;
+	in.bandH = app.bandH;
 	in.crt = app.environment == lolvr::kEnvPassthroughCrt;
 	in.split = app.split;
 	in.keyboardOpen = app.keyboardOpen;
@@ -2266,8 +2291,18 @@ bool renderQuad(App &app) {
 		glUniform2f(app.blitTexSize, (float)app.srcTexW, (float)app.srcTexH);
 		glUniform2f(app.blitOutSize, (float)vw, (float)vh);
 		float sx = (float)app.srcTexW / 320.0f, sy = (float)app.srcTexH / 200.0f;
+		// Avec la ligne de messages collée dessous : la scène en haut, la ligne en bas.
+		int bandPx = app.bandH > 0.0f ? (int)((float)vh * app.bandH / (app.cropH + app.bandH) + 0.5f) : 0;
+		glViewport(vx, vy + bandPx, vw, vh - bandPx);
+		glUniform2f(app.blitOutSize, (float)vw, (float)(vh - bandPx));
 		glUniform4f(app.blitRect, app.cropX * sx, app.cropY * sy, app.cropW * sx, app.cropH * sy);
 		glDrawArrays(GL_TRIANGLES, 0, 3);
+		if (bandPx > 0) {
+			glViewport(vx, vy, vw, bandPx);
+			glUniform2f(app.blitOutSize, (float)vw, (float)bandPx);
+			glUniform4f(app.blitRect, kBandX * sx, kBandY * sy, kBandW * sx, kBandH * sy);
+			glDrawArrays(GL_TRIANGLES, 0, 3);
+		}
 		glBindTexture(GL_TEXTURE_2D, 0);
 	}
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -2319,9 +2354,10 @@ void updateDungeon(App &app, float dt) {
 		app.builtGfx = l.gfxSerial;
 		LOGI("donjon 3D : niveau %d, %d textures", l.level, app.dunTex.layers);
 	}
-	if (gfxChanged || l.wallsSerial != app.builtWalls) {
+	if (gfxChanged || l.wallsSerial != app.builtWalls || (l.direction & 3) != app.builtDir) {
+		app.builtDir = l.direction & 3;
 		std::vector<lolvr::DungeonVertex> verts;
-		lolvr::buildDungeonMesh(l.walls, g, app.dunTex, verts);
+		lolvr::buildDungeonMesh(l.walls, g, app.dunTex, verts, app.builtDir);
 		app.dungeon.setMesh(verts);
 		app.builtWalls = l.wallsSerial;
 	}
@@ -2488,11 +2524,12 @@ void updateDungeon(App &app, float dt) {
 // les monstres et les objets ; l'écran revient pour les boutiques, les dialogues et les scènes, la
 // carte, les menus et la fiche d'un personnage, et reste un moment après.
 void updateScreenShown(App &app, double now) {
-	bool need = !app.dungeonVisible || app.dungeonMode == 2 || !app.split || app.charSheet || app.automapOpen ||
-	            app.level.sceneBusy;
-	if (need)
+	// La carte, une fiche, un menu : l'écran disparaît dès qu'ils se ferment. Une scène (boutique,
+	// rencontre) : un court instant de grâce, le temps qu'une scène suivante enchaîne.
+	bool need = !app.dungeonVisible || app.dungeonMode == 2 || !app.splitWanted || app.charSheet || app.automapOpen;
+	if (app.level.sceneBusy)
 		app.screenNeededAt = now;
-	bool show = need || now - app.screenNeededAt < 0.25;
+	bool show = need || app.level.sceneBusy || now - app.screenNeededAt < 0.1;
 	if (show && !app.screenShown && app.dungeonVisible && app.headValid && app.screenPlaced) {
 		// Il revient là où le joueur regarde, à sa distance et à sa hauteur habituelles.
 		Vec3 f = rotate(app.headRot, {0, 0, -1});

@@ -111,6 +111,7 @@ int main(int argc, char **argv) {
 	Frame f;
 	LevelSnapshot lvl;
 	DungeonTextures tex;
+	int builtDir = -1;
 	uint32_t builtGfx = 0, builtWalls = 0, builtCapture = 0;
 	int16_t audio[960];
 	auto pump = [&](double seconds) {
@@ -204,12 +205,25 @@ int main(int argc, char **argv) {
 				builtCapture = lvl.wallCaptureSerial;
 				decodeDungeonTextures(g, tex);
 				dun.setTextures(tex);
+				// Les types particuliers (sans mur de pierre) : sorte et étendue de leur dessin
+				for (int t = 1; t < 256; t++) {
+					if (g.vmpMap[t] || !g.wallSlot || g.wallSlot[t] < 0)
+						continue;
+					const uint8_t *al = g.wallAlpha + (size_t)g.wallSlot[t] * 128 * 96;
+					int top = 99, bottom = -1, cnt = 0;
+					for (int i = 0; i < 128 * 96; i++)
+						if (al[i]) { cnt++; if (top == 99) top = i / 128; bottom = i / 128; }
+					if (cnt)
+						printf("  type %3d drapeaux %02x : sorte %d, lignes %d-%d, %d pixels\n", t, g.wallFlags[t], tex.kind[t], top, bottom, cnt);
+				}
 				builtGfx = lvl.gfxSerial;
 				builtWalls = 0;
 			}
-			if (lvl.wallsSerial != builtWalls) {
+			const int meshDir = atBlock >= 0 ? atDir : lvl.direction;
+			if (lvl.wallsSerial != builtWalls || meshDir != builtDir) {
+				builtDir = meshDir;
 				std::vector<DungeonVertex> verts;
-				buildDungeonMesh(lvl.walls, g, tex, verts);
+				buildDungeonMesh(lvl.walls, g, tex, verts, meshDir);
 				dun.setMesh(verts);
 				builtWalls = lvl.wallsSerial;
 			}

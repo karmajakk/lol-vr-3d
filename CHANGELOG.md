@@ -3,6 +3,20 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.5.2] — Shops, items, forest
+
+- In shops and conversations (immersive mode), the message line with the choices (Yes / No...) is
+  joined under the game screen, as wide as the scene, and can be clicked there.
+- An item taken from the inventory can be carried out into the 3D dungeon: aiming ahead of the
+  party (far away, up in the air) points into the game's view, to throw or drop it.
+- The game screen hides as soon as a conversation, a shop or an encounter ends (the engine now
+  says so before its fade), and right away when the map or a character sheet closes.
+- Forest: puddles lie flat on the ground (they stood upright in the middle of their block), and
+  always face you as in the game.
+- Pictures at the end of forest paths (a house, a castle) are drawn on the ordinary forest wall,
+  without black around them or green streaks down to the ground; sides where the game draws no
+  picture up close are ordinary forest walls instead of black walls.
+
 ## [0.5.1] — Windows joined together
 
 - The message line is part of the spell scroll window, right under it (no longer a window of its

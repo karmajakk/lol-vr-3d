@@ -200,6 +200,9 @@ void decodeDungeonTextures(const DungeonGfx &g, DungeonTextures &out) {
 			out.rgba.resize(out.layers * layerBytes, 0);
 			return (Rgba *)&out.rgba[(out.layers - 1) * layerBytes];
 		};
+		// Le mur ordinaire du niveau (le premier mur de pierre ou d'arbres plein) : il habille le tour
+		// des images (une maison au bout d'un chemin) et les côtés où le jeu n'en dessine pas.
+		int baseLayer = -1;
 		for (int t = 1; t < 256; t++) {
 			int slot = g.wallSlot[t];
 			if (slot < 0 || slot >= g.wallSlots)
@@ -212,12 +215,18 @@ void decodeDungeonTextures(const DungeonGfx &g, DungeonTextures &out) {
 					top = top < i / kDunTexSize ? top : i / kDunTexSize;
 					bottom = i / kDunTexSize;
 				}
-			if (bottom < 0 && !(g.doorAlpha && seeThrough))
+			const bool picture = !g.vmpMap[t] && isPictureType(g, t);
+			if (bottom < 0 && !(g.doorAlpha && seeThrough)) {
+				// Une image que le jeu ne montre que de loin : de près, c'est le mur ordinaire.
+				if (picture && baseLayer >= 0)
+					out.typeLayer[t] = baseLayer;
 				continue;
+			}
 			// Un type sans mur, fait d'un seul dessin : un objet au milieu de la case, ou, s'il ne
-			// dessine que sous l'horizon (au-delà de la ligne 56), quelque chose au sol.
+			// dessine que bas sous l'horizon (au-delà de la ligne 62, dans la case devant), quelque
+			// chose au sol (flaque, dalle, trappe).
 			if (!g.vmpMap[t] && bottom >= 0) {
-				if (seeThrough && top >= 56) {
+				if (top >= 62) {
 					out.kind[t] = kWallDecal;
 					// Le sol de la case vue de face occupe les lignes 64 (bord lointain) à 96 (bord
 					// proche) ; on le remet à plat, vu de dessus.
@@ -249,6 +258,13 @@ void decodeDungeonTextures(const DungeonGfx &g, DungeonTextures &out) {
 			for (int i = 0; i < n; i++)
 				if (al[i])
 					img[i] = rgb(px[i]);
+			// Une image (une maison au bout d'un chemin) : posée sur le mur ordinaire du niveau.
+			if (picture && out.kind[t] == kWallFace && baseLayer >= 0) {
+				const Rgba *base = (const Rgba *)&out.rgba[(size_t)baseLayer * layerBytes];
+				for (int i = 0; i < n; i++)
+					if (!img[i].a)
+						img[i] = base[i];
+			}
 			// Un mur plein ne doit laisser passer aucun jour (le jeu y dessinait le sol, en bas) : chaque
 			// pixel transparent prend la couleur du pixel opaque au-dessus de lui.
 			if (!seeThrough && out.kind[t] == kWallFace) {
@@ -263,6 +279,8 @@ void decodeDungeonTextures(const DungeonGfx &g, DungeonTextures &out) {
 					}
 				}
 			}
+			if (baseLayer < 0 && g.vmpMap[t] && !seeThrough && out.kind[t] == kWallFace && top == 0)
+				baseLayer = out.typeLayer[t];
 			// La porte, à part : dans le jeu, elle se dresse au milieu de sa case. Son pied (le bas
 			// du dessin) dit à quelle profondeur : sur la face, il serait à la ligne 96.
 			if (g.doorPixels && g.doorAlpha) {
@@ -335,7 +353,7 @@ void decodeDungeonTextures(const DungeonGfx &g, DungeonTextures &out) {
 	}
 }
 
-void buildDungeonMesh(const uint8_t *walls, const DungeonGfx &g, const DungeonTextures &tex, std::vector<DungeonVertex> &out) {
+void buildDungeonMesh(const uint8_t *walls, const DungeonGfx &g, const DungeonTextures &tex, std::vector<DungeonVertex> &out, int viewDir) {
 	out.clear();
 	if (!walls || !g.vmpMap || !g.wallFlags)
 		return;
@@ -408,7 +426,12 @@ void buildDungeonMesh(const uint8_t *walls, const DungeonGfx &g, const DungeonTe
 				if (!decalDone && tex.decalLayer[t] >= 0) {
 					decalDone = true;
 					float x0 = cx - S * 0.5f, x1 = cx + S * 0.5f, z0 = cz - S * 0.5f, z1 = cz + S * 0.5f, y = 0.015f;
-					float a[5] = {x0, y, z0, 0, 0}, bb[5] = {x0, y, z1, 0, 1}, c[5] = {x1, y, z1, 1, 1}, d[5] = {x1, y, z0, 1, 0};
+					// Coins nord-ouest, nord-est, sud-est, sud-ouest ; le haut de l'image (le bord lointain)
+					// est du côté où regarde le groupe.
+					const float cxs[4] = {x0, x1, x1, x0}, czs[4] = {z0, z0, z1, z1};
+					const int r = viewDir & 3;
+					float a[5] = {cxs[r], y, czs[r], 0, 0}, d[5] = {cxs[(r + 1) & 3], y, czs[(r + 1) & 3], 1, 0};
+					float c[5] = {cxs[(r + 2) & 3], y, czs[(r + 2) & 3], 1, 1}, bb[5] = {cxs[(r + 3) & 3], y, czs[(r + 3) & 3], 0, 1};
 					quad(a, bb, c, d, (float)tex.decalLayer[t], 0.95f);
 				}
 				continue;

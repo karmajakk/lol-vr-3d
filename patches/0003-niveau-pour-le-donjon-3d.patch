@@ -1,8 +1,17 @@
 diff --git a/engines/kyra/engine/lol.cpp b/engines/kyra/engine/lol.cpp
-index c4f86a30..127052f0 100644
+index c4f86a30..d9984082 100644
 --- a/engines/kyra/engine/lol.cpp
 +++ b/engines/kyra/engine/lol.cpp
-@@ -45,6 +45,11 @@ LolvrGameState g_lolvrState = {1, 0, {0}, 0, 0, 0, 0, 0, 0, 0, {0}, {0}};
+@@ -21,6 +21,8 @@
+ 
+ #ifdef ENABLE_LOL
+ 
++#define FORBIDDEN_SYMBOL_EXCEPTION_getenv // lol-vr-3d: test bench hook below
++
+ #include "kyra/engine/lol.h"
+ #include "kyra/graphics/screen_lol.h"
+ #include "kyra/resource/resource.h"
+@@ -45,6 +47,11 @@ LolvrGameState g_lolvrState = {1, 0, {0}, 0, 0, 0, 0, 0, 0, 0, {0}, {0}};
  __attribute__((visibility("default"))) const LolvrGameState *retro_lolvr_state(void) {
  	return &g_lolvrState;
  }
@@ -14,7 +23,29 @@ index c4f86a30..127052f0 100644
  }
  
  namespace Kyra {
-@@ -968,6 +973,49 @@ void LoLEngine::runLoop() {
+@@ -964,10 +971,71 @@ void LoLEngine::runLoop() {
+ 			_nextScriptFunc = 0;
+ 		}
+ 
++		// lol-vr-3d test bench (PC only): LOLVR_TEST_LEVEL=level,block,direction jumps to a level once
++		{
++			static bool lolvrJumpDone = false;
++			const char *jump = lolvrJumpDone || g_lolvrState.reserved[0] < 60 ? nullptr : getenv("LOLVR_TEST_LEVEL");
++			if (g_lolvrState.reserved[0] >= 60)
++				lolvrJumpDone = true;
++			int lv = 0, blk = 0, dir = 0;
++			if (jump && sscanf(jump, "%d,%d,%d", &lv, &blk, &dir) == 3 && lv > 0) {
++				completeDoorOperations();
++				generateTempData();
++				_currentBlock = blk;
++				_currentDirection = dir;
++				calcCoordinates(_partyPosX, _partyPosY, _currentBlock, 0x80, 0x80);
++				loadLevel(lv);
++				_sceneUpdateRequired = true;
++				continue; // lol-vr-3d: draw the new level before anything else
++			}
++		}
+ 		// lol-vr: the dungeon loop is running (reserved[0] ticks, reserved[1] = control mode)
  		g_lolvrState.reserved[0]++;
  		g_lolvrState.reserved[1] = _currentControlMode | (_weaponsDisabled ? 0x100 : 0); // 0x100: character sheet
  		g_lolvrState.reserved[3] = countActiveCharacters(); // lol-vr: where the portraits (and their buttons) are
@@ -64,7 +95,7 @@ index c4f86a30..127052f0 100644
  
  		_timer->update();
  
-@@ -1049,6 +1097,7 @@ void LoLEngine::readSettings() {
+@@ -1049,6 +1117,7 @@ void LoLEngine::readSettings() {
  }
  
  void LoLEngine::update() {
@@ -72,7 +103,7 @@ index c4f86a30..127052f0 100644
  	updateSequenceBackgroundAnimations();
  
  	if (_updateCharNum != -1 && _system->getMillis() > _updatePortraitNext)
-@@ -1633,6 +1682,7 @@ void LoLEngine::initSceneWindowDialogue(int controlMode) {
+@@ -1633,6 +1702,7 @@ void LoLEngine::initSceneWindowDialogue(int controlMode) {
  	_txt->expandField();
  	setupScreenDims();
  	gui_disableControls(controlMode);
@@ -80,7 +111,15 @@ index c4f86a30..127052f0 100644
  }
  
  void LoLEngine::toggleSelectedCharacterFrame(bool mode) {
-@@ -1711,6 +1761,7 @@ void LoLEngine::restoreAfterSceneWindowDialogue(int redraw) {
+@@ -1690,6 +1760,7 @@ void LoLEngine::gui_specialSceneRestoreControls(int restoreLamp) {
+ }
+ 
+ void LoLEngine::restoreAfterSceneWindowDialogue(int redraw) {
++	g_lolvrLevel.sceneBusy = 0; // lol-vr-3d: the scene is over, the dungeon comes back (before the fade)
+ 	gui_enableControls();
+ 	_txt->setupField(false);
+ 	_updateFlags &= 0xFFDF;
+@@ -1711,6 +1782,7 @@ void LoLEngine::restoreAfterSceneWindowDialogue(int redraw) {
  
  	_needSceneRestore = 0;
  	enableSysTimer(2);
@@ -88,7 +127,7 @@ index c4f86a30..127052f0 100644
  }
  
  void LoLEngine::initDialogueSequence(int controlMode, int pageNum) {
-@@ -1758,6 +1809,7 @@ void LoLEngine::initDialogueSequence(int controlMode, int pageNum) {
+@@ -1758,11 +1830,13 @@ void LoLEngine::initDialogueSequence(int controlMode, int pageNum) {
  
  	_currentControlMode = controlMode;
  	_dialogueField = true;
@@ -96,7 +135,13 @@ index c4f86a30..127052f0 100644
  }
  
  void LoLEngine::restoreAfterDialogueSequence(int controlMode) {
-@@ -1780,6 +1832,7 @@ void LoLEngine::restoreAfterDialogueSequence(int controlMode) {
+ 	if (!_dialogueField)
+ 		return;
++	g_lolvrLevel.sceneBusy = 0; // lol-vr-3d: the conversation is over (before the fade)
+ 
+ 	stopPortraitSpeechAnim();
+ 	_currentControlMode = controlMode;
+@@ -1780,6 +1854,7 @@ void LoLEngine::restoreAfterDialogueSequence(int controlMode) {
  	}
  
  	_dialogueField = false;
