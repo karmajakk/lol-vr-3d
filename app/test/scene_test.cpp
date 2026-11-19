@@ -207,6 +207,9 @@ int main(int argc, char **argv) {
 	scene.init(true);
 	Ui ui;
 	ui.initGl(true);
+	// L'écriture du jeu, si l'on donne le dossier de ses fichiers (sinon la police de secours).
+	if (const char *g = getenv("LOLVR_GAME_DIR"))
+		printf("police du jeu : %s\n", ui.loadGameFont(g) ? "chargée" : "introuvable");
 	ui.setOptions(false, true);
 
 	SceneState st;
@@ -539,7 +542,7 @@ int main(int argc, char **argv) {
 			SceneState::Panel ch = tmp.panels[3];
 			check(ch.visible && ch.texture != 0 && ch.texture != help.texture, "choix de la vue : la fenêtre est affichée");
 			auto pressAt = [&](float px, float py) {
-				aimAt(ch.center + ch.right * ((px / 584.0f * 2.0f - 1.0f) * ch.halfW) + ch.up * ((1.0f - py / 470.0f * 2.0f) * ch.halfH));
+				aimAt(ch.center + ch.right * ((px / 640.0f * 2.0f - 1.0f) * ch.halfW) + ch.up * ((1.0f - py / 470.0f * 2.0f) * ch.halfH));
 				in.triggerDown = in.triggerPressed = true;
 				ui.update(in, o, tmp);
 				UiFrameOutput r = o;
@@ -547,9 +550,9 @@ int main(int argc, char **argv) {
 				ui.update(in, o, tmp);
 				return r;
 			};
-			check(pressAt(150, 200).action == kUiActionChooseClassic, "choix de la vue : bouton classique");
-			check(pressAt(430, 200).action == kUiActionChooseImmersive, "choix de la vue : bouton immersif");
-			UiFrameOutput none = pressAt(292, 420);
+			check(pressAt(160, 200).action == kUiActionChooseClassic, "choix de la vue : bouton classique");
+			check(pressAt(470, 200).action == kUiActionChooseImmersive, "choix de la vue : bouton immersif");
+			UiFrameOutput none = pressAt(320, 420);
 			check(none.action == kUiActionNone && !none.buttonsToGame, "choix de la vue : à côté des boutons, rien");
 			in.chooserOpen = false;
 			in.triggerDown = in.triggerPressed = false;
@@ -652,6 +655,17 @@ int main(int argc, char **argv) {
 			check(!o.pointerValid && o.pointerLong, "loin de l'écran : rayon entier, pas de clic envoyé au jeu");
 		}
 		printf("%s\n", failures ? "ÉCHEC" : "TOUT EST BON");
+		// Avec LOLVR_UI_DUMP : les fenêtres redessinées en français (les images remplacent les anglaises).
+		if (getenv("LOLVR_UI_DUMP")) {
+			ui.setLanguage(kLangFrench);
+			in.split = true;
+			in.chooserOpen = true;
+			ui.update(in, o, tmp);
+			in.chooserOpen = false;
+			in.helpOpen = true;
+			in.keyboardOpen = true;
+			ui.update(in, o, tmp);
+		}
 		return failures ? 1 : 0;
 	}
 

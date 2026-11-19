@@ -81,6 +81,7 @@ struct LolvrLevelData {
 	uint32_t spellSerial;
 	const uint8_t *spellPixels;
 	const uint8_t *spellAlpha;
+	int32_t textBox;
 };
 const LolvrLevelData *retro_lolvr_level(void);
 }
@@ -377,6 +378,7 @@ void copyLevel() {
 	l.direction = s->direction;
 	l.nearObjects = s->nearObjects;
 	l.sceneBusy = s->sceneBusy != 0;
+	l.textBox = s->textBox != 0;
 	l.light = s->light > 256 ? 256 : s->light < 0 ? 0 : s->light;
 	// Les effets d'un sort en cours, dessinés par-dessus la vue du jeu
 	l.spellBusy = s->spellBusy != 0 && s->spellPixels && s->spellAlpha;
@@ -653,6 +655,7 @@ bool CoreHost::levelSnapshot(LevelSnapshot &out) const {
 	out.direction = l.direction;
 	out.nearObjects = l.nearObjects;
 	out.sceneBusy = l.sceneBusy;
+	out.textBox = l.textBox;
 	out.light = l.light;
 	out.spellBusy = l.spellBusy;
 	if (l.spellBusy && out.spellSerial != l.spellSerial) {

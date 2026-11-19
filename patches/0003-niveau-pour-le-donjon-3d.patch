@@ -1,5 +1,5 @@
 diff --git a/engines/kyra/engine/lol.cpp b/engines/kyra/engine/lol.cpp
-index c4f86a30..ed53af0c 100644
+index c4f86a30..ec71dfb5 100644
 --- a/engines/kyra/engine/lol.cpp
 +++ b/engines/kyra/engine/lol.cpp
 @@ -21,6 +21,8 @@
@@ -26,7 +26,7 @@ index c4f86a30..ed53af0c 100644
  }
  
  namespace Kyra {
-@@ -964,10 +974,71 @@ void LoLEngine::runLoop() {
+@@ -964,10 +974,72 @@ void LoLEngine::runLoop() {
  			_nextScriptFunc = 0;
  		}
  
@@ -64,6 +64,7 @@ index c4f86a30..ed53af0c 100644
 +		g_lolvrLevel.direction = _currentDirection;
 +		g_lolvrLevel.inDungeon = 1;
 +		g_lolvrLevel.sceneBusy = (_needSceneRestore || _dialogueField) ? 1 : 0;
++		g_lolvrLevel.textBox = lolvrTextBox(); // lol-vr-3d
 +		{
 +			const Palette &cur = _screen->lolvrScreenPalette();
 +			const Palette &base = _screen->getPalette(0);
@@ -98,61 +99,68 @@ index c4f86a30..ed53af0c 100644
  
  		_timer->update();
  
-@@ -1049,6 +1120,7 @@ void LoLEngine::readSettings() {
+@@ -1049,6 +1121,8 @@ void LoLEngine::readSettings() {
  }
  
  void LoLEngine::update() {
 +	g_lolvrLevel.sceneBusy = (_needSceneRestore || _dialogueField) ? 1 : 0; // lol-vr-3d
++	g_lolvrLevel.textBox = lolvrTextBox(); // lol-vr-3d
  	updateSequenceBackgroundAnimations();
  
  	if (_updateCharNum != -1 && _system->getMillis() > _updatePortraitNext)
-@@ -1633,6 +1705,7 @@ void LoLEngine::initSceneWindowDialogue(int controlMode) {
+@@ -1633,6 +1707,8 @@ void LoLEngine::initSceneWindowDialogue(int controlMode) {
  	_txt->expandField();
  	setupScreenDims();
  	gui_disableControls(controlMode);
 +	g_lolvrLevel.sceneBusy = (_needSceneRestore || _dialogueField) ? 1 : 0; // lol-vr-3d
++	g_lolvrLevel.textBox = lolvrTextBox(); // lol-vr-3d
  }
  
  void LoLEngine::toggleSelectedCharacterFrame(bool mode) {
-@@ -1690,6 +1763,7 @@ void LoLEngine::gui_specialSceneRestoreControls(int restoreLamp) {
+@@ -1690,6 +1766,8 @@ void LoLEngine::gui_specialSceneRestoreControls(int restoreLamp) {
  }
  
  void LoLEngine::restoreAfterSceneWindowDialogue(int redraw) {
 +	g_lolvrLevel.sceneBusy = 0; // lol-vr-3d: the scene is over, the dungeon comes back (before the fade)
++	g_lolvrLevel.textBox = 0; // lol-vr-3d
  	gui_enableControls();
  	_txt->setupField(false);
  	_updateFlags &= 0xFFDF;
-@@ -1711,6 +1785,7 @@ void LoLEngine::restoreAfterSceneWindowDialogue(int redraw) {
+@@ -1711,6 +1789,8 @@ void LoLEngine::restoreAfterSceneWindowDialogue(int redraw) {
  
  	_needSceneRestore = 0;
  	enableSysTimer(2);
 +	g_lolvrLevel.sceneBusy = (_needSceneRestore || _dialogueField) ? 1 : 0; // lol-vr-3d
++	g_lolvrLevel.textBox = lolvrTextBox(); // lol-vr-3d
  }
  
  void LoLEngine::initDialogueSequence(int controlMode, int pageNum) {
-@@ -1758,11 +1833,13 @@ void LoLEngine::initDialogueSequence(int controlMode, int pageNum) {
+@@ -1758,11 +1838,15 @@ void LoLEngine::initDialogueSequence(int controlMode, int pageNum) {
  
  	_currentControlMode = controlMode;
  	_dialogueField = true;
 +	g_lolvrLevel.sceneBusy = (_needSceneRestore || _dialogueField) ? 1 : 0; // lol-vr-3d
++	g_lolvrLevel.textBox = lolvrTextBox(); // lol-vr-3d
  }
  
  void LoLEngine::restoreAfterDialogueSequence(int controlMode) {
  	if (!_dialogueField)
  		return;
 +	g_lolvrLevel.sceneBusy = 0; // lol-vr-3d: the conversation is over (before the fade)
++	g_lolvrLevel.textBox = 0; // lol-vr-3d
  
  	stopPortraitSpeechAnim();
  	_currentControlMode = controlMode;
-@@ -1780,6 +1857,7 @@ void LoLEngine::restoreAfterDialogueSequence(int controlMode) {
+@@ -1780,6 +1864,8 @@ void LoLEngine::restoreAfterDialogueSequence(int controlMode) {
  	}
  
  	_dialogueField = false;
 +	g_lolvrLevel.sceneBusy = (_needSceneRestore || _dialogueField) ? 1 : 0; // lol-vr-3d
++	g_lolvrLevel.textBox = lolvrTextBox(); // lol-vr-3d
  }
  
  void LoLEngine::resetPortraitsAndDisableSysTimer() {
-@@ -2123,8 +2201,12 @@ int LoLEngine::castSpell(int charNum, int spellType, int spellLevel) {
+@@ -2123,8 +2209,12 @@ int LoLEngine::castSpell(int charNum, int spellType, int spellLevel) {
  
  	if (charNum < 0) {
  		_activeSpell.charNum = (charNum * -1) - 1;
@@ -167,7 +175,7 @@ index c4f86a30..ed53af0c 100644
  	} else {
  		if (_activeSpell.p->mpRequired[spellLevel] > _characters[charNum].magicPointsCur)
  			return 0;
-@@ -2136,13 +2218,49 @@ int LoLEngine::castSpell(int charNum, int spellType, int spellLevel) {
+@@ -2136,13 +2226,49 @@ int LoLEngine::castSpell(int charNum, int spellType, int spellLevel) {
  		setCharacterMagicOrHitPoints(charNum, 0, -_activeSpell.p->hpRequired[spellLevel], 1);
  		gui_drawCharPortraitWithStats(charNum);
  
@@ -218,10 +226,10 @@ index c4f86a30..ed53af0c 100644
  	processMagicSpark(a->charNum, a->level);
  	return 1;
 diff --git a/engines/kyra/engine/lol.h b/engines/kyra/engine/lol.h
-index a9028a26..5c3748d1 100644
+index a9028a26..eccc50b4 100644
 --- a/engines/kyra/engine/lol.h
 +++ b/engines/kyra/engine/lol.h
-@@ -50,6 +50,71 @@ struct LolvrGameState {
+@@ -50,6 +50,74 @@ struct LolvrGameState {
  	int32 reserved[4];  // [0] dungeon loop ticks, [1] control mode, [2] bit 0: automap open, bit 1: game menu open
  };
  extern LolvrGameState g_lolvrState;
@@ -288,12 +296,15 @@ index a9028a26..5c3748d1 100644
 +	uint32 spellSerial;
 +	const uint8 *spellPixels;
 +	const uint8 *spellAlpha;
++	// 1 while the text field is expanded (83,122 - 318,179): conversations and shops, often with
++	// the speaker's portrait in it.
++	int32 textBox;
 +};
 +extern LolvrLevelData g_lolvrLevel;
  }
  
  namespace Audio {
-@@ -335,6 +400,14 @@ private:
+@@ -335,6 +403,15 @@ private:
  
  	// main loop
  	void runLoop();
@@ -303,13 +314,14 @@ index a9028a26..5c3748d1 100644
 +	void lolvrSpellEnd(); // lol-vr-3d
 +public:
 +	void lolvrSpellUpdate(); // lol-vr-3d: called by retro_lolvr_level()
++	int lolvrTextBox() { return ((_needSceneRestore || _dialogueField) && (_updateFlags & 2) && textEnabled()) ? 1 : 0; } // lol-vr-3d
 +private:
 +	bool lolvrDrawSprite(uint16 id, uint8 &ceiling); // lol-vr-3d
  	void update() override;
  
  	// mouse
 diff --git a/engines/kyra/engine/scene_lol.cpp b/engines/kyra/engine/scene_lol.cpp
-index 210b4828..df18dc71 100644
+index 210b4828..1f3b64fe 100644
 --- a/engines/kyra/engine/scene_lol.cpp
 +++ b/engines/kyra/engine/scene_lol.cpp
 @@ -405,6 +405,19 @@ void LoLEngine::loadLevelGraphics(const char *file, int specialColor, int weight
@@ -332,23 +344,25 @@ index 210b4828..df18dc71 100644
  	Palette tpal(256);
  	if (_flags.use16ColorMode) {
  		uint8 *dst = tpal.getData();
-@@ -1309,6 +1322,7 @@ void LoLEngine::prepareSpecialScene(int fieldType, int hasDialogue, int suspendG
+@@ -1309,6 +1322,8 @@ void LoLEngine::prepareSpecialScene(int fieldType, int hasDialogue, int suspendG
  
  		setSpecialSceneButtons(112, 0, 176, 120, controlMode);
  	}
 +	g_lolvrLevel.sceneBusy = (_needSceneRestore || _dialogueField) ? 1 : 0; // lol-vr-3d
++	g_lolvrLevel.textBox = lolvrTextBox(); // lol-vr-3d
  }
  
  int LoLEngine::restoreAfterSpecialScene(int fadeFlag, int redrawPlayField, int releaseTimScripts, int sceneUpdateMode) {
-@@ -1317,6 +1331,7 @@ int LoLEngine::restoreAfterSpecialScene(int fadeFlag, int redrawPlayField, int r
+@@ -1317,6 +1332,8 @@ int LoLEngine::restoreAfterSpecialScene(int fadeFlag, int redrawPlayField, int r
  
  	_needSceneRestore = 0;
  	enableSysTimer(2);
 +	g_lolvrLevel.sceneBusy = (_needSceneRestore || _dialogueField) ? 1 : 0; // lol-vr-3d
++	g_lolvrLevel.textBox = lolvrTextBox(); // lol-vr-3d
  
  	if (_dialogueField)
  		restoreAfterDialogueSequence(_currentControlMode);
-@@ -1581,6 +1596,135 @@ void LoLEngine::drawSpecialGuiShape(int pageNum) {
+@@ -1581,6 +1598,135 @@ void LoLEngine::drawSpecialGuiShape(int pageNum) {
  		_screen->drawShape(pageNum, _specialGuiShape, _specialGuiShapeX + _specialGuiShape[3], _specialGuiShapeY, 2, 1);
  }
  

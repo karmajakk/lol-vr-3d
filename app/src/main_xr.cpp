@@ -486,6 +486,7 @@ struct App {
 	float cropX = 0, cropY = 0, cropW = 320, cropH = 200;
 	float dispW = 2.4f, dispH = 1.8f;
 	float bandH = 0;   // hauteur (pixels du jeu, à la largeur de la vue) de la ligne de messages collée sous la scène
+	float bandRect[4] = {83, 122, 234, 20}; // ce qu'elle montre de l'image du jeu (x, y, largeur, hauteur)
 	int quadRectW = 0, quadRectH = 0; // zone du calque quad réellement utilisée
 	float quadScaleX = 1.0f, quadScaleY = 1.0f; // marge noire comprise
 
@@ -997,6 +998,8 @@ void updateGame(App &app) {
 		if (findGameDir(app.gameRoot, 2, found)) {
 			app.gameDir = found;
 			LOGI("jeu trouvé dans %s", found.c_str());
+			// Les fenêtres de l'application prennent l'écriture des menus du jeu.
+			LOGI("police du jeu : %s", app.ui.loadGameFont(found) ? "chargée" : "introuvable");
 			lolvr::HostConfig cfg;
 			cfg.systemDir = app.systemDir;
 			cfg.saveDir = app.saveDir;
@@ -1496,8 +1499,10 @@ Vec3 viewCenter(const App &app) {
 // ---------------------------------------------------------------------------
 // Ce que montre l'écran principal : l'image entière, ou la vue du donjon seule
 
-// La ligne de messages dans l'image du jeu (320 x 200)
+// La ligne de messages dans l'image du jeu (320 x 200) ; agrandie (conversations, boutiques), la
+// zone de texte descend jusqu'à la ligne 179, sur les portraits du groupe.
 const float kBandX = 83, kBandY = 122, kBandW = 234, kBandH = 20;
+const float kBoxW = 235, kBoxH = 57;
 
 void updateLayout(App &app, double now) {
 	const float kViewX = 112, kViewY = 0, kViewW = 176, kViewH = 120; // vue du donjon dans l'image 320x200
@@ -1526,7 +1531,13 @@ void updateLayout(App &app, double now) {
 		// Mode immersif, boutique ou rencontre : la ligne de messages (les choix à faire) est collée
 		// sous la scène, à sa largeur.
 		const bool band = app.dungeonMode && app.level.sceneBusy && !app.charSheet;
-		app.bandH = band ? kBandH * cw / kBandW : 0.0f;
+		// Une conversation : toute la zone de texte agrandie, avec le portrait de celui qui parle.
+		const bool box = band && app.level.textBox;
+		app.bandRect[0] = kBandX;
+		app.bandRect[1] = kBandY;
+		app.bandRect[2] = box ? kBoxW : kBandW;
+		app.bandRect[3] = box ? kBoxH : kBandH;
+		app.bandH = band ? app.bandRect[3] * cw / app.bandRect[2] : 0.0f;
 		const float viewOnlyH = w * lolvr::kSplitViewHeight;
 		app.dispH = viewOnlyH * (kViewH + app.bandH) / kViewH;
 		app.dispW = viewOnlyH * cw / (kViewH * 1.2f);
@@ -1899,6 +1910,8 @@ void updateUi(App &app, XrTime time, float dt, double now, bool pointer, bool tr
 	in.dispH = app.dispH;
 	in.cropX = app.cropX; in.cropY = app.cropY; in.cropW = app.cropW; in.cropH = app.cropH;
 	in.bandH = app.bandH;
+	for (int i = 0; i < 4; i++)
+		in.bandRect[i] = app.bandRect[i];
 	in.crt = app.environment == lolvr::kEnvPassthroughCrt;
 	in.split = app.split;
 	in.keyboardOpen = app.keyboardOpen;
@@ -2351,7 +2364,7 @@ bool renderQuad(App &app) {
 		if (bandPx > 0) {
 			glViewport(vx, vy, vw, bandPx);
 			glUniform2f(app.blitOutSize, (float)vw, (float)bandPx);
-			glUniform4f(app.blitRect, kBandX * sx, kBandY * sy, kBandW * sx, kBandH * sy);
+			glUniform4f(app.blitRect, app.bandRect[0] * sx, app.bandRect[1] * sy, app.bandRect[2] * sx, app.bandRect[3] * sy);
 			glDrawArrays(GL_TRIANGLES, 0, 3);
 		}
 		glBindTexture(GL_TEXTURE_2D, 0);

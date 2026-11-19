@@ -2,11 +2,16 @@
 
 #include "ui.h"
 
+#include <dirent.h>
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 
+#include <algorithm>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <GLES3/gl3.h>
@@ -31,9 +36,9 @@ struct Source {
 // Clavier : grille de 11 colonnes sur 6 rangées.
 const int kCellW = 46, kCellH = 40, kCols = 11, kRows = 6;
 // Menu du poignet : engrenage et petit menu
-const int kGearSize = 64, kHintW = 336, kHintH = 76, kMenuW = 288, kMenuRowH = 44, kMenuRows = 7, kMenuH = kMenuRowH * kMenuRows;
+const int kGearSize = 64, kHintW = 440, kHintH = 84, kMenuW = 360, kMenuRowH = 44, kMenuRows = 7, kMenuH = kMenuRowH * kMenuRows;
 // Panneau d'aide
-const int kHelpW = 584, kHelpH = 470;
+const int kHelpW = 640, kHelpH = 470;
 const int kInfoH = 44; // deux lignes d'information sous les touches
 const int kKbW = kCellW * kCols, kKbH = kCellH * kRows + kInfoH;
 
@@ -109,7 +114,59 @@ Vec3 directionFor(float yaw, float pitch) {
 	return {-sinf(yaw) * cosf(pitch), sinf(pitch), -cosf(yaw) * cosf(pitch)};
 }
 
-// --- Dessin du clavier --------------------------------------------------------------------------
+// --- La police et les couleurs du jeu -----------------------------------------------------------
+
+// La police des menus du jeu (FONT9P.FNT, format DOSFont de Westwood) : chaque caractère a sa
+// largeur (l'espace qui le suit comprise), 9 pixels de haut, un bit de couleur par pixel.
+struct GameFont {
+	std::vector<uint8_t> data;
+	int glyphs = 0, height = 0, bitmaps = 0, widths = 0, heights = 0;
+	bool ok() const { return glyphs > 0; }
+	int u16(size_t o) const { return o + 1 < data.size() ? (int)(data[o] | (data[o + 1] << 8)) : -1; }
+	bool parse(std::vector<uint8_t> &&d) {
+		data = std::move(d);
+		glyphs = 0;
+		if (data.size() < 16 || u16(2) != 0x0500)
+			return false;
+		const int desc = u16(4);
+		if (desc < 0 || desc + 5 >= (int)data.size())
+			return false;
+		const int n = data[desc + 3] + 1;
+		height = data[desc + 4];
+		bitmaps = u16(6);
+		widths = u16(8);
+		heights = u16(12);
+		const int size = (int)data.size();
+		if (height < 4 || height > 16 || bitmaps < 0 || widths < 0 || heights < 0 || bitmaps + 2 * n > size || widths + n > size || heights + 2 * n > size)
+			return false;
+		glyphs = n;
+		return true;
+	}
+	int width(unsigned c) const { return c < (unsigned)glyphs ? data[widths + c] : 0; }
+};
+GameFont g_font;
+
+// Latin-1 -> code du jeu (page de code 437 des PC de l'époque) pour les lettres accentuées.
+unsigned gameCode(unsigned char c) {
+	static const unsigned char from[] = {0xE9, 0xE8, 0xEA, 0xEB, 0xE0, 0xE2, 0xE4, 0xE7, 0xC7, 0xC9 /* É : E, plus lisible */, 0xEE, 0xEF, 0xF4, 0xF6, 0xFB, 0xF9, 0xFC, 0xC4, 0xD6, 0xDC, 0xE1, 0xED, 0xF3, 0xFA, 0xF1, 0xD1, 0xDF};
+	static const unsigned char to[] = {130, 138, 136, 137, 133, 131, 132, 135, 128, 'E', 140, 139, 147, 148, 150, 151, 129, 142, 153, 154, 160, 161, 162, 163, 164, 165, 225};
+	if (c < 128)
+		return c;
+	for (size_t i = 0; i < sizeof(from); i++)
+		if (from[i] == c)
+			return to[i];
+	return '?';
+}
+
+// Les couleurs du menu des options du jeu : terre cuite, reliefs clair et sombre, texte or,
+// titre blanc ; le bleu du choix en cours du menu principal.
+struct Rgb {
+	uint8_t r, g, b;
+};
+const Rgb kFace = {164, 89, 77}, kLight = {206, 124, 100}, kDark = {119, 52, 48};
+const Rgb kGold = {246, 207, 121}, kWhite = {255, 255, 255}, kBlue = {79, 192, 255}, kPale = {240, 228, 204};
+
+// --- Dessin des fenêtres ------------------------------------------------------------------------
 
 struct Canvas {
 	int w, h;
@@ -121,6 +178,7 @@ struct Canvas {
 				p[0] = r; p[1] = g; p[2] = b; p[3] = 255;
 			}
 	}
+	void rect(int x0, int y0, int x1, int y1, Rgb c) { rect(x0, y0, x1, y1, c.r, c.g, c.b); }
 	void text(const std::string &s, int x, int y, int scale, uint8_t r, uint8_t g, uint8_t b) {
 		for (size_t i = 0; i < s.size(); i++) {
 			unsigned ch = (unsigned char)s[i];
@@ -133,6 +191,110 @@ struct Canvas {
 						rect(x + ((int)i * 8 + gx) * scale, y + gy * scale, x + ((int)i * 8 + gx + 1) * scale, y + (gy + 1) * scale, r, g, b);
 		}
 	}
+
+	// L'écriture du jeu (Latin-1), à `scale` pixels par pixel de la police. Sans la police du jeu, la
+	// police 8 x 16 (à peu près la même taille à l'échelle 2).
+	static int fallbackScale(int scale) { return scale >= 3 ? 2 : 1; }
+	static int textW(const std::string &s, int scale) {
+		if (!g_font.ok())
+			return (int)s.size() * 8 * fallbackScale(scale);
+		int w = 0;
+		for (unsigned char ch : s)
+			w += g_font.width(gameCode(ch));
+		return w * scale;
+	}
+	static int textH(int scale) { return g_font.ok() ? g_font.height * scale : 16 * fallbackScale(scale); }
+	void glyph(unsigned c, int x, int y, int s, Rgb col) {
+		if (c >= (unsigned)g_font.glyphs)
+			return;
+		const std::vector<uint8_t> &d = g_font.data;
+		int src = g_font.u16((size_t)g_font.bitmaps + 2 * c);
+		const int w = d[(size_t)g_font.widths + c], h1 = d[(size_t)g_font.heights + 2 * c], h2 = d[(size_t)g_font.heights + 2 * c + 1];
+		if (src <= 0 || !w)
+			return;
+		for (int row = 0; row < h2; row++) {
+			uint8_t b = 0;
+			for (int i = 0; i < w; i++) {
+				int v;
+				if (i & 1) {
+					v = b >> 4;
+				} else {
+					if (src >= (int)d.size())
+						return;
+					b = d[(size_t)src++];
+					v = b & 15;
+				}
+				if (v)
+					rect(x + i * s, y + (h1 + row) * s, x + (i + 1) * s, y + (h1 + row + 1) * s, col);
+			}
+		}
+	}
+	void gameLine(const std::string &s, int x, int y, int scale, Rgb col) {
+		for (unsigned char ch : s) {
+			unsigned c = gameCode(ch);
+			glyph(c, x, y, scale, col);
+			x += g_font.width(c) * scale;
+		}
+	}
+	// Comme dans le jeu : une ombre à gauche et dessous.
+	void gtext(const std::string &s, int x, int y, int scale, Rgb col, Rgb shadow = kDark) {
+		if (!g_font.ok()) {
+			const int fs = fallbackScale(scale);
+			text(s, x - fs, y + fs, fs, shadow.r, shadow.g, shadow.b);
+			text(s, x, y, fs, col.r, col.g, col.b);
+			return;
+		}
+		gameLine(s, x, y + scale, scale, shadow);
+		gameLine(s, x - scale, y, scale, shadow);
+		gameLine(s, x - scale, y + scale, scale, shadow);
+		gameLine(s, x, y, scale, col);
+	}
+	void gcenter(const std::string &s, int x0, int x1, int y, int scale, Rgb col) { gtext(s, x0 + (x1 - x0 - textW(s, scale)) / 2, y, scale, col); }
+	// La plus grande échelle (jusqu'à maxScale) où le texte tient dans maxW.
+	static int fit(const std::string &s, int maxW, int maxScale) {
+		int sc = maxScale;
+		while (sc > 1 && textW(s, sc) > maxW)
+			sc--;
+		return sc;
+	}
+	// Coupe un paragraphe en lignes de largeur maxW au plus.
+	static std::vector<std::string> wrap(const std::string &s, int maxW, int scale) {
+		std::vector<std::string> lines;
+		std::string line, word;
+		auto flush = [&]() {
+			if (word.empty())
+				return;
+			std::string t = line.empty() ? word : line + " " + word;
+			if (!line.empty() && textW(t, scale) > maxW) {
+				lines.push_back(line);
+				line = word;
+			} else {
+				line = t;
+			}
+			word.clear();
+		};
+		for (char ch : s) {
+			if (ch == ' ')
+				flush();
+			else
+				word += ch;
+		}
+		flush();
+		if (!line.empty())
+			lines.push_back(line);
+		return lines;
+	}
+	// Un bouton ou un cadre du jeu : face terre cuite, bord clair en haut et à gauche, sombre en bas et
+	// à droite (l'inverse s'il est enfoncé).
+	void bevel(int x0, int y0, int x1, int y1, int t, bool raised, Rgb face = kFace) {
+		rect(x0, y0, x1, y1, face);
+		const Rgb hi = raised ? kLight : kDark, lo = raised ? kDark : kLight;
+		rect(x0, y1 - t, x1, y1, lo);
+		rect(x1 - t, y0, x1, y1, lo);
+		rect(x0, y0, x1 - 1, y0 + t, hi);
+		rect(x0, y0, x0 + t, y1 - 1, hi);
+	}
+	void window() { bevel(0, 0, w, h, 3, true); }
 };
 
 } // namespace
@@ -164,7 +326,7 @@ struct Ui::Impl {
 	void renderChooser();
 	void renderGear();
 	void renderMenu();
-	void upload(GLuint &tex, const std::vector<uint8_t> &px, int w, int h);
+	void upload(GLuint &tex, const std::vector<uint8_t> &px, int w, int h, const char *name = "fenetre");
 	// Menu du poignet : ouvert, il reste où il est apparu.
 	bool menuOpen = false;
 	Vec3 menuPos = {0, 0, 0}, menuRight = {1, 0, 0}, menuUp = {0, 1, 0};
@@ -219,13 +381,13 @@ void Ui::Impl::buildKeys() {
 
 void Ui::Impl::renderKeyboard() {
 	Canvas cv{kKbW, kKbH, std::vector<uint8_t>((size_t)kKbW * kKbH * 4)};
-	cv.rect(0, 0, kKbW, kKbH, 34, 24, 16);
+	cv.window();
 	const bool fr = language == kLangFrench;
 	for (Key &k : keys) {
 		if (k.action == kUiActionToggleFire)
-			k.label = fr ? (fireOn ? "Feu : oui" : "Feu : non") : (fireOn ? "Fire: on" : "Fire: off");
+			k.label = fr ? "Feu" : "Fire"; // allumé : la touche est enfoncée, son nom en bleu
 		else if (k.action == kUiActionToggleDetach)
-			k.label = fr ? (detached ? "Panneaux : oui" : "Panneaux : non") : (detached ? "Panels: on" : "Panels: off");
+			k.label = fr ? "Panneaux" : "Panels";
 		else if (k.action == kUiActionResetLayout)
 			k.label = fr ? "Tout ranger" : "Reset layout";
 		else if (k.action == kUiActionCloseKeyboard)
@@ -245,33 +407,31 @@ void Ui::Impl::renderKeyboard() {
 		int x0 = k.col * kCellW + 2, y0 = k.row * kCellH + 2, x1 = (k.col + k.span) * kCellW - 2, y1 = (k.row + 1) * kCellH - 2;
 		bool option = k.row == 0;
 		bool lit = (k.action == -1 && shift) || (k.action == kUiActionToggleFire && fireOn) || (k.action == kUiActionToggleDetach && detached);
-		// Touche en relief : bord clair en haut, sombre en bas
-		cv.rect(x0, y0, x1, y1, 30, 20, 12);
-		if (lit)
-			cv.rect(x0 + 1, y0 + 1, x1 - 1, y1 - 1, 150, 104, 40);
-		else if (option)
-			cv.rect(x0 + 1, y0 + 1, x1 - 1, y1 - 1, 74, 60, 70);
-		else
-			cv.rect(x0 + 1, y0 + 1, x1 - 1, y1 - 1, 96, 72, 46);
-		cv.rect(x0 + 1, y0 + 1, x1 - 1, y0 + 3, lit ? 220 : 140, lit ? 170 : 108, lit ? 80 : 72);
-		cv.rect(x0 + 1, y1 - 3, x1 - 1, y1 - 1, 52, 38, 24);
-		const std::string &label = (shift && !k.shiftLabel.empty()) ? k.shiftLabel : k.label;
-		int scale = label.size() == 1 ? 2 : 1;
-		int tw = (int)label.size() * 8 * scale, th = 16 * scale;
-		cv.text(label, (x0 + x1 - tw) / 2, (y0 + y1 - th) / 2 - (scale == 2 ? 2 : 0), scale, 250, 236, 200);
+		// Une touche est un bouton du jeu ; une option active est enfoncée, son nom en bleu.
+		cv.bevel(x0, y0, x1, y1, 2, !lit);
+		const Rgb col = lit ? kBlue : option ? kWhite : kGold;
+		if (k.action == -1) {
+			// Majuscules : une flèche vers le haut (le mot ne tient pas sur la touche)
+			const int cx = (x0 + x1) / 2 + (lit ? 1 : 0), cy = (y0 + y1) / 2 + (lit ? 1 : 0);
+			for (int pass = 0; pass < 2; pass++) {
+				const int o = pass ? 0 : 2;
+				const Rgb c = pass ? col : kDark;
+				for (int r = 0; r < 9; r++)
+					cv.rect(cx - r - o, cy - 11 + r + o, cx + r + 1 - o, cy - 10 + r + o, c);
+				cv.rect(cx - 4 - o, cy - 2 + o, cx + 5 - o, cy + 10 + o, c);
+			}
+			continue;
+		}
+		const std::string &label = (shift && !k.shiftLabel.empty()) ? k.shiftLabel : k.label; // déjà en Latin-1
+		int scale = Canvas::fit(label, x1 - x0 - 6, label.size() == 1 ? 3 : 2);
+		int tw = Canvas::textW(label, scale), th = Canvas::textH(scale);
+		cv.gtext(label, (x0 + x1 - tw) / 2 + (lit ? 1 : 0), (y0 + y1 - th) / 2 + (lit ? 1 : 0), scale, col);
 	}
+	// Les deux lignes d'information, à la même taille
+	const int infoScale = std::min(Canvas::fit(info[0], kKbW - 20, 2), Canvas::fit(info[1], kKbW - 20, 2));
 	for (int l = 0; l < 2; l++)
-		cv.text(info[l].substr(0, (size_t)(kKbW - 12) / 8), 6, kCellH * kRows + 4 + l * 19, 1, 214, 196, 150);
-	if (!kbTex)
-		glGenTextures(1, &kbTex);
-	glBindTexture(GL_TEXTURE_2D, kbTex);
-	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-	glTexImage2D(GL_TEXTURE_2D, 0, srgb ? GL_SRGB8_ALPHA8 : GL_RGBA8, kKbW, kKbH, 0, GL_RGBA, GL_UNSIGNED_BYTE, cv.px.data());
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glBindTexture(GL_TEXTURE_2D, 0);
+		cv.gtext(info[l], 10, kCellH * kRows + 3 + l * (infoScale == 1 ? 14 : 20), infoScale, kPale);
+	upload(kbTex, cv.px, kKbW, kKbH, "clavier");
 	kbDirty = false;
 }
 
@@ -293,7 +453,17 @@ static std::string latin1(const char *utf8) {
 	return out;
 }
 
-void Ui::Impl::upload(GLuint &tex, const std::vector<uint8_t> &px, int w, int h) {
+void Ui::Impl::upload(GLuint &tex, const std::vector<uint8_t> &px, int w, int h, const char *name) {
+	// Banc d'essai : chaque fenêtre dessinée est aussi écrite en image (LOLVR_UI_DUMP = dossier).
+	if (const char *dir = getenv("LOLVR_UI_DUMP")) {
+		std::string path = std::string(dir) + "/" + name + ".ppm";
+		if (FILE *f = fopen(path.c_str(), "wb")) {
+			fprintf(f, "P6\n%d %d\n255\n", w, h);
+			for (int i = 0; i < w * h; i++)
+				fwrite(&px[(size_t)i * 4], 1, 3, f);
+			fclose(f);
+		}
+	}
 	if (!tex)
 		glGenTextures(1, &tex);
 	glBindTexture(GL_TEXTURE_2D, tex);
@@ -379,51 +549,53 @@ void Ui::Impl::compose(int which, const UiFrameInput &in) {
 	// Le bandeau du livre de sorts : un clic l'ouvre ou le replie.
 	if (which == kCompSpells) {
 		const bool fr = language == kLangFrench;
+		// Un bouton du jeu, à la taille de ses pixels (doublés ici comme le parchemin).
 		Canvas cv{c.w, kSpellTabH, std::vector<uint8_t>((size_t)c.w * kSpellTabH * 4)};
-		cv.rect(0, 0, c.w, kSpellTabH, spellTabHot ? 120 : 96, spellTabHot ? 92 : 72, spellTabHot ? 58 : 46);
-		cv.rect(0, kSpellTabH - 1, c.w, kSpellTabH, 140, 108, 72);
+		cv.bevel(0, 0, c.w, kSpellTabH, 2, true, spellTabHot ? kLight : kFace);
 		std::string label = latin1(spellsCollapsed ? (fr ? "Livre de sorts  +" : "Spellbook  +") : (fr ? "Livre de sorts  -" : "Spellbook  -"));
-		cv.text(label, (c.w - (int)label.size() * 8) / 2, 1, 1, 250, 236, 200);
+		const int sc = g_font.ok() ? 2 : 1;
+		cv.gcenter(label, 0, c.w, 1, sc, spellTabHot ? kWhite : kGold);
 		for (int y = 0; y < kSpellTabH; y++)
 			memcpy(&c.px[(size_t)y * c.texW * 4], &cv.px[(size_t)y * c.w * 4], (size_t)c.w * 4);
 	}
-	upload(c.tex, c.px, c.texW, c.texH);
+	upload(c.tex, c.px, c.texW, c.texH, which == kCompParty ? "groupe" : "sorts");
 }
 
 // Boutons de la fenêtre du choix de la vue, en pixels de son image (même taille que l'aide).
 const int kChooseY0 = 70, kChooseY1 = 330;
-const int kChooseX[2][2] = {{20, 282}, {302, 564}};
+const int kChooseX[2][2] = {{24, 310}, {330, 616}};
 
 // Premier lancement : vue classique ou mode immersif.
 void Ui::Impl::renderChooser() {
 	const bool fr = language == kLangFrench;
 	Canvas cv{kHelpW, kHelpH, std::vector<uint8_t>((size_t)kHelpW * kHelpH * 4)};
-	cv.rect(0, 0, kHelpW, kHelpH, 140, 108, 72);
-	cv.rect(3, 3, kHelpW - 3, kHelpH - 3, 34, 24, 16);
-	auto centered = [&](const std::string &t, int x0, int x1, int y, int scale, uint8_t r, uint8_t g, uint8_t b) {
-		std::string l = latin1(t.c_str());
-		cv.text(l, x0 + (x1 - x0 - (int)l.size() * 8 * scale) / 2, y, scale, r, g, b);
-	};
-	centered(fr ? "Choisis ta vue" : "Choose your view", 0, kHelpW, 22, 2, 255, 205, 110);
+	cv.window();
+	cv.gcenter(latin1(fr ? "Choisis ta vue" : "Choose your view"), 0, kHelpW, 20, 3, kWhite);
 	static const char *const labels[2][2] = {{"Classic", "Immersive"}, {"Classique", "Immersif"}};
-	static const char *const lines[2][2][4] = {
-		{{"The game screen in a", "medieval library, in your", "room (mixed reality) or on", "an old 486 PC."},
-		 {"Walk inside the dungeon", "rebuilt in 3D around you.", "The game screen appears", "when needed (shops, map)."}},
-		{{"L'écran du jeu dans une", "bibliothèque médiévale, dans", "ta pièce (réalité mixte) ou", "sur un vieux PC 486."},
-		 {"Marche dans le donjon", "reconstruit en 3D autour", "de toi. L'écran du jeu vient", "au besoin (boutiques, carte)."}}};
+	static const char *const texts[2][2] = {
+		{"The game screen in a medieval library, in your room (mixed reality) or on an old 486 PC.",
+		 "Walk inside the dungeon rebuilt in 3D around you. The game screen appears when needed (shops, map)."},
+		{"L'écran du jeu dans une bibliothèque médiévale, dans ta pièce (réalité mixte) ou sur un vieux PC 486.",
+		 "Marche dans le donjon reconstruit en 3D autour de toi. L'écran du jeu vient au besoin (boutiques, carte)."}};
 	const int lang = fr ? 1 : 0;
 	for (int b = 0; b < 2; b++) {
 		int x0 = kChooseX[b][0], x1 = kChooseX[b][1];
-		cv.rect(x0, kChooseY0, x1, kChooseY1, 30, 20, 12);
-		cv.rect(x0 + 1, kChooseY0 + 1, x1 - 1, kChooseY1 - 1, 96, 72, 46);
-		cv.rect(x0 + 1, kChooseY0 + 1, x1 - 1, kChooseY0 + 4, 140, 108, 72);
-		centered(labels[lang][b], x0, x1, kChooseY0 + 40, 2, 255, 225, 150);
-		for (int k = 0; k < 4; k++)
-			centered(lines[lang][b][k], x0, x1, kChooseY0 + 110 + k * 26, 1, 250, 236, 200);
+		cv.bevel(x0, kChooseY0, x1, kChooseY1, 3, true);
+		cv.gcenter(latin1(labels[lang][b]), x0, x1, kChooseY0 + 22, 3, kGold);
+		int y = kChooseY0 + 78;
+		for (const std::string &l : Canvas::wrap(latin1(texts[lang][b]), x1 - x0 - 28, 2)) {
+			cv.gcenter(l, x0, x1, y, 2, kPale);
+			y += 22;
+		}
 	}
-	centered(fr ? "Tu pourras changer plus tard : regarde ta main gauche," : "You can change this later: look at your left hand,", 0, kHelpW, 370, 1, 250, 236, 200);
-	centered(fr ? "l'engrenage ouvre le menu des réglages." : "the gear opens the settings menu.", 0, kHelpW, 398, 1, 250, 236, 200);
-	upload(chooserTex, cv.px, kHelpW, kHelpH);
+	int y = 350;
+	for (const std::string &l : Canvas::wrap(latin1(fr ? "Tu pourras changer plus tard : regarde ta main gauche, l'engrenage ouvre le menu des réglages."
+	                                                   : "You can change this later: look at your left hand, the gear opens the settings menu."),
+	                                         kHelpW - 48, 2)) {
+		cv.gcenter(l, 0, kHelpW, y, 2, kGold);
+		y += 24;
+	}
+	upload(chooserTex, cv.px, kHelpW, kHelpH, "choix");
 	chooserDirty = false;
 }
 
@@ -442,7 +614,7 @@ void Ui::Impl::renderHelp() {
 		"",
 		"#Combat, in the dungeon",
 		"A ........................ attack with the framed character",
-		"B ........................ open their magic, then aim at a spell",
+		"B ........................ open their magic, aim at a spell",
 		"Right stick (up/down) .... change character",
 		"Drink a potion: aim at it and press X",
 		"",
@@ -451,7 +623,7 @@ void Ui::Impl::renderHelp() {
 		"",
 		"#Windows and screen",
 		"Brass bar + hold trigger ........ move",
-		"Corner (bracket) + hold trigger . resize",
+		"Corner + hold trigger ..... resize",
 		"Right stick click ........ recenter everything",
 		"Left stick click ......... scenery (classic view)",
 		"",
@@ -471,8 +643,8 @@ void Ui::Impl::renderHelp() {
 		"Engrenage au poignet gauche : réglages, clavier, aide",
 		"",
 		"#Combat, dans le donjon",
-		"A ........................ attaquer avec le personnage encadré",
-		"B ........................ ouvrir sa magie, puis viser le sort",
+		"A ........................ attaquer (personnage encadré)",
+		"B ........................ sa magie, puis viser un sort",
 		"Joystick droit (haut/bas)  changer de personnage",
 		"Boire une potion : la viser et appuyer sur X",
 		"",
@@ -480,8 +652,8 @@ void Ui::Impl::renderHelp() {
 		"A : Entrée      B : Échap (passer)",
 		"",
 		"#Fenêtres et écran",
-		"Barrette de laiton + gâchette tenue ... déplacer",
-		"Coin (équerre) + gâchette tenue ....... agrandir, réduire",
+		"Barrette + gâchette tenue ... déplacer",
+		"Coin + gâchette tenue ....... agrandir, réduire",
 		"Clic du joystick droit ... tout recentrer devant soi",
 		"Clic du joystick gauche .. décor (vue classique)",
 		"",
@@ -490,21 +662,62 @@ void Ui::Impl::renderHelp() {
 	};
 	const char *const *lines = language == kLangFrench ? french : english;
 	Canvas cv{kHelpW, kHelpH, std::vector<uint8_t>((size_t)kHelpW * kHelpH * 4)};
-	cv.rect(0, 0, kHelpW, kHelpH, 30, 21, 14);
-	int y = 10;
+	cv.window();
+	// « bouton .... action » (ou deux espaces) : deux colonnes, l'écriture du jeu n'ayant pas des
+	// lettres de même largeur pour aligner les points.
+	auto split = [](const std::string &s, std::string &l, std::string &r) {
+		size_t p = s.find(" ..");
+		size_t q = p != std::string::npos ? s.find_first_not_of(". ", p) : std::string::npos;
+		if (p == std::string::npos) {
+			p = s.find("  ");
+			q = p != std::string::npos ? s.find_first_not_of(' ', p) : std::string::npos;
+		}
+		if (p == std::string::npos || q == std::string::npos)
+			return false;
+		l = s.substr(0, p);
+		r = s.substr(q);
+		return true;
+	};
+	const int x0 = 22, xMax = kHelpW - 12;
+	int col = x0, y = 10;
 	for (int i = 0; lines[i]; i++) {
 		const char *line = lines[i];
 		bool title = line[0] == '#';
-		std::string text = latin1(title ? line + 1 : line);
-		if (title) {
-			cv.rect(8, y + 16, kHelpW - 8, y + 17, 150, 104, 40);
-			cv.text(text, 12, y - 1, 1, 255, 205, 110);
-		} else {
-			cv.text(text, 20, y, 1, 240, 228, 196);
+		std::string text = latin1(title ? line + 1 : line), l, r;
+		if (text.empty()) {
+			y += 6;
+			continue;
 		}
-		y += text.empty() ? 8 : 18;
+		if (title) {
+			// Titre blanc, souligné d'un filet gravé (sombre puis clair)
+			cv.gtext(text, 14, y, 2, kWhite);
+			cv.rect(10, y + 18, kHelpW - 10, y + 19, kDark);
+			cv.rect(10, y + 19, kHelpW - 10, y + 20, kLight);
+			y += 23;
+			// La colonne des actions de cette partie : après le plus long nom de bouton.
+			col = x0;
+			for (int j = i + 1; lines[j] && lines[j][0] != '#'; j++) {
+				std::string t = latin1(lines[j]), a, b;
+				if (split(t, a, b) && x0 + Canvas::textW(a, 2) + 24 > col)
+					col = x0 + Canvas::textW(a, 2) + 24;
+			}
+		} else if (split(text, l, r)) {
+			cv.gtext(l, x0, y, 2, kGold);
+			// L'action dans sa colonne ; trop longue, collée au bord droit.
+			int rw = Canvas::textW(r, 2), rx = col + rw > xMax ? xMax - rw : col;
+			int sc = 2;
+			if (rx < x0 + Canvas::textW(l, 2) + 8) {
+				rx = col;
+				sc = Canvas::fit(r, xMax - col, 2);
+			}
+			cv.gtext(r, rx, y, sc, kPale);
+			y += 18;
+		} else {
+			cv.gtext(text, x0, y, Canvas::fit(text, xMax - x0, 2), kGold);
+			y += 18;
+		}
 	}
-	upload(helpTex, cv.px, kHelpW, kHelpH);
+	upload(helpTex, cv.px, kHelpW, kHelpH, "aide");
 	helpDirty = false;
 }
 
@@ -520,43 +733,47 @@ void Ui::Impl::renderGear() {
 			uint8_t *p = &px[((size_t)y * N + x) * 4];
 			bool metal = r < outer && r > 9.0f;
 			float shade = 0.75f + 0.25f * (-dy / (N * 0.5f));
-			p[0] = metal ? (uint8_t)(230 * shade) : 34;
-			p[1] = metal ? (uint8_t)(170 * shade) : 24;
-			p[2] = metal ? (uint8_t)(70 * shade) : 16;
+			// Sur la terre cuite des fenêtres, bord en relief
+			const bool edge = x < 2 || y < 2 || x >= N - 2 || y >= N - 2;
+			const Rgb bg = !edge ? kFace : (x < 2 || y < 2) && x < N - 2 && y < N - 2 ? kLight : kDark;
+			p[0] = metal ? (uint8_t)(230 * shade) : bg.r;
+			p[1] = metal ? (uint8_t)(170 * shade) : bg.g;
+			p[2] = metal ? (uint8_t)(70 * shade) : bg.b;
 			p[3] = 255;
 		}
-	upload(gearTex, px, N, N);
+	upload(gearTex, px, N, N, "engrenage");
 }
 
 void Ui::Impl::renderMenu() {
 	const bool fr = language == kLangFrench;
+	// Comme le menu des options du jeu : le nom du réglage à gauche, sa valeur sur un bouton à droite ;
+	// dessous, deux grands boutons.
 	Canvas cv{kMenuW, kMenuH, std::vector<uint8_t>((size_t)kMenuW * kMenuH * 4)};
-	cv.rect(0, 0, kMenuW, kMenuH, 34, 24, 16);
-	const std::string rows[kMenuRows] = {
-		"Lands of Lore VR",
-		latin1(fr ? "Langue : Français" : "Language: English"),
-		latin1(dungeonMode ? (fr ? "Mode immersif : oui" : "Immersive mode: on") : (fr ? "Mode immersif : non" : "Immersive mode: off")),
-		// Mode immersif : l'écran du jeu au besoin ou toujours ; vue classique : l'écran entier ou en fenêtres.
-		dungeonMode ? latin1(dungeonMode == 2 ? (fr ? "Écran du jeu : toujours" : "Game screen: always") : (fr ? "Écran du jeu : au besoin" : "Game screen: if needed"))
-		            : latin1(detached ? (fr ? "Écran classique : non" : "Classic screen: off") : (fr ? "Écran classique : oui" : "Classic screen: on")),
-		latin1(menuKeyboard ? (fr ? "Cacher le clavier" : "Hide keyboard") : (fr ? "Afficher le clavier" : "Show keyboard")),
-		latin1(fr ? "Manettes et boutons" : "Controller mapping"),
-		latin1(fr ? "Fermer" : "Close"),
-	};
-	for (int i = 0; i < kMenuRows; i++) {
-		int y0 = i * kMenuRowH;
-		if (i > 0) {
-			cv.rect(6, y0 + 4, kMenuW - 6, y0 + kMenuRowH - 4, 30, 20, 12);
-			cv.rect(7, y0 + 5, kMenuW - 7, y0 + kMenuRowH - 5, 96, 72, 46);
-			cv.rect(7, y0 + 5, kMenuW - 7, y0 + 7, 140, 108, 72);
+	cv.window();
+	const char *names[4] = {fr ? "Langue" : "Language", fr ? "Mode immersif" : "Immersive mode",
+	                        dungeonMode ? (fr ? "Écran du jeu" : "Game screen") : (fr ? "Écran classique" : "Classic screen"),
+	                        fr ? "Clavier" : "Keyboard"};
+	const char *values[4] = {fr ? "Français" : "English", dungeonMode ? (fr ? "Oui" : "On") : (fr ? "Non" : "Off"),
+	                         // Mode immersif : l'écran du jeu au besoin ou toujours ; vue classique : l'écran entier ou en fenêtres.
+	                         dungeonMode ? (dungeonMode == 2 ? (fr ? "Toujours" : "Always") : (fr ? "Au besoin" : "If needed"))
+	                                     : (detached ? (fr ? "Non" : "Off") : (fr ? "Oui" : "On")),
+	                         menuKeyboard ? (fr ? "Affiché" : "Shown") : (fr ? "Caché" : "Hidden")};
+	const int split = 196, th = Canvas::textH(2);
+	cv.gcenter("Lands of Lore VR", 0, kMenuW, (kMenuRowH - th) / 2 + 2, 2, kWhite);
+	for (int i = 1; i < kMenuRows; i++) {
+		const int y0 = i * kMenuRowH, by0 = y0 + 5, by1 = y0 + kMenuRowH - 5, ty = (by0 + by1 - th) / 2;
+		if (i <= 4) {
+			const std::string n = latin1(names[i - 1]), v = latin1(values[i - 1]);
+			cv.gtext(n, split - 10 - Canvas::textW(n, Canvas::fit(n, split - 24, 2)), ty, Canvas::fit(n, split - 24, 2), kGold);
+			cv.bevel(split, by0, kMenuW - 12, by1, 2, true);
+			cv.gcenter(v, split, kMenuW - 12, ty, Canvas::fit(v, kMenuW - 24 - split, 2), kGold);
+		} else {
+			const std::string l = latin1(i == 5 ? (fr ? "Manettes et boutons" : "Controller mapping") : (fr ? "Fermer" : "Close"));
+			cv.bevel(12, by0, kMenuW - 12, by1, 2, true);
+			cv.gcenter(l, 12, kMenuW - 12, ty, 2, kGold);
 		}
-		int tw = (int)rows[i].size() * 8;
-		if (i == 0)
-			cv.text(rows[i], (kMenuW - tw) / 2, y0 + 14, 1, 255, 205, 110);
-		else
-			cv.text(rows[i], (kMenuW - tw) / 2, y0 + 14, 1, 250, 236, 200);
 	}
-	upload(menuTex, cv.px, kMenuW, kMenuH);
+	upload(menuTex, cv.px, kMenuW, kMenuH, "menu");
 	menuDirty = false;
 }
 
@@ -564,8 +781,7 @@ void Ui::Impl::renderMenu() {
 void Ui::Impl::renderHint() {
 	const bool fr = language == kLangFrench;
 	Canvas cv{kHintW, kHintH, std::vector<uint8_t>((size_t)kHintW * kHintH * 4)};
-	cv.rect(0, 0, kHintW, kHintH, 140, 108, 72);
-	cv.rect(3, 3, kHintW - 3, kHintH - 3, 34, 24, 16);
+	cv.window();
 	// Petit engrenage à gauche
 	for (int y = 0; y < kHintH; y++)
 		for (int x = 0; x < 72; x++) {
@@ -579,9 +795,9 @@ void Ui::Impl::renderHint() {
 		}
 	const std::string l1 = latin1(fr ? "Regarde ta main gauche :" : "Look at your left hand:");
 	const std::string l2 = latin1(fr ? "l'engrenage ouvre les réglages." : "the gear opens the settings.");
-	cv.text(l1, 76, 18, 1, 255, 205, 110);
-	cv.text(l2, 76, 42, 1, 250, 236, 200);
-	upload(hintTex, cv.px, kHintW, kHintH);
+	cv.gtext(l1, 80, 18, Canvas::fit(l1, kHintW - 92, 2), kWhite);
+	cv.gtext(l2, 80, 46, Canvas::fit(l2, kHintW - 92, 2), kGold);
+	upload(hintTex, cv.px, kHintW, kHintH, "invitation");
 	hintDirty = false;
 }
 
@@ -646,6 +862,86 @@ void Ui::setInfo(const std::string &line1, const std::string &line2) {
 		d->kbDirty = true;
 	d->info[0] = line1;
 	d->info[1] = line2;
+}
+
+namespace {
+
+// Une entrée d'une archive .PAK du jeu : une table (position sur 4 octets, nom terminé par un zéro)
+// jusqu'à la première donnée.
+bool readPakEntry(const std::string &path, const char *wanted, std::vector<uint8_t> &out) {
+	FILE *f = fopen(path.c_str(), "rb");
+	if (!f)
+		return false;
+	fseek(f, 0, SEEK_END);
+	const long size = ftell(f);
+	fseek(f, 0, SEEK_SET);
+	std::vector<uint8_t> head((size_t)(size < 65536 ? (size > 0 ? size : 0) : 65536));
+	head.resize(fread(head.data(), 1, head.size(), f));
+	bool found = false;
+	size_t pos = 0;
+	long first = -1;
+	while (pos + 4 <= head.size()) {
+		long off = (long)(head[pos] | head[pos + 1] << 8 | head[pos + 2] << 16 | (uint32_t)head[pos + 3] << 24);
+		pos += 4;
+		size_t end = pos;
+		while (end < head.size() && head[end])
+			end++;
+		if (end >= head.size())
+			break;
+		std::string name((const char *)&head[pos], end - pos);
+		pos = end + 1;
+		if (name.empty() || off <= 0 || off > size)
+			break;
+		if (first < 0)
+			first = off;
+		if (!strcasecmp(name.c_str(), wanted)) {
+			// La fin : la position de l'entrée suivante, ou la fin du fichier.
+			long next = size;
+			if (pos + 4 <= head.size()) {
+				long n = (long)(head[pos] | head[pos + 1] << 8 | head[pos + 2] << 16 | (uint32_t)head[pos + 3] << 24);
+				if (n > off && n <= size)
+					next = n;
+			}
+			if (next - off > 0 && next - off < 65536) {
+				out.resize((size_t)(next - off));
+				fseek(f, off, SEEK_SET);
+				found = fread(out.data(), 1, out.size(), f) == out.size();
+			}
+			break;
+		}
+		if ((long)pos >= first)
+			break;
+	}
+	fclose(f);
+	return found;
+}
+
+} // namespace
+
+bool Ui::loadGameFont(const std::string &gameDir) {
+	if (g_font.ok())
+		return true;
+	DIR *dir = opendir(gameDir.c_str());
+	if (!dir)
+		return false;
+	std::vector<std::string> paks;
+	while (dirent *e = readdir(dir)) {
+		size_t n = strlen(e->d_name);
+		if (n > 4 && !strcasecmp(e->d_name + n - 4, ".PAK"))
+			paks.push_back(gameDir + "/" + e->d_name);
+	}
+	closedir(dir);
+	// FONT9P.FNT (le menu du jeu), sinon sa variante FONT9PN.FNT.
+	for (const char *name : {"FONT9P.FNT", "FONT9PN.FNT"})
+		for (const std::string &p : paks) {
+			std::vector<uint8_t> data;
+			if (readPakEntry(p, name, data) && g_font.parse(std::move(data))) {
+				d->kbDirty = d->helpDirty = d->menuDirty = d->hintDirty = d->chooserDirty = true;
+				d->comp[kCompSpells].key = -1;
+				return true;
+			}
+		}
+	return false;
 }
 
 UiPlacement Ui::defaultHelpPlacement(float yaw) {
@@ -1051,9 +1347,9 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 		out.hitRadius = 0.0f;
 		float rowY = screenV01 * (in.cropH + in.bandH);
 		if (in.bandH > 0.0f && rowY > in.cropH) {
-			// La ligne de messages collée sous la vue (83, 122, 234 x 20 dans l'image du jeu)
-			out.gu = (83.0f + 234.0f * screenU01) / 320.0f;
-			out.gv = (122.0f + (rowY - in.cropH) * 20.0f / in.bandH) / 200.0f;
+			// La bande collée sous la vue : la ligne de messages, ou la boîte de dialogue agrandie.
+			out.gu = (in.bandRect[0] + in.bandRect[2] * screenU01) / 320.0f;
+			out.gv = (in.bandRect[1] + (rowY - in.cropH) * in.bandRect[3] / in.bandH) / 200.0f;
 		} else {
 			out.gu = (in.cropX + in.cropW * screenU01) / 320.0f;
 			out.gv = (in.cropY + rowY) / 200.0f;

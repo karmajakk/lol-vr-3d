@@ -67,6 +67,9 @@ struct LevelSnapshot {
 	int direction = 0;        // 0 nord, 1 est, 2 sud, 3 ouest
 	int nearObjects = 0;      // bit k : monstres ou objets k cases devant le groupe (0 = sa case)
 	bool sceneBusy = false;   // la vue du jeu montre autre chose que le donjon (boutique, dialogue, scène)
+	// La zone de texte est agrandie (83,122 à 318,179) : conversation, boutique ; le portrait de celui
+	// qui parle y est souvent dessiné.
+	bool textBox = false;
 	int light = 256;          // clarté de la palette à l'écran (256 = pleine lumière ; pénombre, lampe, fondus)
 	// Sort en cours : ce que le jeu dessine par-dessus sa vue (176 x 120, couleurs de la palette ;
 	// alpha 0 ou 255). spellSerial change à chaque nouvelle image.

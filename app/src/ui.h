@@ -59,6 +59,9 @@ struct UiFrameInput {
 	float dispW = 2.4f, dispH = 1.8f;
 	float cropX = 0, cropY = 0, cropW = 320, cropH = 200;
 	float bandH = 0; // ligne de messages collée sous la vue (hauteur en pixels du jeu, à la largeur de la vue)
+	// Ce que montre cette bande dans l'image du jeu (x, y, largeur, hauteur) : la ligne de messages,
+	// ou toute la boîte de dialogue agrandie (avec le portrait de celui qui parle).
+	float bandRect[4] = {83, 122, 234, 20};
 	bool crt = false;
 	// État du jeu
 	bool split = false;       // l'interface détachée est affichée
@@ -133,6 +136,9 @@ public:
 	void setLanguage(int language);
 	// Deux lignes d'information affichées sous le clavier (Latin-1).
 	void setInfo(const std::string &line1, const std::string &line2);
+	// La police des menus du jeu (FONT9P.FNT), cherchée dans les .PAK du dossier du jeu : les
+	// fenêtres de l'application prennent alors l'écriture du jeu. Sans elle, une police de secours.
+	bool loadGameFont(const std::string &gameDir);
 	// Disposition par défaut : autour de l'écran tel qu'il est placé à cet instant.
 	void resetLayout(const UiFrameInput &in);
 	// Livre de sorts replié (le bandeau et les messages seulement) ou ouvert.

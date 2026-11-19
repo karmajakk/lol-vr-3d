@@ -3,6 +3,22 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.7.0] — The game's own look, conversations
+
+- The app's windows now look like the game's menus: the first-launch choice, the invitation to
+  look at your left hand, the wrist menu, the keyboard, the controller panel and the spellbook
+  strip use the game's own font (read from your game files) and its terracotta panels with raised
+  edges, gold text and white titles, like the in-game options menu.
+- The wrist menu is laid out like the game's options: the setting on the left, its value on a
+  button on the right (Language, Immersive mode, Game screen or Classic screen, Keyboard), then
+  "Controller mapping" and "Close". On the keyboard, Fire and Panels are pushed in, their name in
+  blue, when they are on; Shift is an arrow.
+- Conversations in immersive mode: when the game opens its large text box (with the portrait of
+  the one speaking), the whole box is joined under the game screen instead of just its first line,
+  and its choices can be clicked there. With the game's text turned off, the game draws no such box
+  (voices only) and the message line stays as it was. Full-screen story scenes still show the whole
+  game image.
+
 ## [0.6.1] — Remaining black wall, clicking on the sides
 
 - A second case of the black wall at the end of a forest path, missed by the 0.5.2 fix: when the

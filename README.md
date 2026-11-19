@@ -36,6 +36,8 @@ Early demo. What works:
 - Dark places stay dark until you light the lamp.
 - "Immersive mode: on/off" in the wrist menu, to switch to the classic view (library, mixed reality,
   486 PC) and back.
+- Conversations: the game's large text box, with the speaker's portrait, is joined under the game
+  screen.
 
 - Monsters and items near the party, drawn by the game itself and always facing you.
 - Clicks in the 3D dungeon: on the wall right in front of the party (door buttons, levers,
