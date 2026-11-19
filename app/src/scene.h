@@ -66,8 +66,10 @@ struct SceneState {
 		float hot[4] = {0, 0, 0, 0};          // zone mise en valeur (u0, v0, u1, v1), vide = aucune
 		bool hotOutline = false;              // la zone mise en valeur n'est qu'encadrée (pas de voile)
 		bool blank = false;                   // fenêtre éteinte : du noir à la place de l'image
+		bool cutout = false;                  // image détourée (alpha), sans bordure : le curseur du jeu
+		bool onTop = false;                   // dessiné par-dessus tout (sans test de profondeur)
 	};
-	static const int kMaxPanels = 12;
+	static const int kMaxPanels = 13;         // 12 pour l'interface, 1 pour le curseur du jeu
 	Panel panels[kMaxPanels];
 
 	// Poignées en laiton : on les attrape pour déplacer un panneau ou l'écran.

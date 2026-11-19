@@ -74,6 +74,12 @@ struct LevelSnapshot {
 	// La zone de texte est agrandie (83,122 à 318,179) : conversation, boutique ; le portrait de celui
 	// qui parle y est souvent dessiné.
 	bool textBox = false;
+	// L'objet tenu par le pointeur (0 = rien) et l'image du curseur du jeu (RGBA, fond transparent),
+	// point chaud compris. cursorSerial change avec l'image.
+	int itemInHand = 0;
+	uint32_t cursorSerial = 0;
+	int cursorW = 0, cursorH = 0, cursorHotX = 0, cursorHotY = 0;
+	std::vector<uint8_t> cursorRgba;
 	int light = 256;          // clarté de la palette à l'écran (256 = pleine lumière ; pénombre, lampe, fondus)
 	// Sort en cours : ce que le jeu dessine par-dessus sa vue (176 x 120, couleurs de la palette ;
 	// alpha 0 ou 255). spellSerial change à chaque nouvelle image.

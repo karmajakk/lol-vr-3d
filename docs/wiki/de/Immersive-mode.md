@@ -8,8 +8,8 @@ Der Dungeon wird in echtem 3D um dich herum nachgebaut, in Originalgröße, aus 
 - **Drehen**: Der rechte Stick dreht mit einer sehr kurzen Abblendung, damit es angenehm bleibt.
 - **Im Dungeon klicken**: Ziele auf eine Wand um die Gruppe (Türknöpfe, Hebel, Schlüssellöcher, Büsche, Nester, Baumlöcher) oder auf den Boden vor dir (Gegenstände) und drücke den Abzug.
 - **Läden und andere Gegenden**: Ihre Türen und Bilder sind Wände; geh hinein, und der Spielbildschirm zeigt den Laden, oder die neue Gegend erscheint. In Läden und Gesprächen ist die Nachrichtenzeile mit den Auswahlmöglichkeiten unter dem Spielbildschirm angefügt; wenn das Spiel sein großes Textfeld öffnet (Gespräche, mit dem Porträt des Sprechenden, wenn der Text des Spiels eingeschaltet ist), wird das ganze Feld dort angefügt.
-- **Gegenstände**: Nimm einen aus dem Inventar und ziele nach vorne in den Dungeon, um ihn zu werfen oder abzulegen.
-- **Der Spielbildschirm** erscheint von selbst für Läden, Gespräche, Szenen, die Karte, Menüs und Figurenbögen, und verschwindet wieder, wenn sie enden. In den „VR-Optionen“ (Spielmenü) hält „Spielbild: immer“ ihn sichtbar.
+- **Gegenstände**: Nimm einen aus dem Inventar und ziele nach vorne in den Dungeon, um ihn zu werfen oder abzulegen; der Gegenstand bleibt an deinem Zeiger.
+- **Der Spielbildschirm** erscheint von selbst für Läden, Gespräche, Szenen, die Karte, Menüs und Figurenbögen, und verschwindet wieder, wenn sie enden.
 - **Licht**: Dunkle Orte bleiben dunkel, bis du die Laterne anzündest, nach der Helligkeit des Spiels selbst.
 - **Zauber**: Ihre Effekte, so wie das Spiel sie über seine Ansicht zeichnet, erscheinen im Dungeon vor der Gruppe, solange der Zauber wirkt.
 

@@ -307,6 +307,14 @@ void main() {
 		oColor = vec4(brass * uAlpha, uAlpha);
 		return;
 	}
+	if (uGlow > 2.5) {
+		// Découpe (le curseur du jeu) : pixels nets, le fond transparent n'est pas dessiné.
+		vec4 t = texture(uGame, (floor(vUv * uGameSize) + 0.5) / uGameSize);
+		if (t.a < 0.5)
+			discard;
+		oColor = vec4(t.rgb * uAlpha, uAlpha);
+		return;
+	}
 	vec2 outside = max(uRect.xy - vUv, vUv - uRect.zw);
 	if (outside.x > 0.0 || outside.y > 0.0) {
 		float e = clamp(max(outside.x / uBorder.x, outside.y / uBorder.y), 0.0, 1.0);
@@ -472,6 +480,7 @@ struct Scene::Impl {
 		int first = 0, count = 0;
 		float rect[4] = {0, 0, 1, 1}, border[2] = {0.01f, 0.01f}, alpha = 1.0f, hot[4] = {0, 0, 0, 0};
 		float mode = 0.0f, glow = 0.0f;
+		bool onTop = false;
 		GLuint texture = 0;
 		float texSize[2] = {320, 200};
 		Vec3 center = {0, 0, 0};
@@ -957,7 +966,7 @@ void Scene::prepare(const SceneState &s) {
 		if (!pn.visible || pn.alpha <= 0.01f || !tex)
 			continue;
 		Impl::PanelDraw pd;
-		const float b = pn.border;
+		const float b = pn.cutout ? 0.0f : pn.border;
 		float du = (pn.u1 - pn.u0) * b / (2.0f * pn.halfW), dv = (pn.v1 - pn.v0) * b / (2.0f * pn.halfH);
 		Vec3 r = pn.right * (pn.halfW + b), u = pn.up * (pn.halfH + b);
 		pd.first = (int)panel.verts.size();
@@ -967,13 +976,14 @@ void Scene::prepare(const SceneState &s) {
 		pd.rect[0] = pn.u0; pd.rect[1] = pn.v0; pd.rect[2] = pn.u1; pd.rect[3] = pn.v1;
 		pd.border[0] = du; pd.border[1] = dv;
 		pd.alpha = pn.alpha;
-		pd.glow = pn.blank ? 1.0f : (pn.hotOutline ? 2.0f : 0.0f); // pour un panneau : 1 éteint, 2 zone encadrée
+		pd.glow = pn.cutout ? 3.0f : pn.blank ? 1.0f : (pn.hotOutline ? 2.0f : 0.0f); // 1 éteint, 2 zone encadrée, 3 découpe
 		for (int k = 0; k < 4; k++)
 			pd.hot[k] = pn.hot[k];
 		pd.texture = tex;
 		pd.texSize[0] = (float)(pn.texture ? pn.texW : s.gameWidth);
 		pd.texSize[1] = (float)(pn.texture ? pn.texH : s.gameHeight);
 		pd.center = pn.center;
+		pd.onTop = pn.onTop;
 		d->panelDraws.push_back(pd);
 	}
 	for (int i = 0; i < SceneState::kMaxHandles && d->texturesReady; i++) {
@@ -1143,6 +1153,8 @@ void Scene::render(const Mat4 &view, const Mat4 &proj, const SceneState &s) {
 		for (size_t i = 0; i < order.size(); i++)
 			order[i] = (int)i;
 		std::sort(order.begin(), order.end(), [&](int a, int b) {
+			if (d->panelDraws[a].onTop != d->panelDraws[b].onTop)
+				return d->panelDraws[b].onTop; // par-dessus tout : en dernier
 			Vec3 da = d->panelDraws[a].center - camPos, db = d->panelDraws[b].center - camPos;
 			return dot(da, da) > dot(db, db);
 		});
@@ -1163,7 +1175,11 @@ void Scene::render(const Mat4 &view, const Mat4 &proj, const SceneState &s) {
 			glUniform4f(d->panel.hot, pd.hot[0], pd.hot[1], pd.hot[2], pd.hot[3]);
 			glUniform1f(d->panel.mode, pd.mode);
 			glUniform1f(d->panel.glow, pd.glow);
+			if (pd.onTop)
+				glDisable(GL_DEPTH_TEST);
 			glDrawArrays(GL_TRIANGLES, pd.first, pd.count);
+			if (pd.onTop)
+				glEnable(GL_DEPTH_TEST);
 		}
 		glBindTexture(GL_TEXTURE_2D, 0);
 		glEnable(GL_CULL_FACE);

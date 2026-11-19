@@ -36,7 +36,7 @@ struct Source {
 // Clavier : grille de 11 colonnes sur 6 rangées.
 const int kCellW = 46, kCellH = 40, kCols = 11, kRows = 6;
 // Menu du poignet : engrenage et petit menu
-const int kGearSize = 64, kHintW = 440, kHintH = 84, kMenuW = 360, kMenuRowH = 44, kMenuRows = 5, kMenuH = kMenuRowH * kMenuRows;
+const int kGearSize = 64, kHintW = 440, kHintH = 84, kMenuW = 360, kMenuRowH = 44, kMenuMaxRows = 5;
 // Panneau d'aide
 const int kHelpW = 640, kHelpH = 520;
 const int kInfoH = 0; // (plus de lignes d'information sous les touches)
@@ -340,6 +340,10 @@ struct Ui::Impl {
 	void renderNotice();
 	Vec3 menuPos = {0, 0, 0}, menuRight = {1, 0, 0}, menuUp = {0, 1, 0};
 	int menuHot = -1;
+	// Mode immersif : pas de ligne « vue » (l'écran du jeu n'apparaît que quand il le faut).
+	int menuRows() const { return dungeonMode ? 4 : 5; }
+	int menuH() const { return kMenuRowH * menuRows(); }
+	int menuItem(int row) const { return menuRows() == 4 && row >= 2 ? row + 1 : row; }
 	// Colonne du groupe recomposée
 	int chooserHot = -1; // bouton visé dans la fenêtre du choix de la vue
 	Composite comp[2];
@@ -886,18 +890,18 @@ void Ui::Impl::renderGear() {
 void Ui::Impl::renderMenu() {
 	// Comme le menu des options du jeu : le nom du réglage à gauche, sa valeur sur un bouton à droite ;
 	// dessous, deux grands boutons.
+	const int kMenuH = menuH(), kMenuRows = menuRows();
 	Canvas cv{kMenuW, kMenuH, std::vector<uint8_t>((size_t)kMenuW * kMenuH * 4)};
 	cv.window();
 	static const char *const modes[3][3] = {{"Immersive", "Classic", "Mixed reality"}, {"Immersif", "Classique", "Réalité mixte"}, {"Immersiv", "Klassisch", "Mixed Reality"}};
 	static const char *const views[3][3] = {{"Big screen", "Windows", "486 PC"}, {"Grand écran", "Fenêtres", "PC 486"}, {"Großbild", "Fenster", "486er-PC"}};
 	const int L = language, lg = L == kLangFrench ? 1 : L == kLangGerman ? 2 : 0, mode = dungeonMode ? 0 : vrMode, view = classicView < 0 || classicView > 2 ? 0 : classicView;
-	const char *names[2] = {tr(L, "VR mode", "Mode VR", "VR-Modus"), mode == 0 ? tr(L, "Game screen", "Écran du jeu", "Spielbild") : tr(L, "View (L3)", "Vue (L3)", "Ansicht (L3)")};
-	const char *values[2] = {modes[lg][mode < 0 || mode > 2 ? 1 : mode],
-	                         mode == 0 ? (dungeonMode == 2 ? tr(L, "Always", "Toujours", "Immer") : tr(L, "If needed", "Au besoin", "Bei Bedarf")) : views[lg][view]};
+	const char *names[2] = {tr(L, "VR mode", "Mode VR", "VR-Modus"), tr(L, "View (L3)", "Vue (L3)", "Ansicht (L3)")};
+	const char *values[2] = {modes[lg][mode < 0 || mode > 2 ? 1 : mode], views[lg][view]};
 	const int split = 196, th = Canvas::textH(2);
 	cv.gcenter(latin1(tr(L, "VR controls", "Réglages VR", "VR-Optionen")), 0, kMenuW, (kMenuRowH - th) / 2 + 2, 2, kWhite);
-	for (int i = 1; i < kMenuRows; i++) {
-		const int y0 = i * kMenuRowH, by0 = y0 + 5, by1 = y0 + kMenuRowH - 5, ty = (by0 + by1 - th) / 2;
+	for (int r = 1; r < kMenuRows; r++) {
+		const int i = menuItem(r), y0 = r * kMenuRowH, by0 = y0 + 5, by1 = y0 + kMenuRowH - 5, ty = (by0 + by1 - th) / 2;
 		if (i <= 2) {
 			const std::string n = latin1(names[i - 1]), v = latin1(values[i - 1]);
 			cv.gtext(n, split - 10 - Canvas::textW(n, Canvas::fit(n, split - 24, 2)), ty, Canvas::fit(n, split - 24, 2), kGold);
@@ -1387,7 +1391,7 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 		menuQ.r = d->menuRight;
 		menuQ.u = d->menuUp;
 		menuQ.hw = kMenuW * kMenuScale * 0.5f;
-		menuQ.hh = kMenuH * kMenuScale * 0.5f;
+		menuQ.hh = d->menuH() * kMenuScale * 0.5f;
 	}
 	d->menuHot = -1;
 
@@ -1620,15 +1624,17 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 				out.clicked = true;
 			}
 		} else {
-			int row = (int)((1.0f - hy) * 0.5f * (float)kMenuRows);
-			row = row < 0 ? 0 : row >= kMenuRows ? kMenuRows - 1 : row;
-			d->menuHot = row;
+			const int rows = d->menuRows();
+			int hotRow = (int)((1.0f - hy) * 0.5f * (float)rows);
+			hotRow = hotRow < 0 ? 0 : hotRow >= rows ? rows - 1 : hotRow;
+			d->menuHot = hotRow;
+			const int row = d->menuItem(hotRow);
 			if (in.triggerPressed && row >= 1) {
 				out.clicked = true;
 				if (row == 1) {
 					out.action = kUiActionToggleDungeon; // le mode VR suivant
 				} else if (row == 2) {
-					out.action = d->dungeonMode ? kUiActionToggleScreenAlways : kUiActionCycleView;
+					out.action = kUiActionCycleView;
 				} else if (row == 3) {
 					out.action = kUiActionToggleHelp;
 					d->menuOpen = false;
@@ -1750,7 +1756,7 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 			continue;
 		const Quad &q = content[i];
 		const Source &src = kSources[i];
-		if (np < SceneState::kMaxPanels) {
+		if (np < SceneState::kMaxPanels - 1) {
 			SceneState::Panel &p = scene.panels[np++];
 			p = SceneState::Panel();
 			p.visible = true;
@@ -1820,7 +1826,7 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 	}
 	// Invitation du premier lancement : un peu sous le regard, à portée de lecture, elle suit la tête
 	// sans à-coups. Elle s'efface quand on regarde sa main (l'engrenage prend le relais).
-	if (in.gearHint && placed && !d->menuOpen && !gearVisible && d->hintTex && np < SceneState::kMaxPanels) {
+	if (in.gearHint && placed && !d->menuOpen && !gearVisible && d->hintTex && np < SceneState::kMaxPanels - 1) {
 		Vec3 flat = {in.headDir.x, 0.0f, in.headDir.z};
 		float fl = length(flat);
 		flat = fl > 1e-3f ? flat * (1.0f / fl) : Vec3{0, 0, -1};
@@ -1850,7 +1856,7 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 		p.texH = kHintH;
 	}
 	for (int w = 0; w < 3; w++) {
-		if ((w == 0 ? !gearVisible : w == 1 ? !d->menuOpen : !d->noticeOpen) || np >= SceneState::kMaxPanels)
+		if ((w == 0 ? !gearVisible : w == 1 ? !d->menuOpen : !d->noticeOpen) || np >= SceneState::kMaxPanels - 1)
 			continue;
 		const Quad &q = w == 0 ? gearQ : w == 1 ? menuQ : noticeQ;
 		SceneState::Panel &p = scene.panels[np++];
@@ -1864,12 +1870,12 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 		p.border = 0.004f;
 		p.texture = w == 0 ? d->gearTex : w == 1 ? d->menuTex : d->noticeTex;
 		p.texW = w == 0 ? kGearSize : w == 1 ? kMenuW : kNoticeW;
-		p.texH = w == 0 ? kGearSize : w == 1 ? kMenuH : kNoticeH;
+		p.texH = w == 0 ? kGearSize : w == 1 ? d->menuH() : kNoticeH;
 		if (w == 1 && d->menuHot >= 1) {
 			p.hot[0] = 0.0f;
-			p.hot[1] = (float)d->menuHot / (float)kMenuRows;
+			p.hot[1] = (float)d->menuHot / (float)d->menuRows();
 			p.hot[2] = 1.0f;
-			p.hot[3] = (float)(d->menuHot + 1) / (float)kMenuRows;
+			p.hot[3] = (float)(d->menuHot + 1) / (float)d->menuRows();
 		}
 	}
 	for (int i = 0; i < kHandleCount; i++) {

@@ -1,5 +1,17 @@
+diff --git a/engines/kyra/engine/items_lol.cpp b/engines/kyra/engine/items_lol.cpp
+index 4c00889..4a283e5 100644
+--- a/engines/kyra/engine/items_lol.cpp
++++ b/engines/kyra/engine/items_lol.cpp
+@@ -328,6 +328,7 @@ void LoLEngine::setHandItem(Item itemIndex) {
+ 	}
+ 
+ 	_itemInHand = itemIndex;
++	g_lolvrLevel.itemInHand = itemIndex; // lol-vr-3d
+ 	_screen->setMouseCursor(mouseOffs, mouseOffs, getItemIconShapePtr(itemIndex));
+ }
+ 
 diff --git a/engines/kyra/engine/lol.cpp b/engines/kyra/engine/lol.cpp
-index c4f86a30..d2e293f2 100644
+index c4f86a3..1c06559 100644
 --- a/engines/kyra/engine/lol.cpp
 +++ b/engines/kyra/engine/lol.cpp
 @@ -21,6 +21,8 @@
@@ -11,7 +23,7 @@ index c4f86a30..d2e293f2 100644
  #include "kyra/engine/lol.h"
  #include "kyra/graphics/screen_lol.h"
  #include "kyra/resource/resource.h"
-@@ -45,6 +47,20 @@ LolvrGameState g_lolvrState = {1, 0, {0}, 0, 0, 0, 0, 0, 0, 0, {0}, {0}};
+@@ -45,6 +47,32 @@ LolvrGameState g_lolvrState = {1, 0, {0}, 0, 0, 0, 0, 0, 0, 0, {0}, {0}};
  __attribute__((visibility("default"))) const LolvrGameState *retro_lolvr_state(void) {
  	return &g_lolvrState;
  }
@@ -23,6 +35,18 @@ index c4f86a30..d2e293f2 100644
 +		g_lolvrEngine->lolvrSpellUpdate();
 +	return &g_lolvrLevel;
 +}
++__attribute__((visibility("default"))) void lolvr_export_cursor(const uint8 *px, int w, int h, int hotX, int hotY, int key, const uint8 *pal) {
++	if (w <= 0 || h <= 0 || w > 64 || h > 64)
++		return;
++	memcpy(g_lolvrLevel.cursorPixels, px, w * h);
++	memcpy(g_lolvrLevel.cursorPalette, pal, 768);
++	g_lolvrLevel.cursorW = w;
++	g_lolvrLevel.cursorH = h;
++	g_lolvrLevel.cursorHotX = hotX;
++	g_lolvrLevel.cursorHotY = hotY;
++	g_lolvrLevel.cursorKey = key;
++	g_lolvrLevel.cursorSerial++;
++}
 +// The language picked in the headset (0 English, 1 French, 2 German): applied when the game
 +// starts, or at the next turn of the main loop (CD version, which has the three languages).
 +int g_lolvrLangRequest = -1;
@@ -32,7 +56,7 @@ index c4f86a30..d2e293f2 100644
  }
  
  namespace Kyra {
-@@ -95,6 +111,10 @@ LoLEngine::LoLEngine(OSystem *system, const GameFlags &flags) : KyraRpgEngine(sy
+@@ -95,6 +123,10 @@ LoLEngine::LoLEngine(OSystem *system, const GameFlags &flags) : KyraRpgEngine(sy
  		warning("unsupported language, switching back to English");
  		break;
  	}
@@ -43,7 +67,7 @@ index c4f86a30..d2e293f2 100644
  
  	_chargenFrameTable = _flags.isTalkie ? _chargenFrameTableTalkie : _chargenFrameTableFloppy;
  	_chargenWSA = 0;
-@@ -964,10 +984,74 @@ void LoLEngine::runLoop() {
+@@ -964,10 +996,75 @@ void LoLEngine::runLoop() {
  			_nextScriptFunc = 0;
  		}
  
@@ -82,6 +106,7 @@ index c4f86a30..d2e293f2 100644
 +		g_lolvrLevel.inDungeon = 1;
 +		g_lolvrLevel.sceneBusy = (_needSceneRestore || _dialogueField) ? 1 : 0;
 +		g_lolvrLevel.textBox = lolvrTextBox(); // lol-vr-3d
++		g_lolvrLevel.itemInHand = _itemInHand;
 +		lolvrApplyLangRequest();
 +		lolvrExportLang();
 +		{
@@ -118,7 +143,7 @@ index c4f86a30..d2e293f2 100644
  
  		_timer->update();
  
-@@ -1049,6 +1133,8 @@ void LoLEngine::readSettings() {
+@@ -1049,6 +1146,8 @@ void LoLEngine::readSettings() {
  }
  
  void LoLEngine::update() {
@@ -127,7 +152,7 @@ index c4f86a30..d2e293f2 100644
  	updateSequenceBackgroundAnimations();
  
  	if (_updateCharNum != -1 && _system->getMillis() > _updatePortraitNext)
-@@ -1633,6 +1719,8 @@ void LoLEngine::initSceneWindowDialogue(int controlMode) {
+@@ -1633,6 +1732,8 @@ void LoLEngine::initSceneWindowDialogue(int controlMode) {
  	_txt->expandField();
  	setupScreenDims();
  	gui_disableControls(controlMode);
@@ -136,7 +161,7 @@ index c4f86a30..d2e293f2 100644
  }
  
  void LoLEngine::toggleSelectedCharacterFrame(bool mode) {
-@@ -1690,6 +1778,8 @@ void LoLEngine::gui_specialSceneRestoreControls(int restoreLamp) {
+@@ -1690,6 +1791,8 @@ void LoLEngine::gui_specialSceneRestoreControls(int restoreLamp) {
  }
  
  void LoLEngine::restoreAfterSceneWindowDialogue(int redraw) {
@@ -145,7 +170,7 @@ index c4f86a30..d2e293f2 100644
  	gui_enableControls();
  	_txt->setupField(false);
  	_updateFlags &= 0xFFDF;
-@@ -1711,6 +1801,8 @@ void LoLEngine::restoreAfterSceneWindowDialogue(int redraw) {
+@@ -1711,6 +1814,8 @@ void LoLEngine::restoreAfterSceneWindowDialogue(int redraw) {
  
  	_needSceneRestore = 0;
  	enableSysTimer(2);
@@ -154,7 +179,7 @@ index c4f86a30..d2e293f2 100644
  }
  
  void LoLEngine::initDialogueSequence(int controlMode, int pageNum) {
-@@ -1758,11 +1850,15 @@ void LoLEngine::initDialogueSequence(int controlMode, int pageNum) {
+@@ -1758,11 +1863,15 @@ void LoLEngine::initDialogueSequence(int controlMode, int pageNum) {
  
  	_currentControlMode = controlMode;
  	_dialogueField = true;
@@ -170,7 +195,7 @@ index c4f86a30..d2e293f2 100644
  
  	stopPortraitSpeechAnim();
  	_currentControlMode = controlMode;
-@@ -1780,6 +1876,8 @@ void LoLEngine::restoreAfterDialogueSequence(int controlMode) {
+@@ -1780,6 +1889,8 @@ void LoLEngine::restoreAfterDialogueSequence(int controlMode) {
  	}
  
  	_dialogueField = false;
@@ -179,7 +204,7 @@ index c4f86a30..d2e293f2 100644
  }
  
  void LoLEngine::resetPortraitsAndDisableSysTimer() {
-@@ -2123,8 +2221,12 @@ int LoLEngine::castSpell(int charNum, int spellType, int spellLevel) {
+@@ -2123,8 +2234,12 @@ int LoLEngine::castSpell(int charNum, int spellType, int spellLevel) {
  
  	if (charNum < 0) {
  		_activeSpell.charNum = (charNum * -1) - 1;
@@ -194,7 +219,7 @@ index c4f86a30..d2e293f2 100644
  	} else {
  		if (_activeSpell.p->mpRequired[spellLevel] > _characters[charNum].magicPointsCur)
  			return 0;
-@@ -2136,13 +2238,64 @@ int LoLEngine::castSpell(int charNum, int spellType, int spellLevel) {
+@@ -2136,13 +2251,64 @@ int LoLEngine::castSpell(int charNum, int spellType, int spellLevel) {
  		setCharacterMagicOrHitPoints(charNum, 0, -_activeSpell.p->hpRequired[spellLevel], 1);
  		gui_drawCharPortraitWithStats(charNum);
  
@@ -259,11 +284,29 @@ index c4f86a30..d2e293f2 100644
  int LoLEngine::castSpark(ActiveSpell *a) {
  	processMagicSpark(a->charNum, a->level);
  	return 1;
+@@ -4130,7 +4296,6 @@ uint16 LoLEngine::getNearestPartyMemberFromPos(int x, int y) {
+ // magic atlas
+ 
+ void LoLEngine::displayAutomap() {
+-	g_lolvrState.reserved[2] |= 1; // lol-vr: the automap covers the whole screen
+ 	snd_playSoundEffect(105, -1);
+ 	gui_toggleButtonDisplayMode(_flags.isTalkie ? 78 : 76, 1);
+ 
+@@ -4174,6 +4339,9 @@ void LoLEngine::displayAutomap() {
+ 
+ 	_screen->copyPage(2, 0);
+ 	_screen->updateScreen();
++	// lol-vr: the automap covers the whole screen -- only now, once the dungeon view has faded out
++	// and the map is drawn (still black, it fades in), so the headset never shows the old view
++	g_lolvrState.reserved[2] |= 1;
+ 	_screen->fadePalette(_screen->getPalette(3), 10);
+ 	uint32 delayTimer = _system->getMillis() + 8 * _tickLength;
+ 
 diff --git a/engines/kyra/engine/lol.h b/engines/kyra/engine/lol.h
-index a9028a26..413cb95e 100644
+index a9028a2..204786a 100644
 --- a/engines/kyra/engine/lol.h
 +++ b/engines/kyra/engine/lol.h
-@@ -50,6 +50,75 @@ struct LolvrGameState {
+@@ -50,6 +50,82 @@ struct LolvrGameState {
  	int32 reserved[4];  // [0] dungeon loop ticks, [1] control mode, [2] bit 0: automap open, bit 1: game menu open
  };
  extern LolvrGameState g_lolvrState;
@@ -334,12 +377,19 @@ index a9028a26..413cb95e 100644
 +	// 1 while the text field is expanded (83,122 - 318,179): conversations and shops, often with
 +	// the speaker's portrait in it.
 +	int32 textBox;
++	// The item held by the pointer (0 = none) and the game's mouse cursor (its picture: palette
++	// indices, cursorKey = transparent; the palette on screen when it was set, 6-bit VGA).
++	int32 itemInHand;
++	uint32 cursorSerial;
++	int32 cursorW, cursorH, cursorHotX, cursorHotY, cursorKey;
++	uint8 cursorPixels[64 * 64];
++	uint8 cursorPalette[768];
 +};
 +extern LolvrLevelData g_lolvrLevel;
  }
  
  namespace Audio {
-@@ -335,6 +404,18 @@ private:
+@@ -335,6 +411,18 @@ private:
  
  	// main loop
  	void runLoop();
@@ -359,7 +409,7 @@ index a9028a26..413cb95e 100644
  
  	// mouse
 diff --git a/engines/kyra/engine/scene_lol.cpp b/engines/kyra/engine/scene_lol.cpp
-index 210b4828..1f3b64fe 100644
+index 210b482..1f3b64f 100644
 --- a/engines/kyra/engine/scene_lol.cpp
 +++ b/engines/kyra/engine/scene_lol.cpp
 @@ -405,6 +405,19 @@ void LoLEngine::loadLevelGraphics(const char *file, int specialColor, int weight
@@ -537,7 +587,7 @@ index 210b4828..1f3b64fe 100644
  
  #endif // ENABLE_LOL
 diff --git a/engines/kyra/engine/sprites_lol.cpp b/engines/kyra/engine/sprites_lol.cpp
-index 055e4f8c..830a8a4c 100644
+index 055e4f8..830a8a4 100644
 --- a/engines/kyra/engine/sprites_lol.cpp
 +++ b/engines/kyra/engine/sprites_lol.cpp
 @@ -1554,6 +1554,174 @@ void LoLEngine::killMonster(LoLMonster *monster) {
@@ -715,8 +765,32 @@ index 055e4f8c..830a8a4c 100644
  } // End of namespace Kyra
  
  #endif // ENABLE_LOL
+diff --git a/engines/kyra/graphics/screen.cpp b/engines/kyra/graphics/screen.cpp
+index 2ec438c..1878094 100644
+--- a/engines/kyra/graphics/screen.cpp
++++ b/engines/kyra/graphics/screen.cpp
+@@ -38,6 +38,9 @@
+ 
+ #define KYRA_SCREEN_IDLE_REFRESH
+ 
++// lol-vr-3d: defined by the Lands of Lore engine (lol.cpp)
++extern "C" void lolvr_export_cursor(const uint8 *px, int w, int h, int hotX, int hotY, int key, const uint8 *pal) __attribute__((weak));
++
+ namespace Kyra {
+ 
+ Screen::Screen(KyraEngine_v1 *vm, OSystem *system, const ScreenDim *dimTable, const int dimTableSize)
+@@ -3258,6 +3261,9 @@ void Screen::setMouseCursor(int x, int y, const byte *shape) {
+ 
+ 	CursorMan.showMouse(false);
+ 	copyRegionToBuffer(8, xOffset, 0, mouseWidth, mouseHeight, cursor);
++	// lol-vr-3d: the cursor for the VR frontend (the item in hand, drawn over the 3D dungeon)
++	if (lolvr_export_cursor)
++		lolvr_export_cursor(cursor, mouseWidth, mouseHeight, x, y, _cursorColorKey, _screenPalette->getData());
+ 	CursorMan.replaceCursor(cursor, mouseWidth, mouseHeight, x, y, _cursorColorKey);
+ 	if (isMouseVisible())
+ 		CursorMan.showMouse(true);
 diff --git a/engines/kyra/graphics/screen.h b/engines/kyra/graphics/screen.h
-index 92605cda..627378d4 100644
+index 92605cd..627378d 100644
 --- a/engines/kyra/graphics/screen.h
 +++ b/engines/kyra/graphics/screen.h
 @@ -713,6 +713,7 @@ public:
@@ -728,7 +802,7 @@ index 92605cda..627378d4 100644
  
  	// gui specific (processing on _curPage)
 diff --git a/engines/kyra/gui/gui_lol.cpp b/engines/kyra/gui/gui_lol.cpp
-index b2732d26..a04d0b11 100644
+index b2732d2..a04d0b1 100644
 --- a/engines/kyra/gui/gui_lol.cpp
 +++ b/engines/kyra/gui/gui_lol.cpp
 @@ -2212,7 +2212,7 @@ int GUI_LoL::runMenu(Menu &menu) {
@@ -793,7 +867,7 @@ index b2732d26..a04d0b11 100644
  		return menuItem.itemString;
  	else if (menuItem.itemId & 0x8000 || !menuItem.itemId)
 diff --git a/engines/kyra/gui/gui_v1.h b/engines/kyra/gui/gui_v1.h
-index c2821be3..3085bf4d 100644
+index c2821be..3085bf4 100644
 --- a/engines/kyra/gui/gui_v1.h
 +++ b/engines/kyra/gui/gui_v1.h
 @@ -74,7 +74,7 @@ struct Menu {
@@ -806,7 +880,7 @@ index c2821be3..3085bf4d 100644
  
  class TextDisplayer;
 diff --git a/engines/kyra/resource/staticres_lol.cpp b/engines/kyra/resource/staticres_lol.cpp
-index 00019e93..26a51d5f 100644
+index 00019e9..26a51d5 100644
 --- a/engines/kyra/resource/staticres_lol.cpp
 +++ b/engines/kyra/resource/staticres_lol.cpp
 @@ -474,9 +474,9 @@ void GUI_LoL::initStaticData() {

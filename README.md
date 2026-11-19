@@ -78,8 +78,7 @@ saves there.
 Same as lol-vr: aim and pull the trigger to click, X (or the grip) for a right click (drink a
 potion, use an item), left stick to walk, right stick to turn, A to attack, B for magic, Y for the
 map. Look at your left hand and click the floppy for the game menu; in it, "VR controls" holds the
-headset settings (VR mode, game screen "if needed" or "always" in immersive mode, the view in Classic
-and Mixed reality, controller mapping). The app speaks the language set in the game's options (English, French or German). The
+headset settings (VR mode, the view in Classic and Mixed reality, controller mapping). The app speaks the language set in the game's options (English, French or German). The
 keyboard comes up by itself to name a save.
 
 In the dungeon, the party's position is under your feet. You walk where you look: the left stick

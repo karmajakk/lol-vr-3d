@@ -57,6 +57,12 @@ struct DungeonTextures {
 	float doorDepth[256];      // la porte est à cette fraction de la case (1 = sur la face, 2 = au milieu)
 	float faceDepth[256];      // de même pour le mur lui-même (cadres de porte : au milieu de la case)
 	int decalLayer[256];       // type de mur -> dessin au sol (-1 = aucun)
+	// Une porte dans son renfoncement : le jeu peint les côtés du renfoncement en perspective, puis,
+	// au fond, la porte et les piliers qui la bordent, sur toute la largeur de la case. Ce plan du
+	// fond est remis à sa vraie place : à cette profondeur (0 = pas de plan), colonnes u0..u1 et
+	// lignes top..foot de l'image (fractions de 128) sur toute la largeur et toute la hauteur.
+	float planeDepth[256];
+	float planeU0[256], planeU1[256], planeTop[256], planeFoot[256];
 	uint8_t kind[256];         // WallKind
 	int skyLayer = -1;
 	int floorLayer = -1, ceilingLayer = -1;

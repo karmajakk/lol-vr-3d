@@ -83,6 +83,11 @@ struct LolvrLevelData {
 	const uint8_t *spellPixels;
 	const uint8_t *spellAlpha;
 	int32_t textBox;
+	int32_t itemInHand;
+	uint32_t cursorSerial;
+	int32_t cursorW, cursorH, cursorHotX, cursorHotY, cursorKey;
+	uint8_t cursorPixels[64 * 64];
+	uint8_t cursorPalette[768];
 };
 const LolvrLevelData *retro_lolvr_level(void);
 }
@@ -380,6 +385,26 @@ void copyLevel() {
 	l.nearObjects = s->nearObjects;
 	l.sceneBusy = s->sceneBusy != 0;
 	l.textBox = s->textBox != 0;
+	// L'objet tenu par le pointeur, et l'image du curseur du jeu (en couleurs, le fond transparent)
+	l.itemInHand = s->itemInHand;
+	if (s->cursorSerial != l.cursorSerial && s->cursorW > 0 && s->cursorH > 0 && s->cursorW <= 64 && s->cursorH <= 64) {
+		const int n = s->cursorW * s->cursorH;
+		l.cursorRgba.resize((size_t)n * 4);
+		for (int i = 0; i < n; i++) {
+			const int c = s->cursorPixels[i];
+			uint8_t *o = &l.cursorRgba[(size_t)i * 4];
+			for (int k = 0; k < 3; k++) {
+				const int v = s->cursorPalette[c * 3 + k] & 63;
+				o[k] = (uint8_t)((v << 2) | (v >> 4));
+			}
+			o[3] = c == s->cursorKey ? 0 : 255;
+		}
+		l.cursorW = s->cursorW;
+		l.cursorH = s->cursorH;
+		l.cursorHotX = s->cursorHotX;
+		l.cursorHotY = s->cursorHotY;
+		l.cursorSerial = s->cursorSerial;
+	}
 	l.light = s->light > 256 ? 256 : s->light < 0 ? 0 : s->light;
 	// Les effets d'un sort en cours, dessinés par-dessus la vue du jeu
 	l.spellBusy = s->spellBusy != 0 && s->spellPixels && s->spellAlpha;
@@ -665,6 +690,15 @@ bool CoreHost::levelSnapshot(LevelSnapshot &out) const {
 	out.nearObjects = l.nearObjects;
 	out.sceneBusy = l.sceneBusy;
 	out.textBox = l.textBox;
+	out.itemInHand = l.itemInHand;
+	if (out.cursorSerial != l.cursorSerial) {
+		out.cursorRgba = l.cursorRgba;
+		out.cursorW = l.cursorW;
+		out.cursorH = l.cursorH;
+		out.cursorHotX = l.cursorHotX;
+		out.cursorHotY = l.cursorHotY;
+		out.cursorSerial = l.cursorSerial;
+	}
 	out.light = l.light;
 	out.spellBusy = l.spellBusy;
 	if (l.spellBusy && out.spellSerial != l.spellSerial) {

@@ -83,9 +83,8 @@ tes sauvegardes de lol-vr.
 Comme dans lol-vr : vise et appuie sur la gâchette pour cliquer, X (ou la poignée) pour un clic
 droit (boire une potion, utiliser un objet), joystick gauche pour marcher, joystick droit pour
 tourner, A pour attaquer, B pour la magie, Y pour la carte. Regarde ta main gauche et clique sur la
-disquette pour le menu du jeu ; on y trouve « Réglages VR », les réglages du casque (mode VR, écran
-du jeu « au besoin » ou « toujours » en mode immersif, la vue en Classique et en Réalité mixte,
-manettes et boutons). L'application parle la langue choisie dans les options du jeu (anglais,
+disquette pour le menu du jeu ; on y trouve « Réglages VR », les réglages du casque (mode VR,
+la vue en Classique et en Réalité mixte, manettes et boutons). L'application parle la langue choisie dans les options du jeu (anglais,
 français ou allemand). Le clavier apparaît tout seul pour nommer une sauvegarde.
 
 Dans le donjon, la position du groupe est sous tes pieds. Tu marches là où tu regardes : le joystick

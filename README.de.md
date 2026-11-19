@@ -85,8 +85,7 @@ Wie in lol-vr: zielen und den Abzug drücken, um zu klicken, X (oder der Griff) 
 Rechtsklick (Trank trinken, Gegenstand benutzen), linker Stick zum Gehen, rechter Stick zum Drehen,
 A zum Angreifen, B für Magie, Y für die Karte. Schau auf deine linke Hand und klicke auf die
 Diskette für das Spielmenü; dort findest du „VR-Optionen“, die Einstellungen des Headsets (VR-Modus,
-Spielbildschirm „bei Bedarf“ oder „immer“ im immersiven Modus, die Ansicht in Klassisch und Mixed
-Reality, Steuerung und Tasten). Die App spricht die Sprache, die in den Optionen des Spiels gewählt
+die Ansicht in Klassisch und Mixed Reality, Steuerung und Tasten). Die App spricht die Sprache, die in den Optionen des Spiels gewählt
 ist (Englisch, Französisch oder Deutsch). Die Tastatur erscheint von selbst, um einen Spielstand zu
 benennen.
 

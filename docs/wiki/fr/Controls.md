@@ -26,9 +26,8 @@ Regarde ta main gauche : une petite disquette apparaît au-dessus, comme le bout
 En bas de ce menu, à gauche de « Resume game », **Réglages VR** ouvre devant toi les réglages du casque, disposés comme les options du jeu (le réglage à gauche, sa valeur sur un bouton) :
 
 - **Mode VR** : **Immersif** (tu marches dans le donjon reconstruit en 3D, voir [Mode immersif](Immersive-mode.md)), **Classique** (le jeu dans une bibliothèque médiévale) ou **Réalité mixte** (le jeu dans ta vraie pièce). La première fois que tu choisis Classique ou Réalité mixte, une note te rappelle que L3 change la vue.
-- En mode immersif, **Écran du jeu** : « au besoin » (il apparaît pour les boutiques, les conversations, la carte, les menus) ou « toujours ».
 - En Classique et en Réalité mixte, **Vue (L3)** : **Grand écran** (l'image entière du jeu, comme le jeu original), **Fenêtres** (les fenêtres de l'interface flottent chacune de leur côté) ou **PC 486** (le jeu sur un moniteur bombé des années 90 posé sur un PC 486). Un clic court sur le joystick gauche fait la même chose.
-- **Manettes et boutons** : un panneau qui résume tous les boutons. Clique sur le panneau pour le fermer.
+- **Manettes et boutons** : un panneau qui résume tous les boutons, par-dessus l'écran du jeu. Clique sur le panneau pour le fermer.
 - **Fermer**.
 
 L'application parle la langue choisie dans les options du jeu (« Language is » dans Game controls) : anglais, français ou allemand.

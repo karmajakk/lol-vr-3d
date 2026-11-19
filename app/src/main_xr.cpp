@@ -443,7 +443,7 @@ struct App {
 	lolvr::Dungeon dungeon;
 	bool dungeonOk = false;
 	char tileset[16] = {0};         // région du niveau (« KEEP », « FOREST1 »...)
-	int dungeonMode = 1;            // 0 vue classique ; mode immersif : 1 écran au besoin, 2 écran toujours
+	int dungeonMode = 1;            // 0 vue classique, 1 mode immersif (l'écran du jeu seulement quand il le faut)
 	int classicEnv = lolvr::kEnvLibrary; // décor de la vue classique (le mode immersif n'en a qu'un)
 	bool viewChosen = false;        // le joueur a choisi sa vue au premier lancement
 	bool chooserOpen = false;       // la fenêtre du choix de la vue est ouverte
@@ -462,6 +462,8 @@ struct App {
 	float dungeonLight = 1.0f;
 	bool dungeonVisible = false;
 	lolvr::LevelSnapshot level;
+	GLuint cursorTex = 0;       // le curseur du jeu (l'objet tenu), pour le donjon en 3D
+	uint32_t cursorTexSerial = 0;
 	lolvr::DungeonTextures dunTex;
 	uint32_t builtGfx = 0, builtWalls = 0, builtCapture = 0, builtSprites = 0;
 	uint32_t spriteVersion[32] = {0};
@@ -1151,7 +1153,7 @@ void loadSettings(App &app, int &environment) {
 				app.language = iv == 1 ? lolvr::kLangFrench : iv == 2 ? lolvr::kLangGerman : lolvr::kLangEnglish;
 		} else if (!strcmp(name, "donjon3d")) {
 			if (sscanf(rest, "%d", &iv) == 1)
-				app.dungeonMode = iv >= 0 && iv <= 2 ? iv : 1;
+				app.dungeonMode = iv == 0 ? 0 : 1; // l'ancien « écran toujours » (2) n'existe plus
 		} else if (!strcmp(name, "livresorts")) {
 			if (sscanf(rest, "%d", &iv) == 1)
 				app.ui.setSpellsCollapsed(iv != 0);
@@ -1567,6 +1569,52 @@ void updateGameEvents(App &app, double now) {
 }
 
 // Centre de ce que l'écran affiche (la vue du donjon seule est remontée).
+// L'objet tenu par le pointeur, posé sur le point visé du donjon en 3D : le curseur du jeu (l'icône
+// de l'objet) que le jeu ne dessine que sur son image à plat. Face au joueur, il garde la même
+// taille apparente quelle que soit la distance ; son point chaud tombe sur le point visé.
+void showHeldItem(App &app, Vec3 hit) {
+	const lolvr::LevelSnapshot &l = app.level;
+	if (!l.itemInHand || l.cursorW <= 0 || l.cursorH <= 0 || l.cursorRgba.size() < (size_t)l.cursorW * l.cursorH * 4)
+		return;
+	if (app.cursorTexSerial != l.cursorSerial || !app.cursorTex) {
+		if (!app.cursorTex)
+			glGenTextures(1, &app.cursorTex);
+		glBindTexture(GL_TEXTURE_2D, app.cursorTex);
+		glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+		glTexImage2D(GL_TEXTURE_2D, 0, app.srgb ? GL_SRGB8_ALPHA8 : GL_RGBA8, l.cursorW, l.cursorH, 0, GL_RGBA, GL_UNSIGNED_BYTE, l.cursorRgba.data());
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glBindTexture(GL_TEXTURE_2D, 0);
+		app.cursorTexSerial = l.cursorSerial;
+	}
+	Vec3 toEye = app.headPos - hit;
+	const float dist = length(toEye);
+	if (dist < 0.05f)
+		return;
+	toEye = toEye * (1.0f / dist);
+	Vec3 right = cross(Vec3{0, 1, 0}, toEye);
+	if (length(right) < 0.01f)
+		right = rotate(app.headRot, {1, 0, 0});
+	right = normalize(right);
+	const Vec3 up = normalize(cross(toEye, right));
+	const float px = 0.0032f * dist; // un pixel du jeu : à peu près la taille qu'il a sur le grand écran
+	lolvr::SceneState::Panel &p = app.ss.panels[lolvr::SceneState::kMaxPanels - 1];
+	p = lolvr::SceneState::Panel();
+	p.visible = true;
+	p.cutout = true;
+	p.onTop = true;
+	p.texture = app.cursorTex;
+	p.texW = l.cursorW;
+	p.texH = l.cursorH;
+	p.right = right;
+	p.up = up;
+	p.halfW = l.cursorW * px * 0.5f;
+	p.halfH = l.cursorH * px * 0.5f;
+	p.center = hit + toEye * 0.01f + right * ((l.cursorW * 0.5f - l.cursorHotX) * px) - up * ((l.cursorH * 0.5f - l.cursorHotY) * px);
+}
+
 Vec3 viewCenter(const App &app) {
 	return app.screenPos + Vec3{0, app.viewLift, 0} + rotate(screenRot(app), {app.viewShift, 0, 0});
 }
@@ -1860,7 +1908,27 @@ bool dungeonPick(App &app, Vec3 tip, Vec3 dir, float &gu, float &gv, Vec3 &hitW,
 		if (!backT)
 			continue;
 		Vec3 f{(float)dx[k], 0.0f, (float)dz[k]}, r{-f.z, 0.0f, f.x};
-		if (app.dunTex.kind[backT] == lolvr::kWallFace) {
+		if (app.dunTex.kind[backT] == lolvr::kWallFace && app.dunTex.planeDepth[backT] > 0.0f) {
+			// Une porte dans son renfoncement : le plan du fond (porte et piliers) sur toute la case.
+			const lolvr::DungeonTextures &dt = app.dunTex;
+			float den = dot(v, f);
+			if (den <= 1e-4f)
+				continue;
+			Vec3 facePt = center + f * (S * 0.5f * dt.planeDepth[backT]);
+			float tt = dot(facePt - o, f) / den;
+			if (tt <= 0.0f || tt >= bestT)
+				continue;
+			Vec3 hh = o + v * tt;
+			float u = 0.5f + dot(hh - facePt, r) / S;
+			if (u < 0.0f || u > 1.0f || hh.y < 0.0f || hh.y > H)
+				continue;
+			bestT = tt;
+			hit = hh;
+			px = 136.0f + (dt.planeU0[backT] + u * (dt.planeU1[backT] - dt.planeU0[backT])) * 128.0f;
+			py = 8.0f + (dt.planeTop[backT] + (1.0f - hh.y / H) * (dt.planeFoot[backT] - dt.planeTop[backT])) * 128.0f;
+			finalF = f;
+			finalR = r;
+		} else if (app.dunTex.kind[backT] == lolvr::kWallFace) {
 			float wfr = app.dunTex.faceDepth[backT];
 			float den = dot(v, f);
 			if (den <= 1e-4f)
@@ -2051,6 +2119,7 @@ void updateUi(App &app, XrTime time, float dt, double now, bool pointer, bool tr
 			out.hitUp = hu;
 			out.hitRadius = 0.012f * length(hit - in.tip);
 			out.pointerLong = false;
+			showHeldItem(app, hit);
 		}
 	}
 
@@ -2067,6 +2136,19 @@ void updateUi(App &app, XrTime time, float dt, double now, bool pointer, bool tr
 		break;
 	case lolvr::kUiActionToggleHelp:
 		app.helpOpen = !app.helpOpen;
+		if (app.helpOpen) {
+			// Les manettes s'ouvrent par-dessus l'écran du jeu (ou droit devant, l'écran caché),
+			// un peu en avant de lui, à la même taille apparente qu'avant.
+			const Vec3 target = app.screenShown ? viewCenter(app) : app.headPos + rotate(app.headRot, {0, 0, -1.5f});
+			const Vec3 v = target - app.anchorPos;
+			const float len = length(v) > 0.1f ? length(v) : 0.1f;
+			const float dist = clampf(len - 0.35f, 0.7f, 1.05f);
+			lolvr::UiPlacement pl = lolvr::Ui::defaultHelpPlacement(wrapAngle(atan2f(-v.x, -v.z) - app.anchorYaw));
+			pl.b = asinf(clampf(v.y / len, -0.9f, 0.9f));
+			pl.c = dist;
+			pl.scale *= dist / 1.05f;
+			app.ui.placement[lolvr::kPanelHelp] = pl;
+		}
 		break;
 	case lolvr::kUiActionCloseHelp:
 		app.helpOpen = false;
@@ -2106,9 +2188,6 @@ void updateUi(App &app, XrTime time, float dt, double now, bool pointer, bool tr
 			setViewMode(app, 1, time);
 		break;
 	}
-	case lolvr::kUiActionToggleScreenAlways:
-		setViewMode(app, app.dungeonMode == 2 ? 1 : 2, time);
-		break;
 	case lolvr::kUiActionChooseClassic:
 	case lolvr::kUiActionChooseImmersive:
 		if (out.action == lolvr::kUiActionChooseImmersive)
@@ -2725,7 +2804,7 @@ void updateDungeon(App &app, float dt) {
 void updateScreenShown(App &app, double now) {
 	// La carte, une fiche, un menu : l'écran disparaît dès qu'ils se ferment. Une scène (boutique,
 	// rencontre) : un court instant de grâce, le temps qu'une scène suivante enchaîne.
-	bool need = !app.dungeonVisible || app.dungeonMode == 2 || !app.splitWanted || app.charSheet || app.automapOpen;
+	bool need = !app.dungeonVisible || !app.splitWanted || app.charSheet || app.automapOpen;
 	if (app.level.sceneBusy)
 		app.screenNeededAt = now;
 	bool show = need || app.level.sceneBusy || now - app.screenNeededAt < 0.1;

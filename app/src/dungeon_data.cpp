@@ -9,6 +9,7 @@
 // c'est lui qui habille les murs en 3D.
 #include "dungeon_data.h"
 
+#include <stdlib.h>
 #include <string.h>
 
 namespace lolvr {
@@ -149,6 +150,7 @@ void decodeDungeonTextures(const DungeonGfx &g, DungeonTextures &out) {
 	for (int i = 0; i < 256; i++) {
 		out.typeLayer[i] = out.doorLayer[i] = out.decalLayer[i] = -1;
 		out.doorDepth[i] = 1.0f;
+		out.planeDepth[i] = 0.0f;
 		out.faceDepth[i] = 1.0f;
 		out.kind[i] = kWallFace;
 	}
@@ -304,6 +306,40 @@ void decodeDungeonTextures(const DungeonGfx &g, DungeonTextures &out) {
 					for (int i = 0; i < n; i++)
 						if (dal[i])
 							dimg[i] = rgb(dpx[i]);
+					// Le plan du fond : les colonnes de la porte, plus, de chaque côté, celles du cadre
+					// qui ont la même hauteur qu'elle (les piliers). Sa largeur dit sa profondeur : la
+					// largeur entière d'une case y prend 128 / profondeur pixels.
+					int dtop = kDunWallRows, dc0 = kDunTexSize, dc1 = -1;
+					for (int y = 0; y < kDunWallRows; y++)
+						for (int x = 0; x < kDunTexSize; x++)
+							if (dal[y * kDunTexSize + x]) {
+								dtop = y < dtop ? y : dtop;
+								dc0 = x < dc0 ? x : dc0;
+								dc1 = x > dc1 ? x : dc1;
+							}
+					auto sameHeight = [&](int x) {
+						int t0 = -1, t1 = -1;
+						for (int y = 0; y < kDunWallRows; y++)
+							if (al[y * kDunTexSize + x] || dal[y * kDunTexSize + x]) {
+								if (t0 < 0)
+									t0 = y;
+								t1 = y;
+							}
+						return t0 >= 0 && abs(t0 - dtop) <= 1 && abs(t1 - foot) <= 1;
+					};
+					int c0 = dc0, c1 = dc1;
+					while (c0 > 0 && sameHeight(c0 - 1))
+						c0--;
+					while (c1 < kDunTexSize - 1 && sameHeight(c1 + 1))
+						c1++;
+					const float r = (float)kDunTexSize / (float)(c1 - c0 + 1);
+					if (dc1 >= dc0 && seeThrough && r > 1.05f && r < 3.5f && foot - dtop > 20) {
+						out.planeDepth[t] = r;
+						out.planeU0[t] = (float)c0 / kDunTexSize;
+						out.planeU1[t] = (float)(c1 + 1) / kDunTexSize;
+						out.planeTop[t] = (float)dtop / kDunTexSize;
+						out.planeFoot[t] = (float)(foot + 1) / kDunTexSize;
+					}
 				}
 			}
 		}
@@ -468,6 +504,23 @@ void buildDungeonMesh(const uint8_t *walls, const DungeonGfx &g, const DungeonTe
 			float nx = (float)dx[k], nz = (float)dz[k];
 			float fx = cx + nx * S * 0.5f, fz = cz + nz * S * 0.5f;
 			float layer = tex.typeLayer[t] >= 0 ? typeLayer : (float)tex.pageLayer[page];
+			if (tex.planeDepth[t] > 0.0f && tex.typeLayer[t] >= 0) {
+				// La porte dans son renfoncement : le cadre (les piliers) et la porte, au fond, sur toute
+				// la largeur et toute la hauteur de la case ; les côtés du renfoncement sont les vrais
+				// murs des cases voisines (la case de la porte est un passage).
+				const float r = tex.planeDepth[t], rx = nz, rz = -nx;
+				for (int pass = 0; pass < 2; pass++) {
+					const float lyr = pass ? (float)tex.doorLayer[t] : layer;
+					const float off = pass ? 0.004f : 0.0f; // la porte un rien devant le cadre
+					const float px = fx - nx * ((r - 1.0f) * S * 0.5f - off), pz = fz - nz * ((r - 1.0f) * S * 0.5f - off);
+					float bl[5] = {px - rx * S * 0.5f, 0.0f, pz - rz * S * 0.5f, tex.planeU0[t], tex.planeFoot[t]};
+					float br[5] = {px + rx * S * 0.5f, 0.0f, pz + rz * S * 0.5f, tex.planeU1[t], tex.planeFoot[t]};
+					float tr[5] = {px + rx * S * 0.5f, H, pz + rz * S * 0.5f, tex.planeU1[t], tex.planeTop[t]};
+					float tl[5] = {px - rx * S * 0.5f, H, pz - rz * S * 0.5f, tex.planeU0[t], tex.planeTop[t]};
+					quad(bl, br, tr, tl, lyr, faceShade[k]);
+				}
+				continue;
+			}
 			float fr = tex.faceDepth[t];
 			upright(fx - nx * (fr - 1.0f) * S * 0.5f, fz - nz * (fr - 1.0f) * S * 0.5f, nx, nz, layer, faceShade[k], fr, false);
 			// La porte se dresse plus loin dans la case, à la profondeur où le jeu la dessine.

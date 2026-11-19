@@ -26,9 +26,8 @@ Schau auf deine linke Hand: Eine kleine Diskette erscheint darüber, wie der Opt
 Unten in diesem Menü, links von „Resume game“, öffnet **VR-Optionen** die Einstellungen des Headsets vor dir, angeordnet wie die Optionen des Spiels (die Einstellung links, ihr Wert auf einem Knopf):
 
 - **VR-Modus**: **Immersiv** (du gehst durch den in 3D nachgebauten Dungeon, siehe [Immersiver Modus](Immersive-mode.md)), **Klassisch** (das Spiel in einer mittelalterlichen Bibliothek) oder **Mixed Reality** (das Spiel in deinem echten Zimmer). Wenn du zum ersten Mal Klassisch oder Mixed Reality wählst, erinnert dich ein Hinweis daran, dass L3 die Ansicht wechselt.
-- Im immersiven Modus **Spielbild**: „bei Bedarf“ (es erscheint für Läden, Gespräche, die Karte, Menüs) oder „immer“.
 - In Klassisch und Mixed Reality **Ansicht (L3)**: **Großbild** (das ganze Spielbild, wie im Originalspiel), **Fenster** (die Fenster der Oberfläche schweben jedes für sich) oder **486er-PC** (das Spiel auf einem gewölbten 90er-Jahre-Monitor auf einem 486er-PC). Ein kurzer Klick auf den linken Stick macht dasselbe.
-- **Steuerung und Tasten**: ein Feld, das alle Tasten zusammenfasst. Klicke auf das Feld, um es zu schließen.
+- **Steuerung und Tasten**: ein Feld, das alle Tasten zusammenfasst, über dem Spielbildschirm. Klicke auf das Feld, um es zu schließen.
 - **Schließen**.
 
 Die App spricht die Sprache, die in den Optionen des Spiels gewählt ist („Language is“ unter Game controls): Englisch, Französisch oder Deutsch.

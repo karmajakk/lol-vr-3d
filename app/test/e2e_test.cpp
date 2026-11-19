@@ -167,6 +167,22 @@ int main(int argc, char **argv) {
 			bool hasL = host.levelSnapshot(ls);
 			if (host.gameState(gs))
 				printf("  état : langue=%d vr=%d nom=%d niveau=%d boucle=%u mode=%d menu=%d scène=%d boîte=%d lumière=%d case=%d dir=%d sort=%d/%u\n", gs.gameLang, gs.vrMenuSerial, (int)gs.nameEntry, gs.level, gs.loopSerial, gs.controlMode, (int)gs.menuOpen, hasL ? (int)ls.sceneBusy : -1, hasL ? (int)ls.textBox : -1, hasL ? ls.light : -1, hasL ? ls.block : -1, hasL ? ls.direction : -1, hasL ? (int)ls.spellBusy : -1, hasL ? ls.spellSerial : 0);
+			if (hasL)
+				printf("  tenu=%d curseur=%dx%d chaud=%d,%d n°%u\n", ls.itemInHand, ls.cursorW, ls.cursorH, ls.cursorHotX, ls.cursorHotY, ls.cursorSerial);
+			if (hasL && ls.cursorW > 0 && ls.cursorRgba.size() >= (size_t)ls.cursorW * ls.cursorH * 4) {
+				// Le curseur du jeu, agrandi 8 fois, le fond transparent en magenta
+				if (FILE *cf = fopen((out + "/" + name + "_curseur.ppm").c_str(), "wb")) {
+					const int z = 8;
+					fprintf(cf, "P6\n%d %d\n255\n", ls.cursorW * z, ls.cursorH * z);
+					for (int y = 0; y < ls.cursorH * z; y++)
+						for (int x = 0; x < ls.cursorW * z; x++) {
+							const uint8_t *p = &ls.cursorRgba[((size_t)(y / z) * ls.cursorW + x / z) * 4];
+							const uint8_t c[3] = {p[3] ? p[0] : (uint8_t)255, p[3] ? p[1] : (uint8_t)0, p[3] ? p[2] : (uint8_t)255};
+							fwrite(c, 1, 3, cf);
+						}
+					fclose(cf);
+				}
+			}
 		} else if (op == "dungeon" || op == "dungeonat") {
 			std::string name;
 			cs >> name;
@@ -210,6 +226,27 @@ int main(int argc, char **argv) {
 			if (lvl.gfxSerial != builtGfx || lvl.wallCaptureSerial != builtCapture) {
 				builtCapture = lvl.wallCaptureSerial;
 				decodeDungeonTextures(g, tex);
+				// LOLVR_DUMP_TYPE=t : les dessins d'un type de mur (mur, porte), en images
+				if (const char *dt = getenv("LOLVR_DUMP_TYPE"))
+				for (int t = 1; t < 256; t++) {
+					if (strcmp(dt, "portes") ? t != (atoi(dt) & 255) : tex.doorLayer[t] < 0)
+						continue;
+					printf("    type %d : genre %d couche %d porte %d profondeur face %.2f porte %.2f\n", t, tex.kind[t], tex.typeLayer[t], tex.doorLayer[t], tex.faceDepth[t], tex.doorDepth[t]);
+					const int ls[2] = {tex.typeLayer[t], tex.doorLayer[t]};
+					for (int k = 0; k < 2; k++) {
+						if (ls[k] < 0)
+							continue;
+						FILE *fo = fopen((out + "/type" + std::to_string(t) + (k ? "_porte" : "_mur") + ".ppm").c_str(), "wb");
+						fprintf(fo, "P6\n128 128\n255\n");
+						const uint8_t *src = &tex.rgba[(size_t)ls[k] * 128 * 128 * 4];
+						for (int i = 0; i < 128 * 128; i++) {
+							uint8_t px3[3] = {src[i * 4], src[i * 4 + 1], src[i * 4 + 2]};
+							if (!src[i * 4 + 3]) { px3[0] = 255; px3[1] = 0; px3[2] = 255; }
+							fwrite(px3, 1, 3, fo);
+						}
+						fclose(fo);
+					}
+				}
 				dun.setTextures(tex);
 				// Les types particuliers (sans mur de pierre) : sorte et étendue de leur dessin
 				for (int t = 1; t < 256; t++) {

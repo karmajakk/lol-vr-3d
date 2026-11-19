@@ -260,6 +260,7 @@ int main(int argc, char **argv) {
 		{"wrist", kEnvLibrary, kThemeKeep, seat, 10, -12, 0.6f, true, 0.0f, 0.0f, 5},
 		{"hint", kEnvLibrary, kThemeKeep, seat, 0, -10, 1.0f, false, 0.0f, 0.0f, 6},
 		{"keyboard", kEnvLibrary, kThemeKeep, seat, 0, -26, 0.85f, true, 0.0f, 0.0f, 2},
+		{"curseur", kEnvLibrary, kThemeKeep, seat, 0, 0, 0.6f, false, 0.0f, 0.0f, 7},
 	};
 
 	// --- Essai de l'interface sans casque : pointage, poignées, clavier, butées ---
@@ -602,7 +603,9 @@ int main(int argc, char **argv) {
 				if (tmp.panels[i].visible) { shown4++; menu = i; }
 			SceneState::Panel m = tmp.panels[menu];
 			check(shown4 >= shown + 1 && m.center.z < in.headPos.z - 0.4f && fabsf(m.center.x - in.headPos.x) < 0.05f, "réglages VR : la fenêtre s'ouvre devant le joueur");
-			auto row = [&](int r) { return m.center + m.up * ((1.0f - 2.0f * (r + 0.5f) / 5.0f) * m.halfH); };
+			int rows = 4; // mode immersif : titre, mode VR, manettes, fermer
+			check(fabsf(m.halfH / m.halfW - 4.0f * 44.0f / 360.0f) < 0.01f, "réglages VR : mode immersif, pas de ligne « écran du jeu »");
+			auto row = [&](int r) { return m.center + m.up * ((1.0f - 2.0f * (r + 0.5f) / (float)rows) * m.halfH); };
 			in.tip = in.headPos + Vec3{0.15f, -0.15f, 0.0f};
 			auto click = [&](int r) {
 				aimAt(row(r));
@@ -615,20 +618,27 @@ int main(int argc, char **argv) {
 			};
 			UiFrameOutput c1 = click(1);
 			check(c1.action == kUiActionToggleDungeon && !c1.buttonsToGame, "réglages VR : première ligne, le mode VR suivant");
-			check(click(2).action == kUiActionToggleScreenAlways, "réglages VR : deuxième ligne, l'écran du jeu (mode immersif)");
+			check(click(2).action == kUiActionToggleHelp, "réglages VR (immersif) : deuxième ligne, les manettes");
 			ui.setDungeonOption(0);
 			ui.setVrState(1, 0);
+			ui.openMenu();
 			ui.update(in, o, tmp);
+			for (int i = 0; i < SceneState::kMaxPanels; i++)
+				if (tmp.panels[i].visible && tmp.panels[i].texW == 360) m = tmp.panels[i];
+			rows = 5;
+			check(fabsf(m.halfH / m.halfW - 5.0f * 44.0f / 360.0f) < 0.01f, "réglages VR : vue classique, cinq lignes");
 			check(click(2).action == kUiActionCycleView, "réglages VR : deuxième ligne, la vue (classique, réalité mixte)");
-			ui.setDungeonOption(1);
-			ui.update(in, o, tmp);
 			check(click(3).action == kUiActionToggleHelp, "réglages VR : troisième ligne, les manettes (et la fenêtre se ferme)");
 			ui.openMenu();
 			ui.update(in, o, tmp);
+			int shown4b = 0;
+			for (int i = 0; i < SceneState::kMaxPanels; i++) shown4b += tmp.panels[i].visible ? 1 : 0;
 			UiFrameOutput c4 = click(4);
 			int shown5 = 0;
 			for (int i = 0; i < SceneState::kMaxPanels; i++) shown5 += tmp.panels[i].visible ? 1 : 0;
-			check(c4.action == kUiActionNone && shown5 == shown4 - 1, "réglages VR : quatrième ligne, fermer");
+			check(c4.action == kUiActionNone && shown5 == shown4b - 1, "réglages VR : dernière ligne, fermer");
+			ui.setDungeonOption(1);
+			ui.update(in, o, tmp);
 			// Le rappel « L3 change la vue » : devant le joueur, un clic le ferme
 			ui.openViewNotice();
 			ui.update(in, o, tmp);
@@ -786,6 +796,33 @@ int main(int argc, char **argv) {
 		}
 		ui.update(in, uo, st);
 		ui.update(in, uo, st);
+		if (sh.mode == 7) {
+			// Le curseur du jeu (un objet tenu) : image détourée, dessinée par-dessus tout. Un disque
+			// rouge sur fond transparent, devant le joueur.
+			static GLuint cursorTex = 0;
+			const int cw = 22, ch = 20;
+			std::vector<uint8_t> px(cw * ch * 4, 0);
+			for (int y = 0; y < ch; y++)
+				for (int x = 0; x < cw; x++) {
+					const float dx = x + 0.5f - cw * 0.5f, dy = y + 0.5f - ch * 0.5f;
+					uint8_t *q = &px[(y * cw + x) * 4];
+					if (dx * dx + dy * dy < 64.0f) { q[0] = 220; q[1] = 20; q[2] = 20; q[3] = 255; }
+				}
+			glGenTextures(1, &cursorTex);
+			glBindTexture(GL_TEXTURE_2D, cursorTex);
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_SRGB8_ALPHA8, cw, ch, 0, GL_RGBA, GL_UNSIGNED_BYTE, px.data());
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+			SceneState::Panel &cp = st.panels[SceneState::kMaxPanels - 1];
+			cp = SceneState::Panel();
+			cp.visible = cp.cutout = cp.onTop = true;
+			cp.texture = cursorTex;
+			cp.texW = cw;
+			cp.texH = ch;
+			cp.center = sh.eye + Vec3{0, 0, -1.0f};
+			cp.halfW = 0.11f;
+			cp.halfH = 0.10f;
+		}
 		st.hitValid = uo.hitValid;
 		st.hit = uo.hit;
 		st.hitRight = uo.hitRight;
@@ -850,6 +887,14 @@ int main(int argc, char **argv) {
 				fwrite(&buf[(y * W + x) * 4], 1, 3, f);
 		fclose(f);
 		fprintf(stderr, "écrit %s (GL %x)\n", path.c_str(), glGetError());
+		if (sh.mode == 7) {
+			const uint8_t *c = &buf[((H / 2) * W + W / 2) * 4], *e = &buf[((H / 2) * W + W / 2 + (int)(W * 0.083f)) * 4];
+			const bool ok = c[0] > 150 && c[1] < 80 && c[2] < 80 && !(e[0] > 150 && e[1] < 80 && e[2] < 80);
+			fprintf(stderr, "curseur : centre %d,%d,%d, coin %d,%d,%d %s\n", c[0], c[1], c[2], e[0], e[1], e[2], ok ? "ok" : "ÉCHEC");
+			if (!ok)
+				return 1;
+			st.panels[SceneState::kMaxPanels - 1].visible = false;
+		}
 	}
 	return 0;
 }

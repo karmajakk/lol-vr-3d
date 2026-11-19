@@ -3,6 +3,19 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.12.0] — Item on the pointer, castle door, VR controls
+
+- Immersive mode: an item taken from the inventory stays on the pointer when you aim into the
+  3D dungeon (the game's own cursor, the item's icon, at the aimed point), instead of vanishing.
+  The engine now publishes its mouse cursor and the item in hand (patch 0003).
+- Castle doors: the door, its frame and its pillars are now set back on one plane inside the
+  doorway, at the depth the game's picture gives them, instead of a narrow door behind a dark step.
+- "VR controls": the "Game screen: if needed / always" line is gone in immersive mode; the game
+  screen comes up when it is needed. A saved "always" setting is read as immersive mode.
+- "Controller mapping" now opens over the game screen (just in front of it, same apparent size).
+- The map (atlas) no longer lets the game screen flash for an instant before it: the engine only
+  reports the map once it is drawn.
+
 ## [0.11.2] — A better Quebec flag
 
 - The flags of the first-launch window are larger (96 x 64) and in the 3:2 shape of the Quebec
