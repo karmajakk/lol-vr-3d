@@ -1,5 +1,7 @@
 **Lands of Lore VR**
 
+**English** · [Français](fr/Home.md) · [Deutsch](de/Home.md)
+
 - [Home](Home.md)
 - [Installation](Installation.md)
 - [Controls](Controls.md)

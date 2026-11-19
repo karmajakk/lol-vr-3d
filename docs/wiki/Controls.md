@@ -1,5 +1,7 @@
 # Controls
 
+**English** · [Français](fr/Controls.md) · [Deutsch](de/Controls.md)
+
 | Controller | Action |
 |---|---|
 | Aim + trigger | Left click (the hand that clicks becomes the pointer) |
@@ -26,10 +28,10 @@ At the bottom of that menu, left of "Resume game", **VR controls** opens the hea
 - **VR mode**: **Immersive** (you walk in the dungeon rebuilt in 3D, see [Immersive mode](Immersive-mode.md)), **Classic** (the game in a medieval library) or **Mixed reality** (the game in your real room). The first time you pick Classic or Mixed reality, a note reminds you that L3 changes the view.
 - In immersive mode, **Game screen**: "if needed" (it comes up for shops, conversations, the map, menus) or "always".
 - In Classic and Mixed reality, **View (L3)**: **Big screen** (the whole game image, like the original game), **Windows** (the interface windows float on their own) or **486 PC** (the game on a curved 90s monitor standing on a 486 PC). A short click of the left stick does the same.
-
-The app speaks the language chosen in the game's own options ("Language is" in Game controls): French, or English for the others.
 - **Controller mapping**: shows a panel summing up every button. Click the panel to close it.
 - **Close**.
+
+The app speaks the language chosen in the game's own options ("Language is" in Game controls): English, French or German.
 
 The keyboard opens by itself when the game asks for a save description, and closes when the save is done.
 

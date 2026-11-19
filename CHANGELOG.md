@@ -3,6 +3,16 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.10.0] — German, documentation in three languages
+
+- The app speaks German too, when the game is set to German ("Language is" in the game's options):
+  first-launch choice, hint, VR controls, view reminder, keyboard, controller panel, spellbook strip
+  and messages, with the game's own umlauts and ß.
+- At the very first launch, before any game language is known, the app takes the headset's language
+  (English, French or German).
+- The documentation comes in English (default), French and German: README.fr.md and README.de.md,
+  and the wiki pages in docs/wiki/fr and docs/wiki/de, each page linking to its translations.
+
 ## [0.9.0] — VR mode, views, the game's language
 
 - "VR controls" has a **VR mode** setting: Immersive, Classic (the medieval library) or Mixed

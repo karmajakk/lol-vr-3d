@@ -1,5 +1,7 @@
 # Installation
 
+**English** · [Français](fr/Installation.md) · [Deutsch](de/Installation.md)
+
 Nothing to compile.
 
 ## 1. Install the app
@@ -26,7 +28,7 @@ If you used the older `lol-vr` app: this app is installed next to it and has its
 
 ## Language
 
-The app follows the language chosen in the game's options: floppy on your left wrist, "Game controls", "Language is". Before the game has started, it uses the last language seen (English at first launch).
+The app follows the language chosen in the game's options: floppy on your left wrist, "Game controls", "Language is". Before the game has started, it uses the last language seen, and at the very first launch the headset's language (English, French or German).
 
 ## Updating
 

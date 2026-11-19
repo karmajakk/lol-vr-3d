@@ -663,7 +663,8 @@ int main(int argc, char **argv) {
 		printf("%s\n", failures ? "ÉCHEC" : "TOUT EST BON");
 		// Avec LOLVR_UI_DUMP : les fenêtres redessinées en français (les images remplacent les anglaises).
 		if (getenv("LOLVR_UI_DUMP")) {
-			ui.setLanguage(kLangFrench);
+			const char *dl = getenv("LOLVR_UI_DUMP_LANG");
+			ui.setLanguage(dl && !strcmp(dl, "de") ? kLangGerman : kLangFrench);
 			ui.openMenu();
 			ui.openViewNotice();
 			in.split = true;

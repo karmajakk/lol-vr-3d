@@ -1,5 +1,7 @@
 # Lands of Lore VR
 
+**English** · [Français](fr/Home.md) · [Deutsch](de/Home.md)
+
 *Lands of Lore: The Throne of Chaos* (Westwood, 1993) in virtual reality on **Meta Quest 3**, standalone, no PC needed.
 The original game runs on [ScummVM](https://www.scummvm.org); the app adds two ways to play:
 

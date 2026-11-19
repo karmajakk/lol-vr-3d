@@ -32,7 +32,7 @@ const float kSplitViewLift = 0.16f;
 
 enum UiAction { kUiActionNone = 0, kUiActionToggleFire, kUiActionToggleDetach, kUiActionResetLayout, kUiActionCloseKeyboard, kUiActionToggleHelp, kUiActionCloseHelp, kUiActionToggleLanguage, kUiActionToggleKeyboard, kUiActionToggleDungeon, kUiActionToggleScreenAlways, kUiActionChooseClassic, kUiActionChooseImmersive, kUiActionGameMenu, kUiActionCycleView };
 
-enum UiLanguage { kLangEnglish = 0, kLangFrench = 1 };
+enum UiLanguage { kLangEnglish = 0, kLangFrench = 1, kLangGerman = 2 };
 
 const unsigned kUiModShift = 1;
 

@@ -158,6 +158,9 @@ unsigned gameCode(unsigned char c) {
 	return '?';
 }
 
+// Le texte dans la langue de l'application : anglais, français ou allemand.
+const char *tr(int lang, const char *en, const char *fr, const char *de) { return lang == kLangFrench ? fr : lang == kLangGerman ? de : en; }
+
 // Les couleurs du menu des options du jeu : terre cuite, reliefs clair et sombre, texte or,
 // titre blanc ; le bleu du choix en cours du menu principal.
 struct Rgb {
@@ -387,25 +390,26 @@ void Ui::Impl::buildKeys() {
 void Ui::Impl::renderKeyboard() {
 	Canvas cv{kKbW, kKbH, std::vector<uint8_t>((size_t)kKbW * kKbH * 4)};
 	cv.window();
-	const bool fr = language == kLangFrench;
+	const int lg = language;
+	// (en Latin-1, comme les touches)
 	for (Key &k : keys) {
 		if (k.action == kUiActionToggleFire)
-			k.label = fr ? "Feu" : "Fire"; // allumé : la touche est enfoncée, son nom en bleu
+			k.label = tr(lg, "Fire", "Feu", "Feuer"); // allumé : la touche est enfoncée, son nom en bleu
 		else if (k.action == kUiActionToggleDetach)
-			k.label = fr ? "Panneaux" : "Panels";
+			k.label = tr(lg, "Panels", "Panneaux", "Fenster");
 		else if (k.action == kUiActionResetLayout)
-			k.label = fr ? "Tout ranger" : "Reset layout";
+			k.label = tr(lg, "Reset layout", "Tout ranger", "Ordnen");
 		else if (k.action == kUiActionCloseKeyboard)
-			k.label = fr ? "Fermer" : "Close";
+			k.label = tr(lg, "Close", "Fermer", "Schlie\xDF" "en");
 		else if (k.action == -1) {
-			k.label = fr ? "Maj" : "Shift";
-			k.shiftLabel = fr ? "MAJ" : "SHIFT";
+			k.label = tr(lg, "Shift", "Maj", "Umschalt");
+			k.shiftLabel = tr(lg, "SHIFT", "MAJ", "UMSCHALT");
 		} else if (k.key == 27)
-			k.label = fr ? "\xC9" "chap" : "Esc";
+			k.label = tr(lg, "Esc", "\xC9" "chap", "Esc");
 		else if (k.key == ' ')
-			k.label = fr ? "Espace" : "Space";
+			k.label = tr(lg, "Space", "Espace", "Leertaste");
 		else if (k.key == 13)
-			k.label = fr ? "Entr\xE9" "e" : "Enter";
+			k.label = tr(lg, "Enter", "Entr\xE9" "e", "Eingabe");
 	}
 	for (size_t i = 0; i < keys.size(); i++) {
 		const Key &k = keys[i];
@@ -548,11 +552,10 @@ void Ui::Impl::compose(int which, const UiFrameInput &in) {
 	}
 	// Le bandeau du livre de sorts : un clic l'ouvre ou le replie.
 	if (which == kCompSpells) {
-		const bool fr = language == kLangFrench;
 		// Un bouton du jeu, à la taille de ses pixels (doublés ici comme le parchemin).
 		Canvas cv{c.w, kSpellTabH, std::vector<uint8_t>((size_t)c.w * kSpellTabH * 4)};
 		cv.bevel(0, 0, c.w, kSpellTabH, 2, true, spellTabHot ? kLight : kFace);
-		std::string label = latin1(spellsCollapsed ? (fr ? "Livre de sorts  +" : "Spellbook  +") : (fr ? "Livre de sorts  -" : "Spellbook  -"));
+		std::string label = latin1(spellsCollapsed ? tr(language, "Spellbook  +", "Livre de sorts  +", "Zauberbuch  +") : tr(language, "Spellbook  -", "Livre de sorts  -", "Zauberbuch  -"));
 		const int sc = g_font.ok() ? 2 : 1;
 		cv.gcenter(label, 0, c.w, 1, sc, spellTabHot ? kWhite : kGold);
 		for (int y = 0; y < kSpellTabH; y++)
@@ -567,17 +570,18 @@ const int kChooseX[2][2] = {{24, 310}, {330, 616}};
 
 // Premier lancement : vue classique ou mode immersif.
 void Ui::Impl::renderChooser() {
-	const bool fr = language == kLangFrench;
 	Canvas cv{kHelpW, kHelpH, std::vector<uint8_t>((size_t)kHelpW * kHelpH * 4)};
 	cv.window();
-	cv.gcenter(latin1(fr ? "Choisis ta vue" : "Choose your view"), 0, kHelpW, 20, 3, kWhite);
-	static const char *const labels[2][2] = {{"Classic", "Immersive"}, {"Classique", "Immersif"}};
-	static const char *const texts[2][2] = {
+	cv.gcenter(latin1(tr(language, "Choose your view", "Choisis ta vue", "Wähle deine Ansicht")), 0, kHelpW, 20, 3, kWhite);
+	static const char *const labels[3][2] = {{"Classic", "Immersive"}, {"Classique", "Immersif"}, {"Klassisch", "Immersiv"}};
+	static const char *const texts[3][2] = {
 		{"The game screen in a medieval library, in your room (mixed reality) or on an old 486 PC.",
 		 "Walk inside the dungeon rebuilt in 3D around you. The game screen appears when needed (shops, map)."},
 		{"L'écran du jeu dans une bibliothèque médiévale, dans ta pièce (réalité mixte) ou sur un vieux PC 486.",
-		 "Marche dans le donjon reconstruit en 3D autour de toi. L'écran du jeu vient au besoin (boutiques, carte)."}};
-	const int lang = fr ? 1 : 0;
+		 "Marche dans le donjon reconstruit en 3D autour de toi. L'écran du jeu vient au besoin (boutiques, carte)."},
+		{"Der Spielbildschirm in einer mittelalterlichen Bibliothek, in deinem Zimmer (Mixed Reality) oder auf einem alten 486er-PC.",
+		 "Geh durch den Dungeon, in 3D um dich herum nachgebaut. Der Spielbildschirm erscheint bei Bedarf (Läden, Karte)."}};
+	const int lang = language == kLangFrench ? 1 : language == kLangGerman ? 2 : 0;
 	for (int b = 0; b < 2; b++) {
 		int x0 = kChooseX[b][0], x1 = kChooseX[b][1];
 		cv.bevel(x0, kChooseY0, x1, kChooseY1, 3, true);
@@ -589,8 +593,9 @@ void Ui::Impl::renderChooser() {
 		}
 	}
 	int y = 350;
-	for (const std::string &l : Canvas::wrap(latin1(fr ? "Tu pourras changer plus tard : la disquette sur ta main gauche ouvre le menu du jeu, puis \"Réglages VR\"."
-	                                                   : "You can change this later: the floppy on your left hand opens the game menu, then \"VR controls\"."),
+	for (const std::string &l : Canvas::wrap(latin1(tr(language, "You can change this later: the floppy on your left hand opens the game menu, then \"VR controls\".",
+	                                                   "Tu pourras changer plus tard : la disquette sur ta main gauche ouvre le menu du jeu, puis \"Réglages VR\".",
+	                                                   "Du kannst das später ändern: Die Diskette an deiner linken Hand öffnet das Spielmenü, dann \"VR-Optionen\".")),
 	                                         kHelpW - 48, 2)) {
 		cv.gcenter(l, 0, kHelpW, y, 2, kGold);
 		y += 24;
@@ -660,7 +665,37 @@ void Ui::Impl::renderHelp() {
 		"Cliquer ce panneau pour le fermer.",
 		nullptr,
 	};
-	const char *const *lines = language == kLangFrench ? french : english;
+	static const char *const german[] = {
+		"#CONTROLLER UND TASTEN",
+		"",
+		"#Überall",
+		"Zielen + Abzug ........... Linksklick",
+		"Zielen + Griff, oder X ... Rechtsklick (trinken, benutzen)",
+		"Linker Stick ............. gehen, wohin man schaut",
+		"Rechter Stick (Seiten) ... drehen",
+		"Y ........................ Karte",
+		"Menütaste (links) ........ speichern, laden, beenden",
+		"Diskette (linke Hand) .... Spielmenü, VR-Optionen",
+		"",
+		"#Kampf, im Dungeon",
+		"A ........................ angreifen (gerahmte Figur)",
+		"B ........................ ihre Magie, dann Zauber zielen",
+		"Rechter Stick (auf/ab) ... Figur wechseln",
+		"Trank trinken: ihn zielen und X drücken",
+		"",
+		"#Menüs und Zwischensequenzen",
+		"A : Eingabe     B : Esc (überspringen)",
+		"",
+		"#Fenster und Bildschirm",
+		"Messingleiste + Abzug .... verschieben",
+		"Ecke + Abzug gehalten .... vergrößern, verkleinern",
+		"Rechter Stick klicken .... alles vor dir zentrieren",
+		"Linker Stick klicken ..... Ansicht: Bild, Fenster, 486er",
+		"",
+		"Dieses Feld anklicken, um es zu schließen.",
+		nullptr,
+	};
+	const char *const *lines = language == kLangFrench ? french : language == kLangGerman ? german : english;
 	Canvas cv{kHelpW, kHelpH, std::vector<uint8_t>((size_t)kHelpW * kHelpH * 4)};
 	cv.window();
 	// « bouton .... action » (ou deux espaces) : deux colonnes, l'écriture du jeu n'ayant pas des
@@ -764,19 +799,18 @@ void Ui::Impl::renderGear() {
 }
 
 void Ui::Impl::renderMenu() {
-	const bool fr = language == kLangFrench;
 	// Comme le menu des options du jeu : le nom du réglage à gauche, sa valeur sur un bouton à droite ;
 	// dessous, deux grands boutons.
 	Canvas cv{kMenuW, kMenuH, std::vector<uint8_t>((size_t)kMenuW * kMenuH * 4)};
 	cv.window();
-	static const char *const modes[2][3] = {{"Immersive", "Classic", "Mixed reality"}, {"Immersif", "Classique", "Réalité mixte"}};
-	static const char *const views[2][3] = {{"Big screen", "Windows", "486 PC"}, {"Grand écran", "Fenêtres", "PC 486"}};
-	const int lg = fr ? 1 : 0, mode = dungeonMode ? 0 : vrMode, view = classicView < 0 || classicView > 2 ? 0 : classicView;
-	const char *names[2] = {fr ? "Mode VR" : "VR mode", mode == 0 ? (fr ? "Écran du jeu" : "Game screen") : (fr ? "Vue (L3)" : "View (L3)")};
+	static const char *const modes[3][3] = {{"Immersive", "Classic", "Mixed reality"}, {"Immersif", "Classique", "Réalité mixte"}, {"Immersiv", "Klassisch", "Mixed Reality"}};
+	static const char *const views[3][3] = {{"Big screen", "Windows", "486 PC"}, {"Grand écran", "Fenêtres", "PC 486"}, {"Großbild", "Fenster", "486er-PC"}};
+	const int L = language, lg = L == kLangFrench ? 1 : L == kLangGerman ? 2 : 0, mode = dungeonMode ? 0 : vrMode, view = classicView < 0 || classicView > 2 ? 0 : classicView;
+	const char *names[2] = {tr(L, "VR mode", "Mode VR", "VR-Modus"), mode == 0 ? tr(L, "Game screen", "Écran du jeu", "Spielbild") : tr(L, "View (L3)", "Vue (L3)", "Ansicht (L3)")};
 	const char *values[2] = {modes[lg][mode < 0 || mode > 2 ? 1 : mode],
-	                         mode == 0 ? (dungeonMode == 2 ? (fr ? "Toujours" : "Always") : (fr ? "Au besoin" : "If needed")) : views[lg][view]};
+	                         mode == 0 ? (dungeonMode == 2 ? tr(L, "Always", "Toujours", "Immer") : tr(L, "If needed", "Au besoin", "Bei Bedarf")) : views[lg][view]};
 	const int split = 196, th = Canvas::textH(2);
-	cv.gcenter(latin1(fr ? "Réglages VR" : "VR controls"), 0, kMenuW, (kMenuRowH - th) / 2 + 2, 2, kWhite);
+	cv.gcenter(latin1(tr(L, "VR controls", "Réglages VR", "VR-Optionen")), 0, kMenuW, (kMenuRowH - th) / 2 + 2, 2, kWhite);
 	for (int i = 1; i < kMenuRows; i++) {
 		const int y0 = i * kMenuRowH, by0 = y0 + 5, by1 = y0 + kMenuRowH - 5, ty = (by0 + by1 - th) / 2;
 		if (i <= 2) {
@@ -785,7 +819,7 @@ void Ui::Impl::renderMenu() {
 			cv.bevel(split, by0, kMenuW - 12, by1, 2, true);
 			cv.gcenter(v, split, kMenuW - 12, ty, Canvas::fit(v, kMenuW - 24 - split, 2), kGold);
 		} else {
-			const std::string l = latin1(i == 3 ? (fr ? "Manettes et boutons" : "Controller mapping") : (fr ? "Fermer" : "Close"));
+			const std::string l = latin1(i == 3 ? tr(L, "Controller mapping", "Manettes et boutons", "Steuerung und Tasten") : tr(L, "Close", "Fermer", "Schließen"));
 			cv.bevel(12, by0, kMenuW - 12, by1, 2, true);
 			cv.gcenter(l, 12, kMenuW - 12, ty, 2, kGold);
 		}
@@ -799,20 +833,20 @@ void Ui::Impl::renderMenu() {
 const int kNoticeW = 480, kNoticeH = 200;
 
 void Ui::Impl::renderNotice() {
-	const bool fr = language == kLangFrench;
 	Canvas cv{kNoticeW, kNoticeH, std::vector<uint8_t>((size_t)kNoticeW * kNoticeH * 4)};
 	cv.window();
-	cv.gcenter(latin1(fr ? "Changer de vue" : "Change the view"), 0, kNoticeW, 14, 2, kWhite);
+	cv.gcenter(latin1(tr(language, "Change the view", "Changer de vue", "Ansicht wechseln")), 0, kNoticeW, 14, 2, kWhite);
 	cv.rect(12, 34, kNoticeW - 12, 35, kDark);
 	cv.rect(12, 35, kNoticeW - 12, 36, kLight);
 	int y = 48;
-	for (const std::string &l : Canvas::wrap(latin1(fr ? "Clique sur le joystick gauche (L3) pour passer du grand écran aux fenêtres, puis au PC 486."
-	                                                   : "Click the left stick (L3) to go from the big screen to the windows, then to the 486 PC."),
+	for (const std::string &l : Canvas::wrap(latin1(tr(language, "Click the left stick (L3) to go from the big screen to the windows, then to the 486 PC.",
+	                                                   "Clique sur le joystick gauche (L3) pour passer du grand écran aux fenêtres, puis au PC 486.",
+	                                                   "Klicke auf den linken Stick (L3), um vom Großbild zu den Fenstern und dann zum 486er-PC zu wechseln.")),
 	                                         kNoticeW - 40, 2)) {
 		cv.gcenter(l, 0, kNoticeW, y, 2, kGold);
 		y += 20;
 	}
-	cv.gcenter(latin1(fr ? "Aussi dans le menu du jeu, Réglages VR." : "Also in the game menu, VR controls."), 0, kNoticeW, y + 6, 2, kPale);
+	cv.gcenter(latin1(tr(language, "Also in the game menu, VR controls.", "Aussi dans le menu du jeu, Réglages VR.", "Auch im Spielmenü, VR-Optionen.")), 0, kNoticeW, y + 6, 2, kPale);
 	cv.bevel(kNoticeW / 2 - 50, kNoticeH - 42, kNoticeW / 2 + 50, kNoticeH - 12, 2, true);
 	cv.gcenter("OK", kNoticeW / 2 - 50, kNoticeW / 2 + 50, kNoticeH - 36, 2, kGold);
 	upload(noticeTex, cv.px, kNoticeW, kNoticeH, "rappel");
@@ -820,7 +854,6 @@ void Ui::Impl::renderNotice() {
 }
 
 void Ui::Impl::renderHint() {
-	const bool fr = language == kLangFrench;
 	Canvas cv{kHintW, kHintH, std::vector<uint8_t>((size_t)kHintW * kHintH * 4)};
 	cv.window();
 	// La disquette du poignet, à gauche
@@ -834,8 +867,8 @@ void Ui::Impl::renderHint() {
 				const int px = 16 + x * 3 - (pass ? 0 : 2), py = (kHintH - 48) / 2 + y * 3 + (pass ? 0 : 2);
 				cv.rect(px, py, px + 3, py + 3, col);
 			}
-	const std::string l1 = latin1(fr ? "Regarde ta main gauche :" : "Look at your left hand:");
-	const std::string l2 = latin1(fr ? "la disquette ouvre le menu du jeu." : "the floppy opens the game menu.");
+	const std::string l1 = latin1(tr(language, "Look at your left hand:", "Regarde ta main gauche :", "Schau auf deine linke Hand:"));
+	const std::string l2 = latin1(tr(language, "the floppy opens the game menu.", "la disquette ouvre le menu du jeu.", "die Diskette öffnet das Spielmenü."));
 	cv.gtext(l1, 80, 18, Canvas::fit(l1, kHintW - 92, 2), kWhite);
 	cv.gtext(l2, 80, 46, Canvas::fit(l2, kHintW - 92, 2), kGold);
 	upload(hintTex, cv.px, kHintW, kHintH, "invitation");

@@ -1,5 +1,7 @@
 # Scenery and pictures
 
+**English** · [Français](fr/Scenery-and-pictures.md) · [Deutsch](de/Scenery-and-pictures.md)
+
 Besides the immersive mode (the 3D dungeon only), "VR controls" offers two places:
 
 - **Classic**: a medieval library, a closed room with a fireplace, a window, shelves, paintings, banners and relics on pedestals. The view through the window, the light, a painting, the banners and the ambience change with the game area.

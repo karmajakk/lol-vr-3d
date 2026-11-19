@@ -32,6 +32,7 @@
 
 #include <aaudio/AAudio.h>
 #include <android/asset_manager.h>
+#include <android/configuration.h>
 #include <android/log.h>
 #include <android/native_activity.h>
 #include <android_native_app_glue.h>
@@ -964,30 +965,43 @@ void showMissingFilesMessage(App &app) {
 	size_t pos = shortPath.find("/Android/");
 	if (pos != std::string::npos)
 		shortPath = shortPath.substr(pos + 1);
-	std::string body = app.language == lolvr::kLangFrench ?
-		"Les fichiers du jeu sont introuvables.\n"
-		"\n"
-		"1. Branchez le casque à votre ordinateur.\n"
-		"2. Copiez tout le contenu du CD de Lands of Lore\n"
-		"   (les fichiers .PAK, dont GENERAL.PAK) dans ce\n"
-		"   dossier du casque :\n"
-		"\n"
-		"   " + shortPath + "\n"
-		"\n"
-		"Le jeu démarrera tout seul dès que les fichiers\n"
-		"seront en place. (Langue : engrenage au poignet gauche.)"
-		:
-		"The game files were not found.\n"
-		"\n"
-		"1. Connect the headset to your computer.\n"
-		"2. Copy the whole content of the Lands of Lore CD\n"
-		"   (the .PAK files, including GENERAL.PAK) into\n"
-		"   this folder of the headset:\n"
-		"\n"
-		"   " + shortPath + "\n"
-		"\n"
-		"The game starts by itself as soon as the files\n"
-		"are in place. (Language: gear on your left wrist.)";
+	std::string body;
+	if (app.language == lolvr::kLangFrench)
+		body = "Les fichiers du jeu sont introuvables.\n"
+		       "\n"
+		       "1. Branchez le casque à votre ordinateur.\n"
+		       "2. Copiez tout le contenu du CD de Lands of Lore\n"
+		       "   (les fichiers .PAK, dont GENERAL.PAK) dans ce\n"
+		       "   dossier du casque :\n"
+		       "\n"
+		       "   " + shortPath + "\n"
+		       "\n"
+		       "Le jeu démarrera tout seul dès que les fichiers\n"
+		       "seront en place.";
+	else if (app.language == lolvr::kLangGerman)
+		body = "Die Spieldateien wurden nicht gefunden.\n"
+		       "\n"
+		       "1. Verbinde das Headset mit deinem Computer.\n"
+		       "2. Kopiere den ganzen Inhalt der Lands-of-Lore-CD\n"
+		       "   (die .PAK-Dateien, auch GENERAL.PAK) in diesen\n"
+		       "   Ordner des Headsets:\n"
+		       "\n"
+		       "   " + shortPath + "\n"
+		       "\n"
+		       "Das Spiel startet von selbst, sobald die Dateien\n"
+		       "da sind.";
+	else
+		body = "The game files were not found.\n"
+		       "\n"
+		       "1. Connect the headset to your computer.\n"
+		       "2. Copy the whole content of the Lands of Lore CD\n"
+		       "   (the .PAK files, including GENERAL.PAK) into\n"
+		       "   this folder of the headset:\n"
+		       "\n"
+		       "   " + shortPath + "\n"
+		       "\n"
+		       "The game starts by itself as soon as the files\n"
+		       "are in place.";
 	lolvr::renderMessage(app.frame, "Lands of Lore VR", body.c_str());
 	app.frameDirty = true;
 }
@@ -1010,7 +1024,7 @@ void updateGame(App &app) {
 			cfg.saveDir = app.saveDir;
 			cfg.gameDir = app.gameDir;
 			cfg.log = coreLog;
-			lolvr::renderMessage(app.frame, "Lands of Lore VR", app.language == lolvr::kLangFrench ? "Démarrage du jeu…" : "Starting the game…");
+			lolvr::renderMessage(app.frame, "Lands of Lore VR", app.language == lolvr::kLangFrench ? "Démarrage du jeu…" : app.language == lolvr::kLangGerman ? "Das Spiel startet…" : "Starting the game…");
 			app.frameDirty = true;
 			if (host.start(cfg))
 				app.coreStarted = true;
@@ -1131,7 +1145,7 @@ void loadSettings(App &app, int &environment) {
 				app.fireOn = false; // (plus de bouton pour le feu : il reste éteint)
 		} else if (!strcmp(name, "langue")) {
 			if (sscanf(rest, "%d", &iv) == 1)
-				app.language = iv == 1 ? lolvr::kLangFrench : lolvr::kLangEnglish;
+				app.language = iv == 1 ? lolvr::kLangFrench : iv == 2 ? lolvr::kLangGerman : lolvr::kLangEnglish;
 		} else if (!strcmp(name, "donjon3d")) {
 			if (sscanf(rest, "%d", &iv) == 1)
 				app.dungeonMode = iv >= 0 && iv <= 2 ? iv : 1;
@@ -1447,9 +1461,9 @@ void updateGameEvents(App &app, double now) {
 		app.automapSince = now;
 	app.automapOpen = gs.automapOpen;
 	app.gameMenuOpen = gs.menuOpen;
-	// La langue de l'application suit celle du jeu (son menu des options) ; l'allemand reste en anglais.
+	// La langue de l'application suit celle du jeu (son menu des options).
 	if (gs.gameLang >= 0) {
-		const int lang = gs.gameLang == 1 ? lolvr::kLangFrench : lolvr::kLangEnglish;
+		const int lang = gs.gameLang == 1 ? lolvr::kLangFrench : gs.gameLang == 2 ? lolvr::kLangGerman : lolvr::kLangEnglish;
 		if (lang != app.language) {
 			app.language = lang;
 			app.settingsDirty = true;
@@ -3001,6 +3015,12 @@ void android_main(android_app *androidApp) {
 	extractAssetDir(activity->assetManager, "scummvm/theme", app.systemDir + "/scummvm/theme");
 	extractAssetDir(activity->assetManager, "scummvm/extra", app.systemDir + "/scummvm/extra");
 	LOGI("dossier du jeu : %s", app.gameRoot.c_str());
+	// Au tout premier lancement, la langue du casque ; ensuite celle enregistrée, puis celle du jeu.
+	if (androidApp->config) {
+		char lang[2] = {0, 0};
+		AConfiguration_getLanguage(androidApp->config, lang);
+		app.language = lang[0] == 'f' && lang[1] == 'r' ? lolvr::kLangFrench : lang[0] == 'd' && lang[1] == 'e' ? lolvr::kLangGerman : lolvr::kLangEnglish;
+	}
 	int savedEnvironment = lolvr::kEnvLibrary;
 	loadSettings(app, savedEnvironment);
 	app.startTime = nowSeconds();

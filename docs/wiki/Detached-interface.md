@@ -1,5 +1,7 @@
 # Windows
 
+**English** · [Français](fr/Detached-interface.md) · [Deutsch](de/Detached-interface.md)
+
 While exploring, the game interface is spread over windows you place wherever you like (always in immersive mode; in Classic and Mixed reality with the "Windows" view):
 
 - on the left, the spell scroll, with the message line joined under it; the strip at its top ("Spellbook +/-") folds it away, leaving only the message line, and opens it again to change the spell;

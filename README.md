@@ -1,5 +1,7 @@
 # Lands of Lore VR
 
+**English** · [Français](README.fr.md) · [Deutsch](README.de.md)
+
 *Lands of Lore: The Throne of Chaos* (Westwood, 1993) on Meta Quest 3, standalone, no PC needed.
 The original game runs on [ScummVM](https://www.scummvm.org) and decides everything (combat,
 items, spells, saves). Two ways to play, switched at any time from "VR controls" in the game menu (the floppy on your left wrist):
@@ -38,13 +40,14 @@ Early demo. What works:
   two, L3 switches the view: big screen, windows, 486 PC.
 - Conversations: the game's large text box, with the speaker's portrait, is joined under the game
   screen.
-
 - Monsters and items near the party, drawn by the game itself and always facing you.
-- Clicks in the 3D dungeon: on the wall right in front of the party (door buttons, levers,
-  keyholes) and on the floor in front of you (items).
+- Clicks in the 3D dungeon: on the walls around the party (door buttons, levers, keyholes, bushes,
+  nests) and on the floor in front of you (items).
+- Spell effects are shown in 3D, as the game draws them. The game screen appears by itself for
+  scenes, dialogues, the map and menus.
 
 Not there yet: doors that slide open in 3D (they jump from closed to open), thrown objects in
-flight. Spell effects are shown in 3D, as the game draws them. The game screen appears by itself for scenes, dialogues, the map and menus.
+flight.
 
 Version details: [CHANGELOG.md](CHANGELOG.md).
 
@@ -76,7 +79,7 @@ Same as lol-vr: aim and pull the trigger to click, X (or the grip) for a right c
 potion, use an item), left stick to walk, right stick to turn, A to attack, B for magic, Y for the
 map. Look at your left hand and click the floppy for the game menu; in it, "VR controls" holds the
 headset settings (VR mode, game screen "if needed" or "always" in immersive mode, the view in Classic
-and Mixed reality, controller mapping). The app speaks the language set in the game's options. The
+and Mixed reality, controller mapping). The app speaks the language set in the game's options (English, French or German). The
 keyboard comes up by itself to name a save.
 
 In the dungeon, the party's position is under your feet. You walk where you look: the left stick

@@ -1,5 +1,7 @@
 # Roadmap
 
+**English** · [Français](fr/Roadmap.md) · [Deutsch](de/Roadmap.md)
+
 These are ideas, not promises.
 
 ## Reliability (priority)
