@@ -3,7 +3,7 @@
 ## Code layout
 
 - `app/`: the Quest app (C++, OpenXR, OpenGL ES). `core_host.cpp` runs ScummVM; `main_xr.cpp` handles the headset, controllers, layers and haptics.
-- `app/src/scene.cpp`, `room.cpp`, `props.cpp`, `proctex.cpp`, `ambience.cpp`, `ui.cpp`: rendering, room and props, generated textures, spatial sound, windows, keyboard and wrist menu.
+- `app/src/scene.cpp`, `room.cpp`, `props.cpp`, `proctex.cpp`, `ambience.cpp`, `ui.cpp`: rendering, room and props, generated textures, spatial sound, windows, keyboard, wrist floppy and VR controls.
 - `app/src/dungeon.cpp`, `dungeon_data.cpp`: the immersive mode's 3D dungeon (textures from the engine's own drawings, mesh, sprites).
 - `app/test/`: test benches that run on a PC without a headset.
 - `core/` and `patches/`: ScummVM settings and patches (libretro core limited to Lands of Lore). The first patch adds the absolute VR pointer; the second tells the app the game area, the screen in use (character sheet, menus) and events (hits, sounds); the third publishes the level, the engine's drawings of walls, doors, monsters and items, and the light for the 3D dungeon.

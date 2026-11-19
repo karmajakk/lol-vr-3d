@@ -27,10 +27,8 @@ The **name** tells where each picture goes:
 
 Six pictures at most. A picture with any other name takes the first free spot. The app picks them up a few seconds after you copy them, no restart needed.
 
-**To check**: open the keyboard (wrist menu). Under the keys, two lines tell which pictures are displayed and which files the app sees in the `decor` folder.
-
 These pictures are not provided: like the game files, everyone brings their own.
 
 ## Sound
 
-The game sound comes from the screen: it stays in place when you turn your head. The only ambient sound is the fireplace, off by default (keyboard from the wrist menu, "Fire" button).
+The game sound comes from the screen: it stays in place when you turn your head. There is no ambient sound.

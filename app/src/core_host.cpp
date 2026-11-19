@@ -637,6 +637,7 @@ bool CoreHost::gameState(GameState &out) const {
 	out.automapOpen = (s->reserved[2] & 1) != 0;
 	out.menuOpen = (s->reserved[2] & (2 | 4)) != 0; // menu du jeu, ou menu de ScummVM (jeu en pause)
 	out.nameEntry = (s->reserved[2] & 8) != 0;
+	out.vrMenuSerial = (s->reserved[2] >> 8) & 0xFF;
 	memcpy(out.tileset, s->tileset, sizeof(out.tileset));
 	memcpy(out.sfxName, s->sfxName, sizeof(out.sfxName));
 	out.tileset[sizeof(out.tileset) - 1] = 0;

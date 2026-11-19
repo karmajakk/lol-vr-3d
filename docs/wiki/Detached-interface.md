@@ -3,7 +3,7 @@
 While exploring, the game interface is spread over windows you place wherever you like (always in immersive mode; in the classic view when "Classic screen" is off):
 
 - on the left, the spell scroll, with the message line joined under it; the strip at its top ("Spellbook +/-") folds it away, leaving only the message line, and opens it again to change the spell;
-- on the right, the characters one under the other, the atlas column (lamp, purse) to their right, and under them both a strip with the options (disk) and rest buttons, all in one window;
+- on the right, the characters one under the other, the atlas column (lamp, purse) to their right, and the rest button under the purse, all in one window (the options button, the floppy, is on your left wrist);
 - below, the inventory.
 
 At first they sit around the screen: the pointer moves from one to the other with no offset, so you can pick up an item on the floor and drop it into the inventory. If you aim just beside a window, the pointer snaps to the nearest one.
@@ -14,4 +14,4 @@ During cutscenes, menus, the map and full-width scenes, the whole image comes ba
 
 A **character sheet** is shown in full on the screen, which widens to the right while it's open. The windows stay where they are; the atlas column goes dark, because the sheet uses that part of the image.
 
-The **Reset layout** button of the keyboard (wrist menu) arranges the windows around the screen, wherever it is. To move or resize a window, see [Controls](Controls.md).
+The **Reset layout** button of the keyboard arranges the windows around the screen, wherever it is. To move or resize a window, see [Controls](Controls.md).

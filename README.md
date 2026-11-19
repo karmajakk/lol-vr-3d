@@ -2,7 +2,7 @@
 
 *Lands of Lore: The Throne of Chaos* (Westwood, 1993) on Meta Quest 3, standalone, no PC needed.
 The original game runs on [ScummVM](https://www.scummvm.org) and decides everything (combat,
-items, spells, saves). Two ways to play, switched at any time from the gear on your left wrist:
+items, spells, saves). Two ways to play, switched at any time from "VR controls" in the game menu (the floppy on your left wrist):
 
 - **Immersive mode**: the dungeon rebuilt **in true 3D around you**, at full scale, from the level
   the game has loaded. One view only; the game screen comes up when needed (shops, conversations,
@@ -27,14 +27,14 @@ Early demo. What works:
 - Floor and ceiling rebuilt from the game's own background.
 - The party's moves and turns glide smoothly; doors that open or close update the walls.
 - Everything from lol-vr: the game screen, the detached windows, controllers, keyboard, wrist
-  menu (gear on the left hand). The windows are arranged for the 3D dungeon: on the left the spell
+  floppy (game menu) on the left hand. The windows are arranged for the 3D dungeon: on the left the spell
   scroll with the message line joined under it; on the right the characters one under the other,
-  the atlas column (lamp, purse) beside them and the options and rest buttons below, in one window;
+  the atlas column (lamp, purse) beside them with the rest button under the purse, in one window;
   the inventory below.
 - Shop doors and passages to other regions stay in front of you, like a wall with their picture:
   walk into them and the game screen shows the shop, or the new region appears.
 - Dark places stay dark until you light the lamp.
-- "Immersive mode: on/off" in the wrist menu, to switch to the classic view (library, mixed reality,
+- "Immersive mode: on/off" in "VR controls" (game menu), to switch to the classic view (library, mixed reality,
   486 PC) and back.
 - Conversations: the game's large text box, with the speaker's portrait, is joined under the game
   screen.
@@ -74,9 +74,10 @@ saves there.
 
 Same as lol-vr: aim and pull the trigger to click, X (or the grip) for a right click (drink a
 potion, use an item), left stick to walk, right stick to turn, A to attack, B for magic, Y for the
-map. Look at your left hand and click the gear for the menu (language, immersive mode on/off, game
-screen "if needed" or "always" in immersive mode, classic screen in the classic view, keyboard,
-controller mapping).
+map. Look at your left hand and click the floppy for the game menu; in it, "VR controls" holds the
+headset settings (language, immersive mode on/off, game screen "if needed" or "always" in immersive
+mode, classic screen in the classic view, controller mapping). The keyboard comes up by itself to
+name a save.
 
 In the dungeon, the party's position is under your feet. You walk where you look: the left stick
 points relative to your gaze (forward is where you look, sideways is a side step), and when you

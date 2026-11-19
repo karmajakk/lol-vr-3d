@@ -3,6 +3,19 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.8.0] — Floppy on the wrist, VR controls in the game menu
+
+- The left wrist shows a floppy disk instead of the gear. Clicking it opens the game's own menu
+  (load, save, delete, game and audio controls, exit), as the floppy button of the game does;
+  clicking it again closes the menu. The floppy is gone from the party window.
+- The game menu has a new button, "VR controls" ("Réglages VR" in French), left of "Resume game":
+  it closes the menu and opens the headset settings in front of you (language, immersive mode,
+  game screen or classic screen, controller mapping, close). The keyboard row is gone from it: the
+  keyboard comes up by itself to name a save.
+- The rest button (ZZZ) now sits under the purse, in the atlas column of the party window.
+- The keyboard loses the Fire button (the library's fireplace sound stays off) and the two lines
+  about your scenery pictures under the keys.
+
 ## [0.7.1] — Keyboard for save names
 
 - The keyboard opens by itself when you click a save slot and the game asks for a description, and

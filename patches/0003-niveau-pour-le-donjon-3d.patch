@@ -690,7 +690,7 @@ index 92605cda..627378d4 100644
  
  	// gui specific (processing on _curPage)
 diff --git a/engines/kyra/gui/gui_lol.cpp b/engines/kyra/gui/gui_lol.cpp
-index b2732d26..512f3479 100644
+index b2732d26..4d721a9a 100644
 --- a/engines/kyra/gui/gui_lol.cpp
 +++ b/engines/kyra/gui/gui_lol.cpp
 @@ -2212,7 +2212,7 @@ int GUI_LoL::runMenu(Menu &menu) {
@@ -702,6 +702,15 @@ index b2732d26..512f3479 100644
  	} lolvrMenuFlag;
  	_currentMenu = &menu;
  	_lastMenu = _currentMenu;
+@@ -2369,7 +2369,7 @@ int GUI_LoL::runMenu(Menu &menu) {
+ 			_screen->updateScreen();
+ 		}
+ 
+-		if (_currentMenu == &_mainMenu && !_vm->gameFlags().use16ColorMode) {
++		if (_currentMenu == &_mainMenu && !_vm->gameFlags().use16ColorMode && false) { // lol-vr-3d: "VR controls" sits there
+ 			Screen::FontId f = _screen->setFont(Screen::FID_6_FNT);
+ 			_screen->fprintString("v%s", menu.x + 8, menu.y + menu.height - 12, 204, 0, 8, _vm->_versionString.c_str());
+ 			_screen->setFont(f);
 @@ -2592,6 +2592,12 @@ int GUI_LoL::getInput() {
  	_vm->_mouseX = p.x;
  	_vm->_mouseY = p.y;
@@ -715,3 +724,57 @@ index b2732d26..512f3479 100644
  	if (_currentMenu == &_savenameMenu) {
  		_vm->updateInput();
  
+@@ -2656,6 +2662,11 @@ int GUI_LoL::clickedMainMenu(Button *button) {
+ 	case 0x4005:
+ 		_displayMenu = false;
+ 		break;
++	case 0x8F00:
++		// lol-vr-3d: "VR controls": the menu closes, the headset shows its own settings
++		g_lolvrState.reserved[2] += 0x100;
++		_displayMenu = false;
++		break;
+ 	default:
+ 		break;
+ 	}
+diff --git a/engines/kyra/gui/gui_v1.h b/engines/kyra/gui/gui_v1.h
+index c2821be3..3085bf4d 100644
+--- a/engines/kyra/gui/gui_v1.h
++++ b/engines/kyra/gui/gui_v1.h
+@@ -74,7 +74,7 @@ struct Menu {
+ 	int16 scrollUpButtonX, scrollUpButtonY;
+ 	int16 scrollDownButtonX, scrollDownButtonY;
+ 
+-	MenuItem item[7];
++	MenuItem item[8]; // lol-vr-3d: one more for "VR controls" in the main menu
+ };
+ 
+ class TextDisplayer;
+diff --git a/engines/kyra/resource/staticres_lol.cpp b/engines/kyra/resource/staticres_lol.cpp
+index 00019e93..26a51d5f 100644
+--- a/engines/kyra/resource/staticres_lol.cpp
++++ b/engines/kyra/resource/staticres_lol.cpp
+@@ -474,9 +474,9 @@ void GUI_LoL::initStaticData() {
+ 		GUI_V2_BUTTON(_menuButtons[i], i, 0, 0, 0, 0, 0, 0x4487, 0, 0, 0, 0, 0, 0xFE, 0x01, 0xFE, 0x01, 0xFE, 0x01, 0);
+ 
+ 	if (_vm->gameFlags().isTalkie)
+-		GUI_LOL_MENU(_mainMenu, 9, 0x4000, 0, 7, -1, -1, -1, -1);
++		GUI_LOL_MENU(_mainMenu, 9, 0x4000, 0, 8, -1, -1, -1, -1); // lol-vr-3d: + VR controls
+ 	else
+-		GUI_LOL_MENU(_mainMenu, 17, 0x4000, 0, 6, -1, -1, -1, -1);
++		GUI_LOL_MENU(_mainMenu, 17, 0x4000, 0, 7, -1, -1, -1, -1);
+ 
+ 	int buttonHeight = _vm->gameFlags().lang == Common::Language::ZH_TWN ? 20 : 15;
+ 	int buttonStep = _vm->gameFlags().lang == Common::Language::ZH_TWN ? 21 : 17;
+@@ -494,7 +494,11 @@ void GUI_LoL::initStaticData() {
+ 		row++;
+ 	}
+ 	GUI_LOL_MENU_ITEM(_mainMenu.item[row], 0x4006, 16, titleSkip + 1 + row * buttonStep, 176, buttonHeight, 0, 0); row++;
+-	GUI_LOL_MENU_ITEM(_mainMenu.item[row], 0x4005, 88, titleSkip + 1 + row * buttonStep + 2, 104, buttonHeight, 0, _vm->_keyMap[Common::KEYCODE_ESCAPE]); row++;
++	// lol-vr-3d: "VR controls", left of "Resume game" on its row: the headset's settings
++	GUI_LOL_MENU_ITEM(_mainMenu.item[row], 0x8F00, 16, titleSkip + 1 + row * buttonStep + 2, 68, buttonHeight, 0, 0);
++	_mainMenu.item[row].itemString = _vm->gameFlags().lang == Common::FR_FRA ? "R\x82glages VR" : _vm->gameFlags().lang == Common::DE_DEU ? "VR-Optionen" : "VR controls";
++	row++;
++	GUI_LOL_MENU_ITEM(_mainMenu.item[row], 0x4005, 88, titleSkip + 1 + (row - 1) * buttonStep + 2, 104, buttonHeight, 0, _vm->_keyMap[Common::KEYCODE_ESCAPE]); row++;
+ 
+ 	Button::Callback mainMenuFunctor = BUTTON_FUNCTOR(GUI_LoL, this, &GUI_LoL::clickedMainMenu);
+ 	for (int i = 0; i < _mainMenu.numberOfItems; ++i)

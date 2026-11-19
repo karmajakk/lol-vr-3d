@@ -44,6 +44,7 @@ struct GameState {
 	int characters = 0;       // nombre de personnages du groupe (0 = inconnu)
 	bool menuOpen = false;    // un menu du jeu est affiché
 	bool nameEntry = false;   // le joueur écrit le nom d'une sauvegarde
+	int vrMenuSerial = 0;     // change à chaque clic sur « Réglages VR » dans le menu du jeu
 };
 
 // Un monstre ou un objet près du groupe, dessiné par le moteur en grand dans une image de

@@ -30,7 +30,7 @@ struct UiPlacement {
 const float kSplitViewHeight = 0.54f;
 const float kSplitViewLift = 0.16f;
 
-enum UiAction { kUiActionNone = 0, kUiActionToggleFire, kUiActionToggleDetach, kUiActionResetLayout, kUiActionCloseKeyboard, kUiActionToggleHelp, kUiActionCloseHelp, kUiActionToggleLanguage, kUiActionToggleKeyboard, kUiActionToggleDungeon, kUiActionToggleScreenAlways, kUiActionChooseClassic, kUiActionChooseImmersive };
+enum UiAction { kUiActionNone = 0, kUiActionToggleFire, kUiActionToggleDetach, kUiActionResetLayout, kUiActionCloseKeyboard, kUiActionToggleHelp, kUiActionCloseHelp, kUiActionToggleLanguage, kUiActionToggleKeyboard, kUiActionToggleDungeon, kUiActionToggleScreenAlways, kUiActionChooseClassic, kUiActionChooseImmersive, kUiActionGameMenu };
 
 enum UiLanguage { kLangEnglish = 0, kLangFrench = 1 };
 
@@ -69,7 +69,7 @@ struct UiFrameInput {
 	bool helpOpen = false;
 	// Premier lancement : la fenêtre « vue classique ou immersive » (à la place de l'aide).
 	bool chooserOpen = false;
-	// Menu du poignet : un petit engrenage apparaît sur la main gauche quand on la regarde.
+	// Poignet : une disquette apparaît sur la main gauche quand on la regarde ; elle ouvre le menu du jeu.
 	bool wristValid = false;
 	Vec3 wristPos = {0, 0, 0};
 	Quat wristRot = {0, 0, 0, 1};
@@ -141,6 +141,8 @@ public:
 	bool loadGameFont(const std::string &gameDir);
 	// Disposition par défaut : autour de l'écran tel qu'il est placé à cet instant.
 	void resetLayout(const UiFrameInput &in);
+	// Les réglages VR (choisis dans le menu du jeu) : la fenêtre s'ouvre devant le joueur.
+	void openMenu();
 	// Livre de sorts replié (le bandeau et les messages seulement) ou ouvert.
 	bool spellsCollapsed() const;
 	void setSpellsCollapsed(bool collapsed);

@@ -160,7 +160,7 @@ int main(int argc, char **argv) {
 			LevelSnapshot ls;
 			bool hasL = host.levelSnapshot(ls);
 			if (host.gameState(gs))
-				printf("  état : nom=%d niveau=%d boucle=%u mode=%d menu=%d scène=%d boîte=%d lumière=%d case=%d dir=%d sort=%d/%u\n", (int)gs.nameEntry, gs.level, gs.loopSerial, gs.controlMode, (int)gs.menuOpen, hasL ? (int)ls.sceneBusy : -1, hasL ? (int)ls.textBox : -1, hasL ? ls.light : -1, hasL ? ls.block : -1, hasL ? ls.direction : -1, hasL ? (int)ls.spellBusy : -1, hasL ? ls.spellSerial : 0);
+				printf("  état : vr=%d nom=%d niveau=%d boucle=%u mode=%d menu=%d scène=%d boîte=%d lumière=%d case=%d dir=%d sort=%d/%u\n", gs.vrMenuSerial, (int)gs.nameEntry, gs.level, gs.loopSerial, gs.controlMode, (int)gs.menuOpen, hasL ? (int)ls.sceneBusy : -1, hasL ? (int)ls.textBox : -1, hasL ? ls.light : -1, hasL ? ls.block : -1, hasL ? ls.direction : -1, hasL ? (int)ls.spellBusy : -1, hasL ? ls.spellSerial : 0);
 		} else if (op == "dungeon" || op == "dungeonat") {
 			std::string name;
 			cs >> name;

@@ -497,6 +497,8 @@ struct App {
 	bool splitWanted = false;
 	double splitWantedSince = 0;
 	bool gameStarted = false, automapOpen = false;
+	bool gameMenuOpen = false;   // un menu du jeu est affiché
+	int vrMenuSerial = -1;       // « Réglages VR » dans le menu du jeu (-1 : pas encore lu)
 	// Combat aux boutons : dans le donjon, A attaque et B ouvre la magie du personnage choisi.
 	bool inDungeon = false;
 	int characters = 0, selectedChar = 0;
@@ -1125,7 +1127,7 @@ void loadSettings(App &app, int &environment) {
 			screenIndex++;
 		} else if (!strcmp(name, "feu")) {
 			if (sscanf(rest, "%d", &iv) == 1)
-				app.fireOn = iv != 0;
+				app.fireOn = false; // (plus de bouton pour le feu : il reste éteint)
 		} else if (!strcmp(name, "langue")) {
 			if (sscanf(rest, "%d", &iv) == 1)
 				app.language = iv == 1 ? lolvr::kLangFrench : lolvr::kLangEnglish;
@@ -1422,6 +1424,13 @@ void updateGameEvents(App &app, double now) {
 	if (gs.automapOpen && !app.automapOpen)
 		app.automapSince = now;
 	app.automapOpen = gs.automapOpen;
+	app.gameMenuOpen = gs.menuOpen;
+	// « Réglages VR » choisi dans le menu du jeu : la fenêtre des réglages s'ouvre devant le joueur.
+	if (gs.vrMenuSerial != app.vrMenuSerial) {
+		if (app.vrMenuSerial >= 0)
+			app.ui.openMenu();
+		app.vrMenuSerial = gs.vrMenuSerial;
+	}
 	// Écrire le nom d'une sauvegarde : le clavier vient tout seul, et repart quand c'est fini (s'il
 	// n'était pas déjà ouvert, et si le joueur ne l'a pas fermé entre-temps).
 	if (gs.nameEntry != app.nameEntry) {
@@ -2039,6 +2048,17 @@ void updateUi(App &app, XrTime time, float dt, double now, bool pointer, bool tr
 		app.viewChosen = true;
 		app.chooserOpen = false;
 		pulse(app, kRight, 0.3f, 0.03f);
+		break;
+	case lolvr::kUiActionGameMenu:
+		// La disquette du poignet : le bouton des options du jeu (11..32, 179..199), ou referme le menu.
+		if (app.gameMenuOpen) {
+			typeKey(app, RETROK_ESCAPE, 0, now);
+		} else if (app.gameStarted && (app.inDungeon || app.charSheet)) {
+			app.synthU = 21.5f / 320.0f;
+			app.synthV = 189.0f / 200.0f;
+			app.synthClickUntil = now + 0.16;
+		}
+		pulse(app, kLeft, 0.3f, 0.03f);
 		break;
 	case lolvr::kUiActionToggleKeyboard:
 		app.keyboardOpen = !app.keyboardOpen;

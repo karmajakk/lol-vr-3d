@@ -302,13 +302,13 @@ int main(int argc, char **argv) {
 			ui.update(in, o, tmp);
 		};
 		auto near = [&](float gu, float gv) { return o.pointerValid && o.buttonsToGame && fabsf(o.gu * 320 - gu) < 1.5f && fabsf(o.gv * 200 - gv) < 1.5f; };
-		// À droite (2 personnages : 100 x 154) : portraits à gauche, atlas à droite, boutons dessous.
-		aimIn(0, 16, 53, 100, 154);
+		// À droite (2 personnages : 100 x 148) : portraits à gauche, atlas à droite, le repos sous la bourse.
+		aimIn(0, 16, 53, 100, 148);
 		check(near(233, 160), "à droite : le second personnage");
-		aimIn(0, 84, 100, 100, 154);
+		aimIn(0, 84, 100, 100, 148);
 		check(near(304, 100), "à droite : la colonne de l'atlas, à droite des personnages");
-		aimIn(0, 40, 140, 100, 154);
-		check(near(23, 190), "à droite : dessous, les options et le repos");
+		aimIn(0, 84, 135, 100, 148);
+		check(near(44, 189), "à droite : le repos (ZZZ), sous la bourse");
 		aimAt(panel(1).center);
 		ui.update(in, o, tmp);
 		check(near(201.5f, 189), "fenêtre de l'inventaire");
@@ -504,7 +504,7 @@ int main(int argc, char **argv) {
 			ui.update(in, o, tmp);
 			SceneState::Panel kb = tmp.panels[3];
 			auto keyPos = [&](float col, float row) {
-				return kb.center + kb.right * ((col - 5.5f) / 5.5f * kb.halfW) + kb.up * ((1.0f - 2.0f * row * 40.0f / 284.0f) * kb.halfH);
+				return kb.center + kb.right * ((col - 5.5f) / 5.5f * kb.halfW) + kb.up * ((1.0f - 2.0f * row * 40.0f / 240.0f) * kb.halfH);
 			};
 			auto press = [&](float col, float row) {
 				aimAt(keyPos(col, row));
@@ -522,8 +522,8 @@ int main(int argc, char **argv) {
 			check(k.keyCount == 1 && k.keys[0] == 'a' && k.keyMods[0] == kUiModShift, "clavier : Maj puis a = A");
 			k = press(9.5f, 5.5f);
 			check(k.keyCount == 1 && k.keys[0] == 13, "clavier : Entrée");
-			k = press(1.0f, 0.5f);
-			check(k.action == kUiActionToggleFire, "clavier : bouton du feu");
+			k = press(1.5f, 0.5f);
+			check(k.action == kUiActionToggleDetach, "clavier : bouton des panneaux");
 			in.keyboardOpen = false;
 			// Panneau d'aide : visible, et un clic dessus le ferme
 			in.helpOpen = true;
@@ -576,22 +576,30 @@ int main(int argc, char **argv) {
 			int shown2 = 0, gear = -1;
 			for (int i = 0; i < SceneState::kMaxPanels; i++)
 				if (tmp.panels[i].visible) { shown2++; gear = i; }
-			check(shown2 == shown + 1, "poignet : l'engrenage apparaît (et l'invitation s'efface) quand on regarde la main gauche");
+			check(shown2 == shown + 1, "poignet : la disquette apparaît (et l'invitation s'efface) quand on regarde la main gauche");
 			Vec3 gearPos = tmp.panels[gear].center;
 			in.tip = {0.25f, 0.95f, -0.30f};
 			aimAt(gearPos);
 			in.triggerDown = in.triggerPressed = true;
 			ui.update(in, o, tmp);
-			check(o.gearMenuOpened, "poignet : ouvrir le menu est signalé (l'invitation ne reviendra plus)");
+			check(o.gearMenuOpened && o.action == kUiActionGameMenu, "poignet : la disquette ouvre le menu du jeu (l'invitation ne reviendra plus)");
 			in.gearHint = false;
 			in.triggerDown = in.triggerPressed = false;
 			ui.update(in, o, tmp);
-			int shown3 = 0, menu = -1;
+			int shown3 = 0;
+			for (int i = 0; i < SceneState::kMaxPanels; i++) shown3 += tmp.panels[i].visible ? 1 : 0;
+			check(shown3 == shown2, "poignet : la disquette n'ouvre pas la fenêtre des réglages VR");
+			// « Réglages VR » choisi dans le menu du jeu : la fenêtre s'ouvre devant le joueur
+			in.headDir = {0, 0, -1};
+			ui.openMenu();
+			ui.update(in, o, tmp);
+			int shown4 = 0, menu = -1;
 			for (int i = 0; i < SceneState::kMaxPanels; i++)
-				if (tmp.panels[i].visible) { shown3++; menu = i; }
-			check(o.action == kUiActionNone && shown3 == shown2 + 1, "poignet : un clic sur l'engrenage ouvre le menu");
+				if (tmp.panels[i].visible) { shown4++; menu = i; }
 			SceneState::Panel m = tmp.panels[menu];
-			auto row = [&](int r) { return m.center + m.up * ((1.0f - 2.0f * (r + 0.5f) / 7.0f) * m.halfH); };
+			check(shown4 >= shown + 1 && m.center.z < in.headPos.z - 0.4f && fabsf(m.center.x - in.headPos.x) < 0.05f, "réglages VR : la fenêtre s'ouvre devant le joueur");
+			auto row = [&](int r) { return m.center + m.up * ((1.0f - 2.0f * (r + 0.5f) / 6.0f) * m.halfH); };
+			in.tip = in.headPos + Vec3{0.15f, -0.15f, 0.0f};
 			aimAt(row(1));
 			in.triggerDown = in.triggerPressed = true;
 			ui.update(in, o, tmp);
@@ -621,20 +629,19 @@ int main(int argc, char **argv) {
 			aimAt(row(4));
 			in.triggerDown = in.triggerPressed = true;
 			ui.update(in, o, tmp);
-			check(o.action == kUiActionToggleKeyboard, "menu : quatrième ligne, le clavier (et le menu se ferme)");
+			check(o.action == kUiActionToggleHelp, "menu : quatrième ligne, les manettes (et le menu se ferme)");
 			in.triggerDown = in.triggerPressed = false;
 			ui.update(in, o, tmp);
-			// Rouvrir le menu pour la ligne des manettes
-			in.headDir = normalize(in.wristPos + Vec3{0, 0.075f, 0.06f} - in.headPos);
-			aimAt(gearPos);
-			in.triggerDown = in.triggerPressed = true;
-			ui.update(in, o, tmp);
-			in.triggerDown = in.triggerPressed = false;
+			ui.openMenu();
 			ui.update(in, o, tmp);
 			aimAt(row(5));
 			in.triggerDown = in.triggerPressed = true;
 			ui.update(in, o, tmp);
-			check(o.action == kUiActionToggleHelp, "menu : cinquième ligne, les manettes");
+			in.triggerDown = in.triggerPressed = false;
+			ui.update(in, o, tmp);
+			int shown5 = 0;
+			for (int i = 0; i < SceneState::kMaxPanels; i++) shown5 += tmp.panels[i].visible ? 1 : 0;
+			check(o.action == kUiActionNone && shown5 == shown4 - 1, "menu : cinquième ligne, fermer");
 			in.triggerDown = in.triggerPressed = false;
 			in.wristValid = false;
 			in.keyboardOpen = false;
@@ -658,6 +665,7 @@ int main(int argc, char **argv) {
 		// Avec LOLVR_UI_DUMP : les fenêtres redessinées en français (les images remplacent les anglaises).
 		if (getenv("LOLVR_UI_DUMP")) {
 			ui.setLanguage(kLangFrench);
+			ui.openMenu();
 			in.split = true;
 			in.chooserOpen = true;
 			ui.update(in, o, tmp);

@@ -36,10 +36,10 @@ struct Source {
 // Clavier : grille de 11 colonnes sur 6 rangées.
 const int kCellW = 46, kCellH = 40, kCols = 11, kRows = 6;
 // Menu du poignet : engrenage et petit menu
-const int kGearSize = 64, kHintW = 440, kHintH = 84, kMenuW = 360, kMenuRowH = 44, kMenuRows = 7, kMenuH = kMenuRowH * kMenuRows;
+const int kGearSize = 64, kHintW = 440, kHintH = 84, kMenuW = 360, kMenuRowH = 44, kMenuRows = 6, kMenuH = kMenuRowH * kMenuRows;
 // Panneau d'aide
 const int kHelpW = 640, kHelpH = 470;
-const int kInfoH = 44; // deux lignes d'information sous les touches
+const int kInfoH = 0; // (plus de lignes d'information sous les touches)
 const int kKbW = kCellW * kCols, kKbH = kCellH * kRows + kInfoH;
 
 const Source kSources[kUiPanelCount] = {
@@ -329,6 +329,7 @@ struct Ui::Impl {
 	void upload(GLuint &tex, const std::vector<uint8_t> &px, int w, int h, const char *name = "fenetre");
 	// Menu du poignet : ouvert, il reste où il est apparu.
 	bool menuOpen = false;
+	bool menuAhead = false; // à placer devant le joueur à la prochaine image
 	Vec3 menuPos = {0, 0, 0}, menuRight = {1, 0, 0}, menuUp = {0, 1, 0};
 	int menuHot = -1;
 	// Colonne du groupe recomposée
@@ -352,10 +353,9 @@ struct Ui::Impl {
 
 void Ui::Impl::buildKeys() {
 	keys.clear();
-	keys.push_back({0, 0, 3, "", "", 0, kUiActionToggleFire});
-	keys.push_back({3, 0, 3, "", "", 0, kUiActionToggleDetach});
-	keys.push_back({6, 0, 3, "", "", 0, kUiActionResetLayout});
-	keys.push_back({9, 0, 2, "", "", 0, kUiActionCloseKeyboard});
+	keys.push_back({0, 0, 4, "", "", 0, kUiActionToggleDetach});
+	keys.push_back({4, 0, 4, "", "", 0, kUiActionResetLayout});
+	keys.push_back({8, 0, 3, "", "", 0, kUiActionCloseKeyboard});
 	const char *digits = "1234567890";
 	for (int i = 0; i < 10; i++)
 		keys.push_back({i, 1, 1, std::string(1, digits[i]), "", (unsigned)digits[i], kUiActionNone});
@@ -427,10 +427,6 @@ void Ui::Impl::renderKeyboard() {
 		int tw = Canvas::textW(label, scale), th = Canvas::textH(scale);
 		cv.gtext(label, (x0 + x1 - tw) / 2 + (lit ? 1 : 0), (y0 + y1 - th) / 2 + (lit ? 1 : 0), scale, col);
 	}
-	// Les deux lignes d'information, à la même taille
-	const int infoScale = std::min(Canvas::fit(info[0], kKbW - 20, 2), Canvas::fit(info[1], kKbW - 20, 2));
-	for (int l = 0; l < 2; l++)
-		cv.gtext(info[l], 10, kCellH * kRows + 3 + l * (infoScale == 1 ? 14 : 20), infoScale, kPale);
 	upload(kbTex, cv.px, kKbW, kKbH, "clavier");
 	kbDirty = false;
 }
@@ -478,7 +474,7 @@ void Ui::Impl::upload(GLuint &tex, const std::vector<uint8_t> &px, int w, int h,
 
 // Les deux fenêtres recomposées :
 //  - à droite, les personnages l'un sous l'autre, à leur droite la colonne de l'atlas (lampe,
-//    bourse) ; dessous, dans un bandeau à part, les boutons des options et du repos ;
+//    bourse), et sous la bourse le bouton du repos ;
 //  - à gauche, le parchemin des sorts (pixels doublés), et dessous la ligne de messages, à sa largeur.
 void Ui::Impl::compose(int which, const UiFrameInput &in) {
 	Composite &c = comp[which];
@@ -497,11 +493,10 @@ void Ui::Impl::compose(int which, const UiFrameInput &in) {
 		for (int i = 0; i < n; i++)
 			c.pieces.push_back({0, i * 36, 66, 34, in.portraitX[i], 143, 66, 34});
 		c.pieces.push_back({68, 0, 32, 122, 288, 0, 32, 122});
-		int top = n * 36 > 122 ? n * 36 : 122;
-		band = top + 2;
-		c.pieces.push_back({27, band + 4, 45, 22, 10, 178, 45, 22});
+		// Le repos (ZZZ) sous la bourse ; la disquette, elle, est sur la main gauche.
+		c.pieces.push_back({73, 124, 22, 22, 33, 178, 22, 22});
 		c.w = 100;
-		c.h = band + 30;
+		c.h = n * 36 > 148 ? n * 36 : 148;
 	} else {
 		// Le bandeau (dessiné plus bas), puis le parchemin s'il est ouvert, puis les messages.
 		int y = kSpellTabH;
@@ -589,8 +584,8 @@ void Ui::Impl::renderChooser() {
 		}
 	}
 	int y = 350;
-	for (const std::string &l : Canvas::wrap(latin1(fr ? "Tu pourras changer plus tard : regarde ta main gauche, l'engrenage ouvre le menu des réglages."
-	                                                   : "You can change this later: look at your left hand, the gear opens the settings menu."),
+	for (const std::string &l : Canvas::wrap(latin1(fr ? "Tu pourras changer plus tard : la disquette sur ta main gauche ouvre le menu du jeu, puis \"Réglages VR\"."
+	                                                   : "You can change this later: the floppy on your left hand opens the game menu, then \"VR controls\"."),
 	                                         kHelpW - 48, 2)) {
 		cv.gcenter(l, 0, kHelpW, y, 2, kGold);
 		y += 24;
@@ -610,7 +605,7 @@ void Ui::Impl::renderHelp() {
 		"Right stick (sideways) ... turn",
 		"Y ........................ map",
 		"Menu button (left) ....... save, load, quit",
-		"Gear on the left wrist ... settings, keyboard, help",
+		"Floppy on the left wrist .. game menu, VR controls",
 		"",
 		"#Combat, in the dungeon",
 		"A ........................ attack with the framed character",
@@ -640,7 +635,7 @@ void Ui::Impl::renderHelp() {
 		"Joystick droit (côtés) ... tourner",
 		"Y ........................ carte",
 		"Bouton menu (gauche) ..... sauvegarder, charger, quitter",
-		"Engrenage au poignet gauche : réglages, clavier, aide",
+		"Disquette (main gauche) .. menu du jeu, réglages VR",
 		"",
 		"#Combat, dans le donjon",
 		"A ........................ attaquer (personnage encadré)",
@@ -722,26 +717,45 @@ void Ui::Impl::renderHelp() {
 }
 
 // Un engrenage de laiton sur fond sombre.
+// Une disquette, comme le bouton des options du jeu : un bouton de terre cuite, la disquette bleu
+// nuit à étiquette lavande, ombre à gauche et dessous.
+static const char *const kFloppy[16] = {
+	"................",
+	".BBBBBBBBBBBBB..",
+	".BLLLLLLLLLLLBB.",
+	".BLWWWWWWWWWLBBB",
+	".BLLLLLLLLLLLBBB",
+	".BLWWWWWWWWWLBBB",
+	".BLLLLLLLLLLLBBB",
+	".BBBBBBBBBBBBBBB",
+	".BBBBBBBBBBBBBBB",
+	".BBBSSSSSSSSBBBB",
+	".BBBSSSSDDSSBBBB",
+	".BBBSSSSDDSSBBBB",
+	".BBBSSSSDDSSBBBB",
+	".BBBSSSSSSSSBBBB",
+	".BBBBBBBBBBBBBBB",
+	"................",
+};
+
 void Ui::Impl::renderGear() {
-	const int N = kGearSize;
-	std::vector<uint8_t> px((size_t)N * N * 4);
-	for (int y = 0; y < N; y++)
-		for (int x = 0; x < N; x++) {
-			float dx = (float)x + 0.5f - N * 0.5f, dy = (float)y + 0.5f - N * 0.5f;
-			float r = sqrtf(dx * dx + dy * dy), a = atan2f(dy, dx);
-			float outer = cosf(a * 8.0f) > 0.0f ? 27.0f : 21.0f;
-			uint8_t *p = &px[((size_t)y * N + x) * 4];
-			bool metal = r < outer && r > 9.0f;
-			float shade = 0.75f + 0.25f * (-dy / (N * 0.5f));
-			// Sur la terre cuite des fenêtres, bord en relief
-			const bool edge = x < 2 || y < 2 || x >= N - 2 || y >= N - 2;
-			const Rgb bg = !edge ? kFace : (x < 2 || y < 2) && x < N - 2 && y < N - 2 ? kLight : kDark;
-			p[0] = metal ? (uint8_t)(230 * shade) : bg.r;
-			p[1] = metal ? (uint8_t)(170 * shade) : bg.g;
-			p[2] = metal ? (uint8_t)(70 * shade) : bg.b;
-			p[3] = 255;
-		}
-	upload(gearTex, px, N, N, "engrenage");
+	const int N = kGearSize, S = 3, ox = (N - 16 * S) / 2 + 1, oy = (N - 16 * S) / 2;
+	Canvas cv{N, N, std::vector<uint8_t>((size_t)N * N * 4)};
+	cv.bevel(0, 0, N, N, 3, true);
+	for (int pass = 0; pass < 2; pass++)
+		for (int y = 0; y < 16; y++)
+			for (int x = 0; x < 16; x++) {
+				const char c = kFloppy[y][x];
+				if (c == '.')
+					continue;
+				Rgb col = kDark; // ombre
+				if (pass) {
+					col = c == 'L' ? Rgb{184, 176, 216} : c == 'W' ? Rgb{150, 142, 190} : c == 'S' ? Rgb{168, 168, 184} : c == 'D' ? Rgb{48, 48, 64} : Rgb{56, 60, 104};
+				}
+				const int px = ox + x * S - (pass ? 0 : 2), py = oy + y * S + (pass ? 0 : 2);
+				cv.rect(px, py, px + S, py + S, col);
+			}
+	upload(gearTex, cv.px, N, N, "disquette");
 }
 
 void Ui::Impl::renderMenu() {
@@ -750,25 +764,23 @@ void Ui::Impl::renderMenu() {
 	// dessous, deux grands boutons.
 	Canvas cv{kMenuW, kMenuH, std::vector<uint8_t>((size_t)kMenuW * kMenuH * 4)};
 	cv.window();
-	const char *names[4] = {fr ? "Langue" : "Language", fr ? "Mode immersif" : "Immersive mode",
-	                        dungeonMode ? (fr ? "Écran du jeu" : "Game screen") : (fr ? "Écran classique" : "Classic screen"),
-	                        fr ? "Clavier" : "Keyboard"};
+	const char *names[3] = {fr ? "Langue" : "Language", fr ? "Mode immersif" : "Immersive mode",
+	                        dungeonMode ? (fr ? "Écran du jeu" : "Game screen") : (fr ? "Écran classique" : "Classic screen")};
 	const char *values[4] = {fr ? "Français" : "English", dungeonMode ? (fr ? "Oui" : "On") : (fr ? "Non" : "Off"),
 	                         // Mode immersif : l'écran du jeu au besoin ou toujours ; vue classique : l'écran entier ou en fenêtres.
 	                         dungeonMode ? (dungeonMode == 2 ? (fr ? "Toujours" : "Always") : (fr ? "Au besoin" : "If needed"))
-	                                     : (detached ? (fr ? "Non" : "Off") : (fr ? "Oui" : "On")),
-	                         menuKeyboard ? (fr ? "Affiché" : "Shown") : (fr ? "Caché" : "Hidden")};
+	                                     : (detached ? (fr ? "Non" : "Off") : (fr ? "Oui" : "On"))};
 	const int split = 196, th = Canvas::textH(2);
-	cv.gcenter("Lands of Lore VR", 0, kMenuW, (kMenuRowH - th) / 2 + 2, 2, kWhite);
+	cv.gcenter(latin1(fr ? "Réglages VR" : "VR controls"), 0, kMenuW, (kMenuRowH - th) / 2 + 2, 2, kWhite);
 	for (int i = 1; i < kMenuRows; i++) {
 		const int y0 = i * kMenuRowH, by0 = y0 + 5, by1 = y0 + kMenuRowH - 5, ty = (by0 + by1 - th) / 2;
-		if (i <= 4) {
+		if (i <= 3) {
 			const std::string n = latin1(names[i - 1]), v = latin1(values[i - 1]);
 			cv.gtext(n, split - 10 - Canvas::textW(n, Canvas::fit(n, split - 24, 2)), ty, Canvas::fit(n, split - 24, 2), kGold);
 			cv.bevel(split, by0, kMenuW - 12, by1, 2, true);
 			cv.gcenter(v, split, kMenuW - 12, ty, Canvas::fit(v, kMenuW - 24 - split, 2), kGold);
 		} else {
-			const std::string l = latin1(i == 5 ? (fr ? "Manettes et boutons" : "Controller mapping") : (fr ? "Fermer" : "Close"));
+			const std::string l = latin1(i == 4 ? (fr ? "Manettes et boutons" : "Controller mapping") : (fr ? "Fermer" : "Close"));
 			cv.bevel(12, by0, kMenuW - 12, by1, 2, true);
 			cv.gcenter(l, 12, kMenuW - 12, ty, 2, kGold);
 		}
@@ -782,19 +794,19 @@ void Ui::Impl::renderHint() {
 	const bool fr = language == kLangFrench;
 	Canvas cv{kHintW, kHintH, std::vector<uint8_t>((size_t)kHintW * kHintH * 4)};
 	cv.window();
-	// Petit engrenage à gauche
-	for (int y = 0; y < kHintH; y++)
-		for (int x = 0; x < 72; x++) {
-			float dx = (float)x + 0.5f - 38.0f, dy = (float)y + 0.5f - kHintH * 0.5f;
-			float r = sqrtf(dx * dx + dy * dy), a = atan2f(dy, dx);
-			float outer = cosf(a * 8.0f) > 0.0f ? 24.0f : 18.0f;
-			if (r < outer && r > 8.0f) {
-				float shade = 0.75f + 0.25f * (-dy / (kHintH * 0.5f));
-				cv.rect(x, y, x + 1, y + 1, (uint8_t)(230 * shade), (uint8_t)(170 * shade), (uint8_t)(70 * shade));
+	// La disquette du poignet, à gauche
+	for (int pass = 0; pass < 2; pass++)
+		for (int y = 0; y < 16; y++)
+			for (int x = 0; x < 16; x++) {
+				const char c = kFloppy[y][x];
+				if (c == '.')
+					continue;
+				const Rgb col = !pass ? kDark : c == 'L' ? Rgb{184, 176, 216} : c == 'W' ? Rgb{150, 142, 190} : c == 'S' ? Rgb{168, 168, 184} : c == 'D' ? Rgb{48, 48, 64} : Rgb{56, 60, 104};
+				const int px = 16 + x * 3 - (pass ? 0 : 2), py = (kHintH - 48) / 2 + y * 3 + (pass ? 0 : 2);
+				cv.rect(px, py, px + 3, py + 3, col);
 			}
-		}
 	const std::string l1 = latin1(fr ? "Regarde ta main gauche :" : "Look at your left hand:");
-	const std::string l2 = latin1(fr ? "l'engrenage ouvre les réglages." : "the gear opens the settings.");
+	const std::string l2 = latin1(fr ? "la disquette ouvre le menu du jeu." : "the floppy opens the game menu.");
 	cv.gtext(l1, 80, 18, Canvas::fit(l1, kHintW - 92, 2), kWhite);
 	cv.gtext(l2, 80, 46, Canvas::fit(l2, kHintW - 92, 2), kGold);
 	upload(hintTex, cv.px, kHintW, kHintH, "invitation");
@@ -837,6 +849,12 @@ void Ui::setOptions(bool fireOn, bool detached) {
 		d->menuDirty = true;
 	d->fireOn = fireOn;
 	d->detached = detached;
+}
+
+void Ui::openMenu() {
+	d->menuOpen = true;
+	d->menuAhead = true;
+	d->menuDirty = true;
 }
 
 bool Ui::spellsCollapsed() const {
@@ -1175,6 +1193,16 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 		}
 	}
 	const float kMenuScale = 0.0009f;
+	// Ouvert depuis le menu du jeu : devant le joueur, un peu sous le regard, tourné vers lui.
+	if (d->menuOpen && d->menuAhead) {
+		Vec3 f{in.headDir.x, 0.0f, in.headDir.z};
+		float fl = length(f);
+		f = fl > 1e-3f ? f * (1.0f / fl) : Vec3{0, 0, -1};
+		d->menuPos = in.headPos + f * 0.55f + Vec3{0, -0.10f, 0};
+		d->menuRight = cross({0, 1, 0}, f * -1.0f);
+		d->menuUp = {0, 1, 0};
+		d->menuAhead = false;
+	}
 	if (d->menuOpen) {
 		menuQ.c = d->menuPos;
 		menuQ.r = d->menuRight;
@@ -1401,13 +1429,9 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 		out.hitRadius = 0.010f * bestT;
 		if (hitIndex == 0) {
 			if (in.triggerPressed) {
-				// Le menu s'ouvre au-dessus de la main et reste là.
-				d->menuOpen = !d->menuOpen;
-				if (d->menuOpen)
-					out.gearMenuOpened = true;
-				d->menuPos = gearQ.c + gearQ.u * (kMenuH * kMenuScale * 0.5f + 0.05f);
-				d->menuRight = gearQ.r;
-				d->menuUp = gearQ.u;
+				// La disquette : le menu du jeu (sauvegarder, charger, et les réglages VR).
+				out.action = kUiActionGameMenu;
+				out.gearMenuOpened = true;
 				out.clicked = true;
 			}
 		} else {
@@ -1423,9 +1447,6 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 				} else if (row == 3) {
 					out.action = d->dungeonMode ? kUiActionToggleScreenAlways : kUiActionToggleDetach;
 				} else if (row == 4) {
-					out.action = kUiActionToggleKeyboard;
-					d->menuOpen = false;
-				} else if (row == 5) {
 					out.action = kUiActionToggleHelp;
 					d->menuOpen = false;
 				} else {
