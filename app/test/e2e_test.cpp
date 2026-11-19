@@ -78,6 +78,8 @@ int main(int argc, char **argv) {
 	cfg.systemDir = argv[1];
 	cfg.saveDir = argv[2];
 	cfg.gameDir = argv[3];
+	if (const char *l = getenv("LOLVR_LANG"))
+		cfg.language = atoi(l); // la langue choisie dans le casque
 	cfg.log = logLine;
 	CoreHost &host = CoreHost::get();
 	if (!host.start(cfg))
@@ -151,6 +153,10 @@ int main(int argc, char **argv) {
 			pump(0.12);
 			host.setMouseButtons(false, false);
 			pump(0.3);
+		} else if (op == "lang") {
+			int l = 0;
+			cs >> l;
+			host.setGameLanguage(l); // comme le bouton de langue du casque
 		} else if (op == "shot") {
 			std::string name;
 			cs >> name;

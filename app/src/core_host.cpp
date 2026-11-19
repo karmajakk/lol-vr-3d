@@ -30,6 +30,7 @@ struct LolvrGameState {
 	int32_t reserved[4];
 };
 const LolvrGameState *retro_lolvr_state(void);
+void retro_lolvr_set_lang(int lang);
 
 // Un monstre ou un objet près du groupe (voir patches/0003).
 struct LolvrSprite {
@@ -459,6 +460,9 @@ void coreThread() {
 	retro_init();
 
 	bool loaded;
+	// La langue choisie dans le casque, pour le jeu qui démarre
+	if (g.cfg.language >= 0)
+		retro_lolvr_set_lang(g.cfg.language);
 	if (g.cfg.gameDir.empty()) {
 		loaded = retro_load_game(nullptr);
 	} else {
@@ -521,6 +525,8 @@ CoreHost &CoreHost::get() {
 	static CoreHost host;
 	return host;
 }
+
+void CoreHost::setGameLanguage(int language) { retro_lolvr_set_lang(language); }
 
 bool CoreHost::start(const HostConfig &cfg) {
 	if (g.running)

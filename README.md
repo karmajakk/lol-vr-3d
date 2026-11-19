@@ -12,7 +12,7 @@ items, spells, saves). Two ways to play, switched at any time from "VR controls"
 - **Classic view**: the game on a floating screen in a medieval library, in your own room (mixed
   reality) or on an old 486 PC, with the interface in movable windows.
 
-At first launch, a window asks which one you want.
+At first launch, a window asks which one you want, and your language (English, French or German).
 
 This project now includes [lol-vr](https://github.com/karmajakk/lol-vr), where the classic view
 was first developed (its history is kept here; its changelog is in

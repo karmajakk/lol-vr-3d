@@ -13,7 +13,7 @@ le menu du jeu (la disquette sur ton poignet gauche) :
 - **Vue classique** : le jeu sur un écran flottant dans une bibliothèque médiévale, dans ta propre
   pièce (réalité mixte) ou sur un vieux PC 486, avec l'interface dans des fenêtres déplaçables.
 
-Au premier lancement, une fenêtre te demande laquelle tu veux.
+Au premier lancement, une fenêtre te demande laquelle tu veux, et ta langue (anglais, français ou allemand).
 
 Ce projet inclut maintenant [lol-vr](https://github.com/karmajakk/lol-vr), où la vue classique a
 d'abord été développée (son historique est conservé ici ; son journal des versions est dans

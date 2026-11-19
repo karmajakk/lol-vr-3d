@@ -30,7 +30,7 @@ struct UiPlacement {
 const float kSplitViewHeight = 0.54f;
 const float kSplitViewLift = 0.16f;
 
-enum UiAction { kUiActionNone = 0, kUiActionToggleFire, kUiActionToggleDetach, kUiActionResetLayout, kUiActionCloseKeyboard, kUiActionToggleHelp, kUiActionCloseHelp, kUiActionToggleLanguage, kUiActionToggleKeyboard, kUiActionToggleDungeon, kUiActionToggleScreenAlways, kUiActionChooseClassic, kUiActionChooseImmersive, kUiActionGameMenu, kUiActionCycleView };
+enum UiAction { kUiActionNone = 0, kUiActionToggleFire, kUiActionToggleDetach, kUiActionResetLayout, kUiActionCloseKeyboard, kUiActionToggleHelp, kUiActionCloseHelp, kUiActionToggleLanguage, kUiActionToggleKeyboard, kUiActionToggleDungeon, kUiActionToggleScreenAlways, kUiActionChooseClassic, kUiActionChooseImmersive, kUiActionGameMenu, kUiActionCycleView, kUiActionChooseLanguage };
 
 enum UiLanguage { kLangEnglish = 0, kLangFrench = 1, kLangGerman = 2 };
 
@@ -98,6 +98,7 @@ struct UiFrameInput {
 struct UiFrameOutput {
 	// Pointeur de la souris du jeu
 	bool pointerValid = false;
+	int language = -1; // kUiActionChooseLanguage : la langue choisie (UiLanguage)
 	float gu = 0, gv = 0; // 0..1 dans l'image du jeu
 	bool buttonsToGame = false; // les clics de cette image vont au jeu
 	// Lueur du pointeur

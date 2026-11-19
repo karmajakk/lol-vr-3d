@@ -553,7 +553,10 @@ int main(int argc, char **argv) {
 			};
 			check(pressAt(160, 200).action == kUiActionChooseClassic, "choix de la vue : bouton classique");
 			check(pressAt(470, 200).action == kUiActionChooseImmersive, "choix de la vue : bouton immersif");
-			UiFrameOutput none = pressAt(320, 420);
+			UiFrameOutput fr = pressAt(320, 350), de = pressAt(522, 350), en = pressAt(118, 350);
+			check(fr.action == kUiActionChooseLanguage && fr.language == kLangFrench && de.language == kLangGerman && en.language == kLangEnglish,
+			      "choix de la vue : les trois boutons de langue");
+			UiFrameOutput none = pressAt(320, 430);
 			check(none.action == kUiActionNone && !none.buttonsToGame, "choix de la vue : à côté des boutons, rien");
 			in.chooserOpen = false;
 			in.triggerDown = in.triggerPressed = false;

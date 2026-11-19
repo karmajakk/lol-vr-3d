@@ -10,7 +10,7 @@ Rien à compiler.
 2. Branche le casque à ton PC, ouvre [SideQuest](https://sidequestvr.com) et installe l'APK (l'icône « Install APK file from folder »).
 3. Dans le casque : Bibliothèque → filtre « Sources inconnues » → **Lands of Lore VR**.
 
-Au premier lancement, une fenêtre te demande si tu veux la **vue classique** ou le **mode immersif** (tu pourras changer plus tard : disquette sur ton poignet gauche, puis « Réglages VR »), et un écran dit que les fichiers du jeu manquent : c'est normal. Ce lancement crée le dossier où ils vont.
+Au premier lancement, une fenêtre te demande si tu veux la **vue classique** ou le **mode immersif**, et dans quelle langue (anglais, français ou allemand, sous leurs drapeaux) (tu pourras changer plus tard : disquette sur ton poignet gauche, puis « Réglages VR »), et un écran dit que les fichiers du jeu manquent : c'est normal. Ce lancement crée le dossier où ils vont.
 
 ## 2. Copier les fichiers du jeu
 
@@ -28,7 +28,7 @@ Si tu utilisais l'ancienne application `lol-vr` : celle-ci s'installe à côté 
 
 ## Langue
 
-L'application suit la langue choisie dans les options du jeu : disquette sur ton poignet gauche, « Game controls », « Language is ». Avant que le jeu ait démarré, elle prend la dernière langue vue, et au tout premier lancement celle du casque (anglais, français ou allemand).
+La langue choisie dans la première fenêtre est celle de l'application et du jeu (version CD, qui a les trois). Ensuite, l'application suit la langue choisie dans les options du jeu : disquette sur ton poignet gauche, « Game controls », « Language is ». Avant que le jeu ait démarré, elle prend la dernière langue vue, et au tout premier lancement celle du casque (anglais, français ou allemand).
 
 ## Mettre à jour
 

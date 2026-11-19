@@ -14,6 +14,7 @@ struct HostConfig {
 	std::string systemDir; // contient scummvm/theme et scummvm/extra (kyra.dat)
 	std::string saveDir;   // sauvegardes
 	std::string gameDir;   // fichiers du jeu ; vide = lanceur ScummVM
+	int language = -1;     // langue du jeu au démarrage (0 anglais, 1 français, 2 allemand ; version CD)
 	void (*log)(int level, const char *msg) = nullptr;
 };
 
@@ -105,6 +106,8 @@ public:
 	static CoreHost &get();
 
 	bool start(const HostConfig &cfg);
+	// Change la langue du jeu (version CD) : appliquée au prochain tour de sa boucle.
+	void setGameLanguage(int language);
 	void stop();
 	bool running() const;
 	// Vrai quand ScummVM s'est terminé de lui-même (bouton « Quitter »).

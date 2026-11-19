@@ -1,5 +1,5 @@
 diff --git a/engines/kyra/engine/lol.cpp b/engines/kyra/engine/lol.cpp
-index c4f86a30..d8eed074 100644
+index c4f86a30..d2e293f2 100644
 --- a/engines/kyra/engine/lol.cpp
 +++ b/engines/kyra/engine/lol.cpp
 @@ -21,6 +21,8 @@
@@ -11,7 +11,7 @@ index c4f86a30..d8eed074 100644
  #include "kyra/engine/lol.h"
  #include "kyra/graphics/screen_lol.h"
  #include "kyra/resource/resource.h"
-@@ -45,6 +47,14 @@ LolvrGameState g_lolvrState = {1, 0, {0}, 0, 0, 0, 0, 0, 0, 0, {0}, {0}};
+@@ -45,6 +47,20 @@ LolvrGameState g_lolvrState = {1, 0, {0}, 0, 0, 0, 0, 0, 0, 0, {0}, {0}};
  __attribute__((visibility("default"))) const LolvrGameState *retro_lolvr_state(void) {
  	return &g_lolvrState;
  }
@@ -23,10 +23,27 @@ index c4f86a30..d8eed074 100644
 +		g_lolvrEngine->lolvrSpellUpdate();
 +	return &g_lolvrLevel;
 +}
++// The language picked in the headset (0 English, 1 French, 2 German): applied when the game
++// starts, or at the next turn of the main loop (CD version, which has the three languages).
++int g_lolvrLangRequest = -1;
++__attribute__((visibility("default"))) void retro_lolvr_set_lang(int lang) {
++	g_lolvrLangRequest = lang >= 0 && lang <= 2 ? lang : -1;
++}
  }
  
  namespace Kyra {
-@@ -964,10 +974,73 @@ void LoLEngine::runLoop() {
+@@ -95,6 +111,10 @@ LoLEngine::LoLEngine(OSystem *system, const GameFlags &flags) : KyraRpgEngine(sy
+ 		warning("unsupported language, switching back to English");
+ 		break;
+ 	}
++	// lol-vr-3d: the language picked in the headset
++	if (g_lolvrLangRequest >= 0 && !_langIntern && _flags.isTalkie)
++		_lang = g_lolvrLangRequest;
++	g_lolvrLangRequest = -1;
+ 
+ 	_chargenFrameTable = _flags.isTalkie ? _chargenFrameTableTalkie : _chargenFrameTableFloppy;
+ 	_chargenWSA = 0;
+@@ -964,10 +984,74 @@ void LoLEngine::runLoop() {
  			_nextScriptFunc = 0;
  		}
  
@@ -65,6 +82,7 @@ index c4f86a30..d8eed074 100644
 +		g_lolvrLevel.inDungeon = 1;
 +		g_lolvrLevel.sceneBusy = (_needSceneRestore || _dialogueField) ? 1 : 0;
 +		g_lolvrLevel.textBox = lolvrTextBox(); // lol-vr-3d
++		lolvrApplyLangRequest();
 +		lolvrExportLang();
 +		{
 +			const Palette &cur = _screen->lolvrScreenPalette();
@@ -100,7 +118,7 @@ index c4f86a30..d8eed074 100644
  
  		_timer->update();
  
-@@ -1049,6 +1122,8 @@ void LoLEngine::readSettings() {
+@@ -1049,6 +1133,8 @@ void LoLEngine::readSettings() {
  }
  
  void LoLEngine::update() {
@@ -109,7 +127,7 @@ index c4f86a30..d8eed074 100644
  	updateSequenceBackgroundAnimations();
  
  	if (_updateCharNum != -1 && _system->getMillis() > _updatePortraitNext)
-@@ -1633,6 +1708,8 @@ void LoLEngine::initSceneWindowDialogue(int controlMode) {
+@@ -1633,6 +1719,8 @@ void LoLEngine::initSceneWindowDialogue(int controlMode) {
  	_txt->expandField();
  	setupScreenDims();
  	gui_disableControls(controlMode);
@@ -118,7 +136,7 @@ index c4f86a30..d8eed074 100644
  }
  
  void LoLEngine::toggleSelectedCharacterFrame(bool mode) {
-@@ -1690,6 +1767,8 @@ void LoLEngine::gui_specialSceneRestoreControls(int restoreLamp) {
+@@ -1690,6 +1778,8 @@ void LoLEngine::gui_specialSceneRestoreControls(int restoreLamp) {
  }
  
  void LoLEngine::restoreAfterSceneWindowDialogue(int redraw) {
@@ -127,7 +145,7 @@ index c4f86a30..d8eed074 100644
  	gui_enableControls();
  	_txt->setupField(false);
  	_updateFlags &= 0xFFDF;
-@@ -1711,6 +1790,8 @@ void LoLEngine::restoreAfterSceneWindowDialogue(int redraw) {
+@@ -1711,6 +1801,8 @@ void LoLEngine::restoreAfterSceneWindowDialogue(int redraw) {
  
  	_needSceneRestore = 0;
  	enableSysTimer(2);
@@ -136,7 +154,7 @@ index c4f86a30..d8eed074 100644
  }
  
  void LoLEngine::initDialogueSequence(int controlMode, int pageNum) {
-@@ -1758,11 +1839,15 @@ void LoLEngine::initDialogueSequence(int controlMode, int pageNum) {
+@@ -1758,11 +1850,15 @@ void LoLEngine::initDialogueSequence(int controlMode, int pageNum) {
  
  	_currentControlMode = controlMode;
  	_dialogueField = true;
@@ -152,7 +170,7 @@ index c4f86a30..d8eed074 100644
  
  	stopPortraitSpeechAnim();
  	_currentControlMode = controlMode;
-@@ -1780,6 +1865,8 @@ void LoLEngine::restoreAfterDialogueSequence(int controlMode) {
+@@ -1780,6 +1876,8 @@ void LoLEngine::restoreAfterDialogueSequence(int controlMode) {
  	}
  
  	_dialogueField = false;
@@ -161,7 +179,7 @@ index c4f86a30..d8eed074 100644
  }
  
  void LoLEngine::resetPortraitsAndDisableSysTimer() {
-@@ -2123,8 +2210,12 @@ int LoLEngine::castSpell(int charNum, int spellType, int spellLevel) {
+@@ -2123,8 +2221,12 @@ int LoLEngine::castSpell(int charNum, int spellType, int spellLevel) {
  
  	if (charNum < 0) {
  		_activeSpell.charNum = (charNum * -1) - 1;
@@ -176,7 +194,7 @@ index c4f86a30..d8eed074 100644
  	} else {
  		if (_activeSpell.p->mpRequired[spellLevel] > _characters[charNum].magicPointsCur)
  			return 0;
-@@ -2136,13 +2227,49 @@ int LoLEngine::castSpell(int charNum, int spellType, int spellLevel) {
+@@ -2136,13 +2238,64 @@ int LoLEngine::castSpell(int charNum, int spellType, int spellLevel) {
  		setCharacterMagicOrHitPoints(charNum, 0, -_activeSpell.p->hpRequired[spellLevel], 1);
  		gui_drawCharPortraitWithStats(charNum);
  
@@ -192,6 +210,21 @@ index c4f86a30..d8eed074 100644
 +// lol-vr-3d: spell effects for the 3D dungeon. The scene window as it was when the spell began; while
 +// the spell runs, whatever differs from it is the effect (fireball, lightning, mist...).
 +static uint8 g_lolvrSpellRef[176 * 120], g_lolvrSpellPx[176 * 120], g_lolvrSpellAl[176 * 120];
++
++// lol-vr-3d: the language picked in the headset during the game, as the options menu does it
++void LoLEngine::lolvrApplyLangRequest() {
++	const int req = g_lolvrLangRequest;
++	g_lolvrLangRequest = -1;
++	if (req < 0 || req == _lang || _langIntern || !_flags.isTalkie)
++		return;
++	_lang = req;
++	Common::String filename = Common::String::format("LEVEL%02d.%s", _currentLevel, _languageExt[_lang]);
++	delete[] _levelLangFile;
++	_levelLangFile = resource()->fileData(filename.c_str(), 0);
++	filename = Common::String::format("LANDS.%s", _languageExt[_lang]);
++	delete[] _landsFile;
++	_landsFile = resource()->fileData(filename.c_str(), 0);
++}
 +
 +void LoLEngine::lolvrSpellBegin() {
 +	_screen->copyRegionToBuffer(0, 112, 0, 176, 120, g_lolvrSpellRef);
@@ -227,13 +260,14 @@ index c4f86a30..d8eed074 100644
  	processMagicSpark(a->charNum, a->level);
  	return 1;
 diff --git a/engines/kyra/engine/lol.h b/engines/kyra/engine/lol.h
-index a9028a26..602370e5 100644
+index a9028a26..413cb95e 100644
 --- a/engines/kyra/engine/lol.h
 +++ b/engines/kyra/engine/lol.h
-@@ -50,6 +50,74 @@ struct LolvrGameState {
+@@ -50,6 +50,75 @@ struct LolvrGameState {
  	int32 reserved[4];  // [0] dungeon loop ticks, [1] control mode, [2] bit 0: automap open, bit 1: game menu open
  };
  extern LolvrGameState g_lolvrState;
++extern int g_lolvrLangRequest; // lol-vr-3d: language picked in the headset, -1 none
 +
 +// lol-vr-3d: a monster or an item near the party, drawn by the engine at full size (as if right in
 +// front of the party) into a private 176 x 120 picture.
@@ -305,7 +339,7 @@ index a9028a26..602370e5 100644
  }
  
  namespace Audio {
-@@ -335,6 +403,17 @@ private:
+@@ -335,6 +404,18 @@ private:
  
  	// main loop
  	void runLoop();
@@ -316,6 +350,7 @@ index a9028a26..602370e5 100644
 +public:
 +	void lolvrSpellUpdate(); // lol-vr-3d: called by retro_lolvr_level()
 +	// lol-vr-3d: the game's language (bits 16-17: 0 English, 1 French, 2 German; bit 18: known)
++	void lolvrApplyLangRequest(); // lol-vr-3d
 +	void lolvrExportLang() { g_lolvrState.reserved[2] = (g_lolvrState.reserved[2] & ~0x70000) | ((_lang & 3) << 16) | 0x40000; }
 +	int lolvrTextBox() { return ((_needSceneRestore || _dialogueField) && (_updateFlags & 2) && textEnabled()) ? 1 : 0; } // lol-vr-3d
 +private:
@@ -693,7 +728,7 @@ index 92605cda..627378d4 100644
  
  	// gui specific (processing on _curPage)
 diff --git a/engines/kyra/gui/gui_lol.cpp b/engines/kyra/gui/gui_lol.cpp
-index b2732d26..67ecf039 100644
+index b2732d26..a04d0b11 100644
 --- a/engines/kyra/gui/gui_lol.cpp
 +++ b/engines/kyra/gui/gui_lol.cpp
 @@ -2212,7 +2212,7 @@ int GUI_LoL::runMenu(Menu &menu) {
@@ -747,6 +782,16 @@ index b2732d26..67ecf039 100644
  		break;
  	case 0xFFF3:
  		_vm->_configVoice ^= 3;
+@@ -2934,6 +2946,9 @@ Common::String GUI_LoL::getMenuTitle(const Menu &menu) {
+ }
+ 
+ Common::String GUI_LoL::getMenuItemTitle(const MenuItem &menuItem) {
++	// lol-vr-3d: "VR controls" in the game's current language
++	if (menuItem.itemId == 0x8F00)
++		return _vm->_lang == 1 ? "R\x82glages VR" : _vm->_lang == 2 ? "VR-Optionen" : "VR controls";
+ 	if (menuItem.itemId & 0x8000 && !menuItem.itemString.empty())
+ 		return menuItem.itemString;
+ 	else if (menuItem.itemId & 0x8000 || !menuItem.itemId)
 diff --git a/engines/kyra/gui/gui_v1.h b/engines/kyra/gui/gui_v1.h
 index c2821be3..3085bf4d 100644
 --- a/engines/kyra/gui/gui_v1.h

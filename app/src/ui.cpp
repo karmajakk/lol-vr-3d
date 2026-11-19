@@ -565,14 +565,52 @@ void Ui::Impl::compose(int which, const UiFrameInput &in) {
 }
 
 // Boutons de la fenêtre du choix de la vue, en pixels de son image (même taille que l'aide).
-const int kChooseY0 = 70, kChooseY1 = 330;
+const int kChooseY0 = 70, kChooseY1 = 292;
 const int kChooseX[2][2] = {{24, 310}, {330, 616}};
+// Dessous, la langue : trois boutons, le nom et le drapeau.
+const int kLangY0 = 304, kLangY1 = 394;
+const int kLangX[3][2] = {{24, 212}, {226, 414}, {428, 616}};
+
+// Un drapeau de w x h pixels : anglais (Union Jack), français, allemand.
+static void drawFlag(Canvas &cv, int lang, int x0, int y0, int w, int h) {
+	for (int y = 0; y < h; y++)
+		for (int x = 0; x < w; x++) {
+			Rgb c;
+			if (lang == kLangFrench) {
+				c = x * 3 < w ? Rgb{0, 85, 164} : x * 3 < 2 * w ? Rgb{255, 255, 255} : Rgb{239, 65, 53};
+			} else if (lang == kLangGerman) {
+				c = y * 3 < h ? Rgb{0, 0, 0} : y * 3 < 2 * h ? Rgb{221, 0, 0} : Rgb{255, 206, 0};
+			} else {
+				// Fond bleu, sautoirs blancs et rouges, croix blanche et rouge
+				const float fx = (float)x + 0.5f, fy = (float)y + 0.5f, k = (float)h / (float)w;
+				const float n = sqrtf(1.0f + k * k);
+				const float d1 = fabsf(fy - fx * k) / n, d2 = fabsf(fy - ((float)h - fx * k)) / n;
+				const float dd = d1 < d2 ? d1 : d2;
+				const float cx = fabsf(fx - w * 0.5f), cy = fabsf(fy - h * 0.5f);
+				c = {1, 33, 105};
+				if (dd < h * 0.10f)
+					c = {255, 255, 255};
+				if (dd < h * 0.04f)
+					c = {200, 16, 46};
+				if (cx < h * 0.17f || cy < h * 0.17f)
+					c = {255, 255, 255};
+				if (cx < h * 0.10f || cy < h * 0.10f)
+					c = {200, 16, 46};
+			}
+			cv.rect(x0 + x, y0 + y, x0 + x + 1, y0 + y + 1, c);
+		}
+	// Un liseré sombre, comme les boutons du jeu
+	cv.rect(x0 - 1, y0 - 1, x0 + w + 1, y0, kDark);
+	cv.rect(x0 - 1, y0 + h, x0 + w + 1, y0 + h + 1, kDark);
+	cv.rect(x0 - 1, y0, x0, y0 + h, kDark);
+	cv.rect(x0 + w, y0, x0 + w + 1, y0 + h, kDark);
+}
 
 // Premier lancement : vue classique ou mode immersif.
 void Ui::Impl::renderChooser() {
 	Canvas cv{kHelpW, kHelpH, std::vector<uint8_t>((size_t)kHelpW * kHelpH * 4)};
 	cv.window();
-	cv.gcenter(latin1(tr(language, "Choose your view", "Choisis ta vue", "Wähle deine Ansicht")), 0, kHelpW, 20, 3, kWhite);
+	cv.gcenter(latin1(tr(language, "Choose your view and language", "Choisis ta vue et ta langue", "Wähle Ansicht und Sprache")), 0, kHelpW, 20, 3, kWhite);
 	static const char *const labels[3][2] = {{"Classic", "Immersive"}, {"Classique", "Immersif"}, {"Klassisch", "Immersiv"}};
 	static const char *const texts[3][2] = {
 		{"The game screen in a medieval library, in your room (mixed reality) or on an old 486 PC.",
@@ -592,13 +630,22 @@ void Ui::Impl::renderChooser() {
 			y += 22;
 		}
 	}
-	int y = 350;
+	// La langue (celle de l'application et du jeu) : le nom dans sa langue, le drapeau dessous.
+	static const char *const names[3] = {"English", "Français", "Deutsch"};
+	for (int b = 0; b < 3; b++) {
+		const int x0 = kLangX[b][0], x1 = kLangX[b][1];
+		const bool on = language == b;
+		cv.bevel(x0, kLangY0, x1, kLangY1, 3, !on);
+		cv.gcenter(latin1(names[b]), x0 + (on ? 1 : 0), x1 + (on ? 1 : 0), kLangY0 + 10 + (on ? 1 : 0), 2, on ? kBlue : kGold);
+		drawFlag(cv, b, (x0 + x1) / 2 - 30 + (on ? 1 : 0), kLangY0 + 38 + (on ? 1 : 0), 60, 36);
+	}
+	int y = 408;
 	for (const std::string &l : Canvas::wrap(latin1(tr(language, "You can change this later: the floppy on your left hand opens the game menu, then \"VR controls\".",
 	                                                   "Tu pourras changer plus tard : la disquette sur ta main gauche ouvre le menu du jeu, puis \"Réglages VR\".",
 	                                                   "Du kannst das später ändern: Die Diskette an deiner linken Hand öffnet das Spielmenü, dann \"VR-Optionen\".")),
 	                                         kHelpW - 48, 2)) {
 		cv.gcenter(l, 0, kHelpW, y, 2, kGold);
-		y += 24;
+		y += 22;
 	}
 	upload(chooserTex, cv.px, kHelpW, kHelpH, "choix");
 	chooserDirty = false;
@@ -1566,7 +1613,15 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 			for (int b = 0; b < 2; b++)
 				if (px >= kChooseX[b][0] && px < kChooseX[b][1] && py >= kChooseY0 && py < kChooseY1)
 					d->chooserHot = b;
-			if (in.triggerPressed && d->chooserHot >= 0) {
+			// La langue : 2, 3, 4 (anglais, français, allemand) ; la fenêtre reste ouverte.
+			for (int b = 0; b < 3; b++)
+				if (px >= kLangX[b][0] && px < kLangX[b][1] && py >= kLangY0 && py < kLangY1)
+					d->chooserHot = 2 + b;
+			if (in.triggerPressed && d->chooserHot >= 2) {
+				out.action = kUiActionChooseLanguage;
+				out.language = d->chooserHot - 2;
+				out.clicked = true;
+			} else if (in.triggerPressed && d->chooserHot >= 0) {
 				out.action = d->chooserHot == 0 ? kUiActionChooseClassic : kUiActionChooseImmersive;
 				out.clicked = true;
 			}
@@ -1673,10 +1728,12 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 				p.texH = kHelpH;
 				if (d->chooserHot >= 0) {
 					p.hotOutline = true;
-					p.hot[0] = (float)kChooseX[d->chooserHot][0] / (float)kHelpW;
-					p.hot[1] = (float)kChooseY0 / (float)kHelpH;
-					p.hot[2] = (float)kChooseX[d->chooserHot][1] / (float)kHelpW;
-					p.hot[3] = (float)kChooseY1 / (float)kHelpH;
+					const bool lg = d->chooserHot >= 2;
+					const int *xs = lg ? kLangX[d->chooserHot - 2] : kChooseX[d->chooserHot];
+					p.hot[0] = (float)xs[0] / (float)kHelpW;
+					p.hot[1] = (float)(lg ? kLangY0 : kChooseY0) / (float)kHelpH;
+					p.hot[2] = (float)xs[1] / (float)kHelpW;
+					p.hot[3] = (float)(lg ? kLangY1 : kChooseY1) / (float)kHelpH;
 				}
 			} else if (i == kPanelHelp) {
 				p.texture = d->helpTex;

@@ -499,6 +499,8 @@ struct App {
 	double splitWantedSince = 0;
 	bool gameStarted = false, automapOpen = false;
 	bool gameMenuOpen = false;   // un menu du jeu est affiché
+	int langRequested = -1;      // langue choisie dans le casque, en attente que le jeu la prenne
+	double langRequestAt = 0;
 	int viewNotices = 0;         // rappels « L3 change la vue » déjà montrés (1 : classique, 2 : réalité mixte)
 	int vrMenuSerial = -1;       // « Réglages VR » dans le menu du jeu (-1 : pas encore lu)
 	// Combat aux boutons : dans le donjon, A attaque et B ouvre la magie du personnage choisi.
@@ -1023,6 +1025,7 @@ void updateGame(App &app) {
 			cfg.systemDir = app.systemDir;
 			cfg.saveDir = app.saveDir;
 			cfg.gameDir = app.gameDir;
+			cfg.language = app.language; // le jeu démarre dans la langue de l'application
 			cfg.log = coreLog;
 			lolvr::renderMessage(app.frame, "Lands of Lore VR", app.language == lolvr::kLangFrench ? "Démarrage du jeu…" : app.language == lolvr::kLangGerman ? "Das Spiel startet…" : "Starting the game…");
 			app.frameDirty = true;
@@ -1464,7 +1467,11 @@ void updateGameEvents(App &app, double now) {
 	// La langue de l'application suit celle du jeu (son menu des options).
 	if (gs.gameLang >= 0) {
 		const int lang = gs.gameLang == 1 ? lolvr::kLangFrench : gs.gameLang == 2 ? lolvr::kLangGerman : lolvr::kLangEnglish;
-		if (lang != app.language) {
+		// (une langue tout juste choisie dans le casque : le temps que le jeu la prenne)
+		const bool pending = app.langRequested >= 0 && lang != app.langRequested && now - app.langRequestAt < 3.0;
+		if (!pending)
+			app.langRequested = -1;
+		if (!pending && lang != app.language) {
 			app.language = lang;
 			app.settingsDirty = true;
 		}
@@ -2111,6 +2118,18 @@ void updateUi(App &app, XrTime time, float dt, double now, bool pointer, bool tr
 		app.viewChosen = true;
 		app.chooserOpen = false;
 		pulse(app, kRight, 0.3f, 0.03f);
+		break;
+	case lolvr::kUiActionChooseLanguage:
+		// La langue, dans la fenêtre du premier lancement : l'application, et le jeu avec elle.
+		if (out.language >= 0 && out.language <= 2) {
+			app.language = out.language;
+			app.langRequested = out.language;
+			app.langRequestAt = now;
+			if (app.coreStarted)
+				CoreHost::get().setGameLanguage(out.language);
+			app.settingsDirty = true;
+		}
+		pulse(app, kRight, 0.2f, 0.02f);
 		break;
 	case lolvr::kUiActionGameMenu:
 		// La disquette du poignet : le bouton des options du jeu (11..32, 179..199), ou referme le menu.

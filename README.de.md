@@ -14,7 +14,7 @@ Gegenstände, Zauber, Spielstände). Zwei Arten zu spielen, jederzeit umschaltba
   Bibliothek, in deinem eigenen Zimmer (Mixed Reality) oder auf einem alten 486er-PC, mit der
   Oberfläche in verschiebbaren Fenstern.
 
-Beim ersten Start fragt ein Fenster, welche du möchtest.
+Beim ersten Start fragt ein Fenster, welche du möchtest, und deine Sprache (Englisch, Französisch oder Deutsch).
 
 Dieses Projekt enthält jetzt [lol-vr](https://github.com/karmajakk/lol-vr), in dem die klassische
 Ansicht zuerst entwickelt wurde (seine Geschichte bleibt hier erhalten; sein Änderungsprotokoll

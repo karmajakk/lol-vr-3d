@@ -3,6 +3,16 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.11.0] — Language in the first window
+
+- The first-launch window now also asks for the language: three buttons, English, Français and
+  Deutsch, each with its flag below. The choice is the app's and the game's: the game starts in
+  that language (CD version, which has the three), or switches to it at once if it is already
+  running. The game's own "Language is" option still works and the app follows it.
+- "VR controls" in the game menu is named in the game's current language.
+- Engine (patch 0003): retro_lolvr_set_lang(), applied when the engine starts or at the next turn
+  of its main loop, reloading the language files as the options menu does.
+
 ## [0.10.0] — German, documentation in three languages
 
 - The app speaks German too, when the game is set to German ("Language is" in the game's options):
