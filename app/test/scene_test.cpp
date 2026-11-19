@@ -543,7 +543,7 @@ int main(int argc, char **argv) {
 			SceneState::Panel ch = tmp.panels[3];
 			check(ch.visible && ch.texture != 0 && ch.texture != help.texture, "choix de la vue : la fenêtre est affichée");
 			auto pressAt = [&](float px, float py) {
-				aimAt(ch.center + ch.right * ((px / 640.0f * 2.0f - 1.0f) * ch.halfW) + ch.up * ((1.0f - py / 470.0f * 2.0f) * ch.halfH));
+				aimAt(ch.center + ch.right * ((px / 640.0f * 2.0f - 1.0f) * ch.halfW) + ch.up * ((1.0f - py / 520.0f * 2.0f) * ch.halfH));
 				in.triggerDown = in.triggerPressed = true;
 				ui.update(in, o, tmp);
 				UiFrameOutput r = o;
@@ -553,10 +553,10 @@ int main(int argc, char **argv) {
 			};
 			check(pressAt(160, 200).action == kUiActionChooseClassic, "choix de la vue : bouton classique");
 			check(pressAt(470, 200).action == kUiActionChooseImmersive, "choix de la vue : bouton immersif");
-			UiFrameOutput fr = pressAt(320, 350), de = pressAt(522, 350), en = pressAt(118, 350);
+			UiFrameOutput fr = pressAt(320, 358), de = pressAt(522, 358), en = pressAt(118, 358);
 			check(fr.action == kUiActionChooseLanguage && fr.language == kLangFrench && de.language == kLangGerman && en.language == kLangEnglish,
 			      "choix de la vue : les trois boutons de langue");
-			UiFrameOutput none = pressAt(320, 430);
+			UiFrameOutput none = pressAt(320, 470);
 			check(none.action == kUiActionNone && !none.buttonsToGame, "choix de la vue : à côté des boutons, rien");
 			in.chooserOpen = false;
 			in.triggerDown = in.triggerPressed = false;

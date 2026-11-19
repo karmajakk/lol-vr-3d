@@ -38,7 +38,7 @@ const int kCellW = 46, kCellH = 40, kCols = 11, kRows = 6;
 // Menu du poignet : engrenage et petit menu
 const int kGearSize = 64, kHintW = 440, kHintH = 84, kMenuW = 360, kMenuRowH = 44, kMenuRows = 5, kMenuH = kMenuRowH * kMenuRows;
 // Panneau d'aide
-const int kHelpW = 640, kHelpH = 470;
+const int kHelpW = 640, kHelpH = 520;
 const int kInfoH = 0; // (plus de lignes d'information sous les touches)
 const int kKbW = kCellW * kCols, kKbH = kCellH * kRows + kInfoH;
 
@@ -568,7 +568,7 @@ void Ui::Impl::compose(int which, const UiFrameInput &in) {
 const int kChooseY0 = 70, kChooseY1 = 292;
 const int kChooseX[2][2] = {{24, 310}, {330, 616}};
 // Dessous, la langue : trois boutons, le nom et le drapeau.
-const int kLangY0 = 304, kLangY1 = 394;
+const int kLangY0 = 304, kLangY1 = 412;
 const int kLangX[3][2] = {{24, 212}, {226, 414}, {428, 616}};
 
 // Un drapeau de w x h pixels : anglais (Union Jack), français (le Québec), allemand.
@@ -577,21 +577,44 @@ static void drawFlag(Canvas &cv, int lang, int x0, int y0, int w, int h) {
 		for (int x = 0; x < w; x++) {
 			Rgb c;
 			if (lang == kLangFrench) {
-				// Le fleurdelisé du Québec : croix blanche, une fleur de lys dans chaque quart bleu
-				static const char *const kLys[11] = {
-					"....#....", "...###...", "...###...", "#..###..#", "##.###.##", ".#######.",
-					"..#####..", "#########", "..#.#.#..", ".##.#.##.", "...###...",
+				// Le fleurdelisé du Québec (3:2) : croix blanche (1/6 de la largeur, 1/4 de la hauteur),
+				// une fleur de lys au milieu de chaque quart bleu. La fleur : la couverture en blanc de
+				// chaque pixel d'un quart de 40 x 24, mesurée sur le drapeau officiel.
+				static const uint8_t kLys[24][40] = {
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 82, 108, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 32, 244, 251, 50, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 143, 255, 255, 168, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 214, 255, 255, 238, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 233, 255, 255, 254, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 192, 255, 255, 216, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 61, 85, 8, 108, 255, 255, 133, 4, 80, 67, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 94, 255, 255, 203, 31, 252, 255, 47, 184, 255, 255, 121, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 199, 255, 255, 255, 106, 197, 221, 84, 255, 255, 255, 225, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 181, 254, 116, 150, 182, 140, 164, 161, 168, 113, 254, 205, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 33, 182, 1, 3, 200, 117, 140, 193, 13, 1, 187, 45, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 13, 255, 255, 255, 255, 255, 255, 37, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 57, 57, 206, 227, 57, 57, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 83, 253, 255, 105, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 50, 213, 225, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 86, 112, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
 				};
-				const int bw = h / 6, cxl = (w - bw) / 2, cyl = (h - bw) / 2;
-				c = {0, 61, 165};
-				if ((x >= cxl && x < cxl + bw) || (y >= cyl && y < cyl + bw))
+				const int qw = w * 5 / 12, qh = h * 3 / 8; // un quart bleu
+				const Rgb blue = {0, 61, 165};
+				const bool inX = x < qw || x >= w - qw, inY = y < qh || y >= h - qh;
+				if (!inX || !inY) {
 					c = {255, 255, 255};
-				// La fleur au milieu de son quart
-				const int qx = x < cxl ? 0 : x >= cxl + bw ? cxl + bw : -1, qy = y < cyl ? 0 : y >= cyl + bw ? cyl + bw : -1;
-				if (qx >= 0 && qy >= 0) {
-					const int lx = x - (qx + (cxl - 9) / 2), ly = y - (qy + (cyl - 11) / 2);
-					if (lx >= 0 && lx < 9 && ly >= 0 && ly < 11 && kLys[ly][lx] == '#')
-						c = {255, 255, 255};
+				} else {
+					const int lx = (x < qw ? x : x - (w - qw)) * 40 / qw, ly = (y < qh ? y : y - (h - qh)) * 24 / qh;
+					const int a = kLys[ly < 24 ? ly : 23][lx < 40 ? lx : 39];
+					c = {(uint8_t)(blue.r + (255 - blue.r) * a / 255), (uint8_t)(blue.g + (255 - blue.g) * a / 255), (uint8_t)(blue.b + (255 - blue.b) * a / 255)};
 				}
 			} else if (lang == kLangGerman) {
 				c = y * 3 < h ? Rgb{0, 0, 0} : y * 3 < 2 * h ? Rgb{221, 0, 0} : Rgb{255, 206, 0};
@@ -651,10 +674,10 @@ void Ui::Impl::renderChooser() {
 		const int x0 = kLangX[b][0], x1 = kLangX[b][1];
 		const bool on = language == b;
 		cv.bevel(x0, kLangY0, x1, kLangY1, 3, !on);
-		cv.gcenter(latin1(names[b]), x0 + (on ? 1 : 0), x1 + (on ? 1 : 0), kLangY0 + 10 + (on ? 1 : 0), 2, on ? kBlue : kGold);
-		drawFlag(cv, b, (x0 + x1) / 2 - 30 + (on ? 1 : 0), kLangY0 + 38 + (on ? 1 : 0), 60, 36);
+		cv.gcenter(latin1(names[b]), x0 + (on ? 1 : 0), x1 + (on ? 1 : 0), kLangY0 + 9 + (on ? 1 : 0), 2, on ? kBlue : kGold);
+		drawFlag(cv, b, (x0 + x1) / 2 - 48 + (on ? 1 : 0), kLangY0 + 33 + (on ? 1 : 0), 96, 64);
 	}
-	int y = 408;
+	int y = 426;
 	for (const std::string &l : Canvas::wrap(latin1(tr(language, "You can change this later: the floppy on your left hand opens the game menu, then \"VR controls\".",
 	                                                   "Tu pourras changer plus tard : la disquette sur ta main gauche ouvre le menu du jeu, puis \"Réglages VR\".",
 	                                                   "Du kannst das später ändern: Die Diskette an deiner linken Hand öffnet das Spielmenü, dann \"VR-Optionen\".")),
@@ -776,7 +799,7 @@ void Ui::Impl::renderHelp() {
 		return true;
 	};
 	const int x0 = 22, xMax = kHelpW - 12;
-	int col = x0, y = 10;
+	int col = x0, y = 34; // (le contenu fait ~450 pixels de haut : au milieu)
 	for (int i = 0; lines[i]; i++) {
 		const char *line = lines[i];
 		bool title = line[0] == '#';

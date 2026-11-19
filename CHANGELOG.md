@@ -3,6 +3,13 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.11.2] — A better Quebec flag
+
+- The flags of the first-launch window are larger (96 x 64) and in the 3:2 shape of the Quebec
+  flag; the Fleurdelisé follows the official proportions (cross a sixth of the width and a quarter
+  of the height, a fleur-de-lis in the middle of each blue quarter, its shape taken from the official
+  flag). The window is a little taller to make room, and the controller panel with it.
+
 ## [0.11.1] — Quebec flag
 
 - The French button of the first-launch window shows the flag of Quebec (the Fleurdelisé) instead
