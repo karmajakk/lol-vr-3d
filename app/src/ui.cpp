@@ -571,13 +571,28 @@ const int kChooseX[2][2] = {{24, 310}, {330, 616}};
 const int kLangY0 = 304, kLangY1 = 394;
 const int kLangX[3][2] = {{24, 212}, {226, 414}, {428, 616}};
 
-// Un drapeau de w x h pixels : anglais (Union Jack), français, allemand.
+// Un drapeau de w x h pixels : anglais (Union Jack), français (le Québec), allemand.
 static void drawFlag(Canvas &cv, int lang, int x0, int y0, int w, int h) {
 	for (int y = 0; y < h; y++)
 		for (int x = 0; x < w; x++) {
 			Rgb c;
 			if (lang == kLangFrench) {
-				c = x * 3 < w ? Rgb{0, 85, 164} : x * 3 < 2 * w ? Rgb{255, 255, 255} : Rgb{239, 65, 53};
+				// Le fleurdelisé du Québec : croix blanche, une fleur de lys dans chaque quart bleu
+				static const char *const kLys[11] = {
+					"....#....", "...###...", "...###...", "#..###..#", "##.###.##", ".#######.",
+					"..#####..", "#########", "..#.#.#..", ".##.#.##.", "...###...",
+				};
+				const int bw = h / 6, cxl = (w - bw) / 2, cyl = (h - bw) / 2;
+				c = {0, 61, 165};
+				if ((x >= cxl && x < cxl + bw) || (y >= cyl && y < cyl + bw))
+					c = {255, 255, 255};
+				// La fleur au milieu de son quart
+				const int qx = x < cxl ? 0 : x >= cxl + bw ? cxl + bw : -1, qy = y < cyl ? 0 : y >= cyl + bw ? cyl + bw : -1;
+				if (qx >= 0 && qy >= 0) {
+					const int lx = x - (qx + (cxl - 9) / 2), ly = y - (qy + (cyl - 11) / 2);
+					if (lx >= 0 && lx < 9 && ly >= 0 && ly < 11 && kLys[ly][lx] == '#')
+						c = {255, 255, 255};
+				}
 			} else if (lang == kLangGerman) {
 				c = y * 3 < h ? Rgb{0, 0, 0} : y * 3 < 2 * h ? Rgb{221, 0, 0} : Rgb{255, 206, 0};
 			} else {

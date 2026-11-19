@@ -3,6 +3,11 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.11.1] — Quebec flag
+
+- The French button of the first-launch window shows the flag of Quebec (the Fleurdelisé) instead
+  of the flag of France.
+
 ## [0.11.0] — Language in the first window
 
 - The first-launch window now also asks for the language: three buttons, English, Français and
