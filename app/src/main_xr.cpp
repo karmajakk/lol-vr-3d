@@ -522,6 +522,9 @@ struct App {
 	bool inDungeon = false;
 	int characters = 0, selectedChar = 0;
 	bool attackDown = false, magicDown = false, charFlick = false;
+	// Le menu des niveaux de sort : le niveau en surbrillance (0 = niveau 1), R3 le change, B le lance.
+	int spellLevel = 0, spellMenuChar = -1;
+	bool r3Down = false;
 	double synthClickUntil = 0;   // clic envoyé au jeu à la place du pointeur (bouton de magie)
 	// Un clic sur un mur de côté (buisson, nid, trou d'arbre) : le jeu ne clique que sur le mur
 	// d'en face. Le groupe se tourne d'abord vers ce mur, puis le clic part.
@@ -2160,6 +2163,13 @@ void updateUi(App &app, XrTime time, float dt, double now, bool pointer, bool tr
 		in.partyMark[1] = 143.0f;
 		in.partyMark[2] = 66.0f;
 		in.partyMark[3] = 34.0f;
+		if (app.level.magicMenu >= 0 && app.level.magicMenu < app.characters) {
+			// Le niveau en surbrillance, dans la colonne des niveaux à droite du portrait
+			in.magicMark[0] = (float)portraitX(app.characters, app.level.magicMenu) + 44.0f;
+			in.magicMark[1] = 144.0f + 8.0f * (float)app.spellLevel;
+			in.magicMark[2] = 22.0f;
+			in.magicMark[3] = 8.0f;
+		}
 	}
 	app.ui.setOptions(app.fireOn, app.detached);
 	app.ui.setDungeonOption(app.dungeonMode);
@@ -2175,6 +2185,7 @@ void updateUi(App &app, XrTime time, float dt, double now, bool pointer, bool tr
 	in.headDir = rotate(app.headRot, {0, 0, -1});
 	in.helpOpen = app.helpOpen;
 	in.compassBlank = app.split && app.charSheet;
+	in.textBoxActive = app.bandShown && app.level.textRect != 0;
 	if (!app.frame.rgba.empty()) {
 		in.gameRgba = app.frame.rgba.data();
 		in.gameW = app.frame.width;
@@ -2363,13 +2374,15 @@ void updateInput(App &app, XrTime time, float dt, double now) {
 	xrSyncActions(app.session, &sync);
 
 	// Clic du joystick droit : recentrer l'écran (et la pièce) devant soi.
-	bool recenter = getBool(app, app.stickClickAction, kRight);
+	// (menu de magie ouvert : R3 change de niveau de sort, voir les boutons)
+	const bool r3Raw = getBool(app, app.stickClickAction, kRight);
+	bool recenter = r3Raw && app.level.magicMenu < 0;
 	if (app.headValid && recenter && !app.recenterDown) {
 		updateFloor(app, time);
 		placeScreen(app, true);
 		app.dunYaw = app.anchorYaw; // le groupe regarde de nouveau droit devant
 	}
-	app.recenterDown = recenter;
+	app.recenterDown = r3Raw;
 
 	// Position des manettes (les gants les suivent)
 	for (int h = 0; h < 2; h++) {
@@ -2576,12 +2589,33 @@ void updateInput(App &app, XrTime time, float dt, double now) {
 			typeKey(app, (unsigned)RETROK_F1 + (unsigned)app.selectedChar, 0, now);
 			pulse(app, kRight, 0.35f, 0.03f);
 		}
+		const int menu = app.level.magicMenu;
+		if (menu != app.spellMenuChar) {
+			// Le menu vient de s'ouvrir (ou de se fermer) : niveau 1 en surbrillance
+			app.spellMenuChar = menu;
+			app.spellLevel = 0;
+		}
 		if (bDown && !app.magicDown) {
-			app.synthU = ((float)portraitX(app.characters, app.selectedChar) + 44.0f + 11.0f) / 320.0f;
-			app.synthV = (160.0f + 8.5f) / 200.0f;
+			if (menu >= 0 && menu < app.characters) {
+				// 2e appui : lancer le niveau en surbrillance
+				app.synthU = ((float)portraitX(app.characters, menu) + 44.0f + 11.0f) / 320.0f;
+				app.synthV = (144.0f + 8.0f * (float)app.spellLevel + 4.0f) / 200.0f;
+			} else {
+				// 1er appui : ouvrir le menu des niveaux du sort choisi
+				app.synthU = ((float)portraitX(app.characters, app.selectedChar) + 44.0f + 11.0f) / 320.0f;
+				app.synthV = (160.0f + 8.5f) / 200.0f;
+			}
 			app.synthClickUntil = now + 0.16;
 			pulse(app, kRight, 0.25f, 0.03f);
 		}
+		// R3, menu ouvert : niveau suivant parmi ceux que le personnage peut lancer
+		const bool r3 = getBool(app, app.stickClickAction, kRight);
+		if (r3 && !app.r3Down && menu >= 0) {
+			const int n = app.level.magicLevels > 0 ? app.level.magicLevels : 1;
+			app.spellLevel = (app.spellLevel + 1) % n;
+			pulse(app, kRight, 0.20f, 0.02f);
+		}
+		app.r3Down = r3;
 		bool flick = !stickBusy && fabsf(right.y) > 0.75f && fabsf(right.x) < 0.40f;
 		if (flick && !app.charFlick) {
 			int step = right.y > 0 ? 1 : app.characters - 1;

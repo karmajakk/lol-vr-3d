@@ -359,16 +359,53 @@ void decodeDungeonTextures(const DungeonGfx &g, DungeonTextures &out) {
 						c0--;
 					while (c1 < kDunTexSize - 1 && sameHeight(c1 + 1))
 						c1++;
+					int pTop = dtop, pFoot = foot;
+					// Piliers un peu plus hauts que la porte, posés plus bas qu'elle, un seuil entre eux
+					// (manoir de Roland) : on les prend aussi, le plan va du haut des piliers à leur pied.
+					if (!(c0 < dc0 - 2 && c1 > dc1 + 2)) {
+						auto column = [&](int x, int &t0, int &t1) {
+							t0 = -1;
+							t1 = -1;
+							for (int y = 0; y < kDunWallRows; y++)
+								if (al[y * kDunTexSize + x] || dal[y * kDunTexSize + x]) {
+									if (t0 < 0)
+										t0 = y;
+									t1 = y;
+								}
+						};
+						auto pillar = [&](int x) {
+							int t0, t1;
+							column(x, t0, t1);
+							return t0 >= 0 && abs(t0 - dtop) <= 3 && t1 >= foot - 1 && t1 <= foot + 12;
+						};
+						int a0 = dc0, a1 = dc1;
+						while (a0 > 0 && pillar(a0 - 1))
+							a0--;
+						while (a1 < kDunTexSize - 1 && pillar(a1 + 1))
+							a1++;
+						if (a0 < dc0 - 2 && a1 > dc1 + 2) {
+							c0 = a0;
+							c1 = a1;
+							for (int x = c0; x <= c1; x++) {
+								int t0, t1;
+								column(x, t0, t1);
+								if (t0 >= 0) {
+									pTop = t0 < pTop ? t0 : pTop;
+									pFoot = t1 > pFoot ? t1 : pFoot;
+								}
+							}
+						}
+					}
 					const float r = (float)kDunTexSize / (float)(c1 - c0 + 1);
-					// Seulement si le cadre a, des deux côtés de la porte, des piliers à sa hauteur (le
-					// château) : sinon (manoir de Roland) les piliers sont sur la face, la porte derrière.
+					// Seulement si le cadre a, des deux côtés de la porte, des piliers : sinon la porte reste
+					// debout derrière la face.
 					const bool pillars = c0 < dc0 - 2 && c1 > dc1 + 2;
-					if (dc1 >= dc0 && seeThrough && pillars && r > 1.05f && r < 3.5f && foot - dtop > 20) {
+					if (dc1 >= dc0 && seeThrough && pillars && r > 1.0f && r < 3.5f && pFoot - pTop > 20) {
 						out.planeDepth[t] = r;
 						out.planeU0[t] = (float)c0 / kDunTexSize;
 						out.planeU1[t] = (float)(c1 + 1) / kDunTexSize;
-						out.planeTop[t] = (float)dtop / kDunTexSize;
-						out.planeFoot[t] = (float)(foot + 1) / kDunTexSize;
+						out.planeTop[t] = (float)pTop / kDunTexSize;
+						out.planeFoot[t] = (float)(pFoot + 1) / kDunTexSize;
 					}
 				}
 			}
@@ -552,15 +589,22 @@ void buildDungeonMesh(const uint8_t *walls, const DungeonGfx &g, const DungeonTe
 					const float px = fx - nx * ((r - 1.0f) * S * 0.5f - off), pz = fz - nz * ((r - 1.0f) * S * 0.5f - off);
 					// Une porte qui s'ouvre glisse vers le haut, son haut caché sous le linteau : on en
 					// montre le bas, plus haut d'autant.
+					// Le plan va de vt (en haut, à H) à vf (au sol) ; la porte occupe [dt, df] de son image.
 					const float vt = tex.planeTop[t], vf = tex.planeFoot[t];
-					const float lift = pass ? tex.doorLift[t] * (vf - vt) : 0.0f;
-					if (lift >= (vf - vt) - 0.002f)
+					auto yOf = [&](float v) { return H * (vf - v) / (vf - vt); };
+					float dt = vt, df = vf, lift = 0.0f;
+					if (pass) {
+						dt = tex.doorTopV[t] > vt ? tex.doorTopV[t] : vt;
+						df = tex.doorFootV[t] < vf ? tex.doorFootV[t] : vf;
+						lift = tex.doorLift[t] * (df - dt);
+					}
+					if (lift >= (df - dt) - 0.002f)
 						continue;
-					const float yb = H * lift / (vf - vt);
-					float bl[5] = {px - rx * S * 0.5f, yb, pz - rz * S * 0.5f, tex.planeU0[t], vf};
-					float br[5] = {px + rx * S * 0.5f, yb, pz + rz * S * 0.5f, tex.planeU1[t], vf};
-					float tr[5] = {px + rx * S * 0.5f, H, pz + rz * S * 0.5f, tex.planeU1[t], vt + lift};
-					float tl[5] = {px - rx * S * 0.5f, H, pz - rz * S * 0.5f, tex.planeU0[t], vt + lift};
+					const float y0 = yOf(df - lift), y1 = yOf(dt);
+					float bl[5] = {px - rx * S * 0.5f, y0, pz - rz * S * 0.5f, tex.planeU0[t], df};
+					float br[5] = {px + rx * S * 0.5f, y0, pz + rz * S * 0.5f, tex.planeU1[t], df};
+					float tr[5] = {px + rx * S * 0.5f, y1, pz + rz * S * 0.5f, tex.planeU1[t], dt + lift};
+					float tl[5] = {px - rx * S * 0.5f, y1, pz - rz * S * 0.5f, tex.planeU0[t], dt + lift};
 					quad(bl, br, tr, tl, lyr, faceShade[k]);
 				}
 				// Le linteau : au-dessus de l'ouverture, le haut du mur reste sur la face (sinon on voit

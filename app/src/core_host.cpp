@@ -102,6 +102,8 @@ struct LolvrLevelData {
 	uint8_t doorRaise[256];
 	uint32_t flightSerial;
 	LolvrFlight flights[8];
+	int32_t magicMenu;
+	int32_t magicLevels;
 };
 const LolvrLevelData *retro_lolvr_level(void);
 }
@@ -402,6 +404,8 @@ void copyLevel() {
 	l.textRect = (uint32_t)s->textBox;
 	// L'objet tenu par le pointeur, et l'image du curseur du jeu (en couleurs, le fond transparent)
 	l.itemInHand = s->itemInHand;
+	l.magicMenu = s->magicMenu;
+	l.magicLevels = s->magicLevels;
 	// Les objets en vol, à chaque pas
 	if (l.flightSerial != s->flightSerial) {
 		for (int i = 0; i < 8; i++) {
@@ -722,6 +726,8 @@ bool CoreHost::levelSnapshot(LevelSnapshot &out) const {
 	out.textBox = l.textBox;
 	out.textRect = l.textRect;
 	out.itemInHand = l.itemInHand;
+	out.magicMenu = l.magicMenu;
+	out.magicLevels = l.magicLevels;
 	if (out.flightSerial != l.flightSerial) {
 		memcpy(out.flights, l.flights, sizeof(out.flights));
 		out.flightSerial = l.flightSerial;

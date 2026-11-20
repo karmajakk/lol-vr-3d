@@ -3,6 +3,18 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.16.0] — Spell levels on the buttons, manor doors flush, text box apart
+
+- Magic with the controllers: **B** opens the levels of the chosen spell with level 1 framed in the
+  party window, the **right stick click** frames the next level the character can cast (1 to 4,
+  then back to 1), and **B** again casts the framed level. The engine now reports the open spell
+  menu and how many levels the character can afford (patch 0003). The right stick click still
+  recenters when the menu is closed.
+- Roland's manor doors: the door and its pillars are again one plane, flush, as in the game; the
+  pillars and the threshold reach the floor, open or closed, and the door rises between them.
+- While the game's text box covers the party's portraits (a remark, a conversation), the party and
+  spellbook windows keep showing them as they were: the box has its own window under the screen.
+
 ## [0.15.0] — Roland's manor: doors, alcoves, remarks
 
 - Saves made in Roland's manor no longer crash the engine when they load: some wall types of the

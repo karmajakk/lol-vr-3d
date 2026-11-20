@@ -10,12 +10,12 @@
 | Right stick (left/right) | Turn |
 | Right stick (up/down) | In the dungeon: next / previous character |
 | A | In the dungeon: **attack** with the selected character. Elsewhere: Enter |
-| B | In the dungeon: open the selected character's **magic**. Elsewhere: Escape (skip a cutscene) |
+| B | In the dungeon: open the selected character's **spell levels**, then press B again to **cast** the highlighted level. Elsewhere: Escape (skip a cutscene) |
 | Y | Map |
 | **X** | **Right click** where you aim: drink a potion, use an item (same as the grip) |
 | Menu button (left controller) | ScummVM menu: save, load, quit |
 | **Floppy on the left wrist** | The game menu (load, save, language...), and in it "VR controls": VR mode, view, controller mapping |
-| Right stick click | Recenter the screen, the room and the windows in front of you |
+| Right stick click | Recenter the screen, the room and the windows in front of you. With the spell levels open: next level |
 | Short left stick click (L3) | Classic and mixed reality: next view (big screen → windows → 486 PC) |
 | Left stick click held + right stick | Up/down: screen size; left/right: distance |
 
@@ -36,7 +36,7 @@ The keyboard opens by itself when the game asks for a save description, and clos
 
 ## Button combat
 
-In the dungeon, one character is "selected": they are framed in yellow in the party column. **A** makes them attack, **B** opens their spell list (then aim at the spell). Flick the right stick up or down to pick the next or previous character. In menus, cutscenes, the map and a character sheet, A and B go back to Enter and Escape; the Escape key is also on the keyboard.
+In the dungeon, one character is "selected": they are framed in yellow in the party column. **A** makes them attack, **B** opens the levels of the spell chosen in the spellbook, level 1 framed; the **right stick click** frames the next level the character can cast (1, 2, 3, 4, back to 1), and **B** again casts it. Clicking a level with the trigger works too. Flick the right stick up or down to pick the next or previous character. In menus, cutscenes, the map and a character sheet, A and B go back to Enter and Escape; the Escape key is also on the keyboard.
 
 To **drink a potion** or use an item: aim at it in the inventory and press **X** (a right click, like in the original game). The grip of the aiming hand does the same.
 

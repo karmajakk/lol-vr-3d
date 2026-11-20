@@ -221,6 +221,8 @@ int main(int argc, char **argv) {
 			if (hasL && ls.textRect)
 					printf("  zone de texte : x %u y %u, %u x %u\n", ls.textRect & 511, ((ls.textRect >> 9) & 127) + 100, (ls.textRect >> 16) & 511, (ls.textRect >> 25) & 127);
 			if (hasL)
+				printf("  magie : menu %d, %d niveaux\n", ls.magicMenu, ls.magicLevels);
+			if (hasL)
 				printf("  tenu=%d curseur=%dx%d chaud=%d,%d n°%u\n", ls.itemInHand, ls.cursorW, ls.cursorH, ls.cursorHotX, ls.cursorHotY, ls.cursorSerial);
 			if (hasL && ls.cursorW > 0 && ls.cursorRgba.size() >= (size_t)ls.cursorW * ls.cursorH * 4) {
 				// Le curseur du jeu, agrandi 8 fois, le fond transparent en magenta

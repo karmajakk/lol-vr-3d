@@ -347,6 +347,8 @@ struct Ui::Impl {
 	// Colonne du groupe recomposée
 	int chooserHot = -1; // bouton visé dans la fenêtre du choix de la vue
 	Composite comp[2];
+	std::vector<uint8_t> heldFrame; // l'image du jeu d'avant la boîte de texte (voir textBoxActive)
+	int heldW = 0, heldH = 0;
 	bool spellsCollapsed = true; // livre de sorts replié : seuls le bandeau et les messages restent
 	bool spellTabHot = false;
 	void compose(int which, const UiFrameInput &in);
@@ -493,9 +495,20 @@ void Ui::Impl::compose(int which, const UiFrameInput &in) {
 	Composite &c = comp[which];
 	const int n = in.characters < 0 ? 0 : in.characters > 4 ? 4 : in.characters;
 	const bool blank = in.compassBlank;
-	const int key = which == kCompParty ? n * 2 + (blank ? 1 : 0) : (spellsCollapsed ? 1 : 0) + language * 2 + (spellTabHot ? 4 : 0);
+	const int key = (which == kCompParty ? n * 2 + (blank ? 1 : 0) : (spellsCollapsed ? 1 : 0) + language * 2 + (spellTabHot ? 4 : 0)) + (in.textBoxActive ? 64 : 0);
 	if (c.tex && in.gameSerial == c.serial && key == c.key)
 		return;
+	// Pendant une boîte de texte, les morceaux viennent de l'image d'avant ; sinon on la garde à jour.
+	const uint8_t *game = in.gameRgba;
+	if (in.gameRgba && in.gameW > 0 && in.gameH > 0) {
+		if (in.textBoxActive && heldW == in.gameW && heldH == in.gameH) {
+			game = heldFrame.data();
+		} else if (!in.textBoxActive && which == kCompParty) {
+			heldFrame.assign(in.gameRgba, in.gameRgba + (size_t)in.gameW * in.gameH * 4);
+			heldW = in.gameW;
+			heldH = in.gameH;
+		}
+	}
 	c.serial = in.gameSerial;
 	c.key = key;
 	c.texW = kCompTexW[which];
@@ -549,7 +562,7 @@ void Ui::Impl::compose(int which, const UiFrameInput &in) {
 					}
 					int gx = pc.sx + x * pc.sw / pc.dw, gy = pc.sy + y * pc.sh / pc.dh;
 					int sx = gx * in.gameW / 320, sy = gy * in.gameH / 200;
-					const uint8_t *src = in.gameRgba + ((size_t)sy * in.gameW + sx) * 4;
+					const uint8_t *src = game + ((size_t)sy * in.gameW + sx) * 4;
 					p[0] = src[0]; p[1] = src[1]; p[2] = src[2];
 				}
 		}
@@ -1824,6 +1837,20 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 						p.hot[1] = (float)pc.dy / (float)c.texH;
 						p.hot[2] = (float)(pc.dx + pc.dw) / (float)c.texW;
 						p.hot[3] = (float)(pc.dy + pc.dh) / (float)c.texH;
+					}
+				}
+				// Le menu de magie ouvert : le niveau qui partira au prochain B, encadré.
+				if (i == kPanelParty && in.magicMark[2] > 0.0f) {
+					for (const Piece &pc : c.pieces) {
+						const float mx = in.magicMark[0], my = in.magicMark[1];
+						if (pc.sy != 143 || mx < pc.sx || mx >= pc.sx + pc.sw || my < pc.sy || my >= pc.sy + pc.sh)
+							continue;
+						const float kx = (float)pc.dw / (float)pc.sw, ky = (float)pc.dh / (float)pc.sh;
+						p.hotOutline = true;
+						p.hot[0] = (pc.dx + (mx - pc.sx) * kx) / (float)c.texW;
+						p.hot[1] = (pc.dy + (my - pc.sy) * ky) / (float)c.texH;
+						p.hot[2] = (pc.dx + (mx + in.magicMark[2] - pc.sx) * kx) / (float)c.texW;
+						p.hot[3] = (pc.dy + (my + in.magicMark[3] - pc.sy) * ky) / (float)c.texH;
 					}
 				}
 			} else {

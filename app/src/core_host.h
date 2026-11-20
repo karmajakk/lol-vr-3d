@@ -80,6 +80,8 @@ struct LevelSnapshot {
 	// L'objet tenu par le pointeur (0 = rien) et l'image du curseur du jeu (RGBA, fond transparent),
 	// point chaud compris. cursorSerial change avec l'image.
 	int itemInHand = 0;
+	int magicMenu = -1;        // le menu des niveaux de sort est ouvert pour ce personnage (-1 : fermé)
+	int magicLevels = 0;       // niveaux qu'il peut lancer maintenant (à partir du niveau 1)
 	// Les objets en vol (lancés, projectiles) : où ils sont à chaque pas du jeu (item 0 = aucun).
 	struct Flight {
 		int item = 0;

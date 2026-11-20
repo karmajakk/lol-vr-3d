@@ -77,8 +77,13 @@ struct UiFrameInput {
 	// Zone à mettre en valeur dans la fenêtre du groupe (pixels de l'image du jeu ; largeur 0 = aucune) :
 	// le personnage choisi pour les boutons d'attaque et de magie.
 	float partyMark[4] = {0, 0, 0, 0};
+	// Le niveau de sort en surbrillance dans le menu de magie ouvert (rectangle de l'image du jeu)
+	float magicMark[4] = {0, 0, 0, 0};
 	// La fiche d'un personnage occupe l'écran : la colonne de la boussole est éteinte.
 	bool compassBlank = false;
+	// Le jeu a agrandi sa zone de texte par-dessus les portraits (remarque, conversation) : les
+	// fenêtres des personnages et des sorts gardent l'image d'avant (la boîte a sa propre fenêtre).
+	bool textBoxActive = false;
 	// L'image du jeu (RGBA, première ligne en haut) et son numéro : la colonne du groupe en est
 	// recomposée (portraits empilés sous la colonne de la boussole).
 	const uint8_t *gameRgba = nullptr;

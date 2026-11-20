@@ -10,12 +10,12 @@
 | Joystick droit (gauche/droite) | Tourner |
 | Joystick droit (haut/bas) | Dans le donjon : personnage suivant / précédent |
 | A | Dans le donjon : **attaquer** avec le personnage choisi. Ailleurs : Entrée |
-| B | Dans le donjon : ouvrir la **magie** du personnage choisi. Ailleurs : Échap (passer une cinématique) |
+| B | Dans le donjon : ouvrir les **niveaux du sort** du personnage choisi, puis B à nouveau **lance** le niveau en surbrillance. Ailleurs : Échap (passer une cinématique) |
 | Y | Carte |
 | **X** | **Clic droit** là où tu vises : boire une potion, utiliser un objet (comme la poignée) |
 | Bouton menu (manette gauche) | Menu de ScummVM : sauvegarder, charger, quitter |
 | **Disquette au poignet gauche** | Le menu du jeu (charger, sauvegarder, langue…), et dedans « Réglages VR » : mode VR, vue, manettes et boutons |
-| Clic du joystick droit | Recentrer l'écran, la pièce et les fenêtres devant toi |
+| Clic du joystick droit | Recentrer l'écran, la pièce et les fenêtres devant toi. Niveaux de sort ouverts : niveau suivant |
 | Clic court du joystick gauche (L3) | Classique et réalité mixte : vue suivante (grand écran → fenêtres → PC 486) |
 | Clic du joystick gauche tenu + joystick droit | Haut/bas : taille de l'écran ; gauche/droite : distance |
 
@@ -36,7 +36,7 @@ Le clavier s'ouvre tout seul quand le jeu demande le nom d'une sauvegarde, et se
 
 ## Combat aux boutons
 
-Dans le donjon, un personnage est « choisi » : il est encadré de jaune dans la colonne du groupe. **A** le fait attaquer, **B** ouvre sa liste de sorts (vise ensuite le sort). Pousse le joystick droit vers le haut ou le bas pour choisir le personnage suivant ou précédent. Dans les menus, les cinématiques, la carte et une fiche de personnage, A et B redeviennent Entrée et Échap ; la touche Échap est aussi sur le clavier.
+Dans le donjon, un personnage est « choisi » : il est encadré de jaune dans la colonne du groupe. **A** le fait attaquer, **B** ouvre les niveaux du sort choisi dans le livre de sorts, le niveau 1 encadré ; le **clic du joystick droit** encadre le niveau suivant que le personnage peut lancer (1, 2, 3, 4, puis 1), et **B** à nouveau le lance. Cliquer un niveau avec la gâchette marche aussi. Pousse le joystick droit vers le haut ou le bas pour choisir le personnage suivant ou précédent. Dans les menus, les cinématiques, la carte et une fiche de personnage, A et B redeviennent Entrée et Échap ; la touche Échap est aussi sur le clavier.
 
 Pour **boire une potion** ou utiliser un objet : vise-le dans l'inventaire et appuie sur **X** (un clic droit, comme dans le jeu original). La poignée de la main qui vise fait la même chose.
 

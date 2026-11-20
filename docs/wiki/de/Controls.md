@@ -10,12 +10,12 @@
 | Rechter Stick (links/rechts) | Drehen |
 | Rechter Stick (auf/ab) | Im Dungeon: nächste / vorige Figur |
 | A | Im Dungeon: **angreifen** mit der gewählten Figur. Sonst: Eingabe |
-| B | Im Dungeon: die **Magie** der gewählten Figur öffnen. Sonst: Esc (Zwischensequenz überspringen) |
+| B | Im Dungeon: die **Zauberstufen** der gewählten Figur öffnen, dann wirkt B noch einmal die hervorgehobene Stufe. Sonst: Esc (Zwischensequenz überspringen) |
 | Y | Karte |
 | **X** | **Rechtsklick**, wohin du zielst: Trank trinken, Gegenstand benutzen (wie der Griff) |
 | Menütaste (linker Controller) | ScummVM-Menü: speichern, laden, beenden |
 | **Diskette am linken Handgelenk** | Das Spielmenü (laden, speichern, Sprache …), und darin „VR-Optionen“: VR-Modus, Ansicht, Steuerung und Tasten |
-| Rechten Stick klicken | Bildschirm, Raum und Fenster vor dir neu ausrichten |
+| Rechten Stick klicken | Bildschirm, Raum und Fenster vor dir neu ausrichten. Bei offenen Zauberstufen: nächste Stufe |
 | Linken Stick kurz klicken (L3) | Klassisch und Mixed Reality: nächste Ansicht (Großbild → Fenster → 486er-PC) |
 | Linken Stick gedrückt halten + rechter Stick | Auf/ab: Bildschirmgröße; links/rechts: Abstand |
 
@@ -36,7 +36,7 @@ Die Tastatur öffnet sich von selbst, wenn das Spiel nach dem Namen eines Spiels
 
 ## Kampf mit den Tasten
 
-Im Dungeon ist eine Figur „gewählt“: Sie ist in der Gruppenspalte gelb umrahmt. **A** lässt sie angreifen, **B** öffnet ihre Zauberliste (dann den Zauber anzielen). Tippe den rechten Stick nach oben oder unten, um die nächste oder vorige Figur zu wählen. In Menüs, Zwischensequenzen, auf der Karte und in einem Figurenbogen werden A und B wieder zu Eingabe und Esc; die Esc-Taste ist auch auf der Tastatur.
+Im Dungeon ist eine Figur „gewählt“: Sie ist in der Gruppenspalte gelb umrahmt. **A** lässt sie angreifen, **B** öffnet die Stufen des im Zauberbuch gewählten Zaubers, Stufe 1 umrahmt; **rechten Stick klicken** umrahmt die nächste Stufe, die die Figur wirken kann (1, 2, 3, 4, dann 1), und **B** noch einmal wirkt sie. Eine Stufe mit dem Abzug anklicken geht auch. Tippe den rechten Stick nach oben oder unten, um die nächste oder vorige Figur zu wählen. In Menüs, Zwischensequenzen, auf der Karte und in einem Figurenbogen werden A und B wieder zu Eingabe und Esc; die Esc-Taste ist auch auf der Tastatur.
 
 Um einen **Trank zu trinken** oder einen Gegenstand zu benutzen: ziele im Inventar darauf und drücke **X** (ein Rechtsklick, wie im Originalspiel). Der Griff der zielenden Hand macht dasselbe.
 
