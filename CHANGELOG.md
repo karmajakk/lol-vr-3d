@@ -3,6 +3,29 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.19.0] — Places in full size, leaving Buck's hut, the manor's exit, clicks on pictures
+
+- Pictures of places on the walls (the marina, Gladstone keep, Buck's hut, ...): the 3D dungeon now
+  shows the large picture the game opens when you walk into the place, instead of the small blurred
+  one. Gladstone keep and the marina on level 2 are there from the start; the other places show
+  in full once you have been in them (the engine remembers them in the save folder, for every
+  game: patch 0003).
+- Clicks on those pictures (bushes, holes, places) land where the game draws the small picture:
+  stretched over the whole wall, a click on its edge used to fall outside it and the game ignored
+  it.
+- Leaving Buck's hut (and any place the game leaves you inside of after its scene): the view is
+  in the level, in front of the way out, instead of inside the hut's picture with forest all
+  around.
+- The exit of Roland's manor: under the painted path, the floor of the doorway instead of a big
+  brown smear (walls with an opening down to the floor show the floor beyond it, as in the game).
+- Doors set back in their frame: the sides of the recess now stand on the floor all the way (their
+  foot follows the game's drawing column by column).
+- Scenes that take over the screen (meetings, cutscenes): in immersive mode they stay in the frame
+  of the view, with their text under it and the party window beside it, portraits kept, instead of
+  the whole game screen.
+- Dev: `LOLVR_CAM` moves the bench's camera, `LOLVR_DUMP_TYPE=tous` lists every wall type of the
+  level with the engine's raw drawing.
+
 ## [0.18.0] — The guard's welcome in 3D, scenes wait for the turn, messages letter for letter
 
 - New game: the guard's welcome at the castle gate is already in immersive mode, the castle in 3D

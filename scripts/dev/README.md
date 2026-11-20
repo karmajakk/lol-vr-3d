@@ -41,6 +41,9 @@ with NAME, a picture at each change).
 
 `LOLVR_DUMP_TYPE=portes` lists every door type (depth, plane, how far raised) and writes their
 pictures; `LOLVR_FORCE_DOOR=T` shows the closed doors (type 3) as type T, to see each step;
+`LOLVR_CAM=x,y,z,yaw,pitch` moves the camera of `dungeon`/`dungeonat` inside the block (metres,
+degrees); `LOLVR_DUMP_TYPE=tous` (or a type number, or `portes`) lists the wall types with their
+pictures (`typeN_mur.ppm` as used in 3D, `typeN_brut.ppm` as the engine drew it);
 `LOLVR_MURS=1` makes `carte` also list the wall types of every block (north, east, south, west);
 `LOLVR_NOIR=1` makes `dungeon`/`dungeonat` report views with empty (black) areas instead of
 writing pictures.

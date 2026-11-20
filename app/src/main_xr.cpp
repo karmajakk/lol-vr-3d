@@ -465,7 +465,7 @@ struct App {
 	GLuint cursorTex = 0;       // le curseur du jeu (l'objet tenu), pour le donjon en 3D
 	uint32_t cursorTexSerial = 0;
 	lolvr::DungeonTextures dunTex;
-	uint32_t builtGfx = 0, builtWalls = 0, builtCapture = 0, builtSprites = 0;
+	uint32_t builtGfx = 0, builtWalls = 0, builtCapture = 0, builtSprites = 0, builtPlaces = 0;
 	uint32_t spriteVersion[32] = {0};
 	// Objets en vol (lancés, projectiles) : le jeu les avance par petits sauts ; on glisse de l'un à
 	// l'autre. spriteList garde les images posées, flightOf[i] le vol de l'image i (-1 : aucun).
@@ -513,6 +513,7 @@ struct App {
 	bool splitWanted = false;
 	double splitWantedSince = 0;
 	bool gameStarted = false, automapOpen = false;
+	bool cutscene = false;       // une scène a pris la main (mode de contrôle du jeu non nul)
 	bool gameMenuOpen = false;   // un menu du jeu est affiché
 	int langRequested = -1;      // langue choisie dans le casque, en attente que le jeu la prenne
 	double langRequestAt = 0;
@@ -555,6 +556,7 @@ struct App {
 	int builtDir = -1;        // direction du groupe pour laquelle le donjon a été construit (dessins au sol)
 	bool aimOnUi = false;     // le doigt vise une fenêtre ou l'écran
 	int visBlock = -1;        // case où se tient la vue 3D (elle ne suit pas le groupe dans une porte de boutique)
+	bool holdScene = false;   // une scène s'est jouée pendant que le groupe était dans un bloc d'entrée
 	float lightLevel = 1.0f;  // clarté du jeu (pénombre, lampe), adoucie
 	double imagesCheckedAt = -100.0;
 	bool imageLoaded[kImageSlots] = {false, false, false, false, false, false};
@@ -1523,6 +1525,11 @@ void updateGameEvents(App &app, double now) {
 	bool wanted = app.gameStarted && gs.controlMode == 0 && !gs.automapOpen && !gs.menuOpen;
 	app.charSheet = gs.charSheet;
 	app.inDungeon = wanted && !gs.charSheet;
+	// Une scène qui prend la main (rencontre, cinématique) : en mode immersif, elle reste dans le
+	// cadre de la vue, avec sa zone de texte dessous et la fenêtre des personnages à côté (leurs
+	// portraits d'avant la scène : le jeu les cache sous sa grande zone de texte).
+	app.cutscene = app.dungeonMode && app.gameStarted && gs.controlMode != 0 && !gs.automapOpen && !gs.menuOpen && !gs.charSheet;
+	wanted = wanted || app.cutscene;
 	app.characters = gs.characters >= 1 && gs.characters <= 4 ? gs.characters : 0;
 	if (app.selectedChar >= app.characters)
 		app.selectedChar = 0;
@@ -1739,7 +1746,7 @@ void updateLayout(App &app, double now) {
 		app.cropX = kViewX; app.cropY = kViewY; app.cropW = cw; app.cropH = kViewH;
 		// Mode immersif, boutique ou rencontre : la ligne de messages (les choix à faire) est collée
 		// sous la scène, à sa largeur.
-		const bool band = app.dungeonMode && (app.level.sceneBusy || app.level.textRect != 0) && !app.charSheet;
+		const bool band = app.dungeonMode && (app.level.sceneBusy || app.level.textRect != 0 || app.cutscene) && !app.charSheet;
 		// Une conversation ou la remarque d'un personnage : toute la zone de texte, avec le portrait de
 		// celui qui parle (le moteur dit où elle est). La bande est une fenêtre à part, sous le cadre :
 		// collée dans le cadre, elle bouchait la vue.
@@ -2026,7 +2033,10 @@ bool dungeonPick(App &app, Vec3 tip, Vec3 dir, float &gu, float &gv, Vec3 &hitW,
 					const float w = (1.0f / dd - 1.0f / rd) / (1.0f - 1.0f / rd);
 					const float uu = w * (side ? 1.0f : 0.0f) + (1.0f - w) * (side ? dt.planeU1[backT] : dt.planeU0[backT]);
 					const float vTop = (1.0f - w) * dt.planeTop[backT];
-					const float vFoot = w * (96.0f / 128.0f) + (1.0f - w) * dt.planeFoot[backT];
+					float vFoot = w * (96.0f / 128.0f) + (1.0f - w) * dt.planeFoot[backT];
+					const int cx = (int)fminf(fmaxf(uu * 128.0f - (side ? 0.5f : 0.0f), 0.0f), 127.0f);
+					if (dt.planeColFoot[backT][cx]) // comme le maillage : le pied dessiné de la colonne au sol
+						vFoot = (float)dt.planeColFoot[backT][cx] / 128.0f;
 					bestT = tt;
 					hit = hh;
 					px = 136.0f + uu * 128.0f;
@@ -2073,6 +2083,11 @@ bool dungeonPick(App &app, Vec3 tip, Vec3 dir, float &gu, float &gv, Vec3 &hitW,
 			hit = hh;
 			px = 136.0f + u * 128.0f;
 			py = 8.0f + row;
+			// Une image agrandie à tout le mur (un buisson, un lieu) : le clic va là où le jeu la dessine.
+			if (const int16_t *pb = app.dunTex.picBox[backT]; pb[2] > 0) {
+				px = 136.0f + (float)pb[0] + u * (float)pb[2];
+				py = 8.0f + (float)pb[1] + row / 96.0f * (float)pb[3];
+			}
 			finalF = f;
 			face = k;
 			finalR = r;
@@ -2214,14 +2229,14 @@ void updateUi(App &app, XrTime time, float dt, double now, bool pointer, bool tr
 	in.headDir = rotate(app.headRot, {0, 0, -1});
 	in.helpOpen = app.helpOpen;
 	in.compassBlank = app.split && app.charSheet;
-	in.textBoxActive = app.bandShown && app.level.textRect != 0;
+	in.textBoxActive = (app.bandShown && app.level.textRect != 0) || app.cutscene;
 	if (!app.frame.rgba.empty()) {
 		in.gameRgba = app.frame.rgba.data();
 		in.gameW = app.frame.width;
 		in.gameH = app.frame.height;
 	}
 	in.gameSerial = app.frameSerial;
-	in.characters = app.inDungeon ? app.characters : 0;
+	in.characters = app.inDungeon || app.cutscene ? app.characters : 0;
 	for (int i = 0; i < in.characters && i < 4; i++)
 		in.portraitX[i] = portraitX(in.characters, i);
 	in.gearHint = !app.gearKnown && !app.chooserOpen;
@@ -2874,14 +2889,19 @@ void updateDungeon(App &app, float dt) {
 	}
 	g.outdoor = isOutdoorTileset(app.tileset);
 	const bool gfxChanged = l.gfxSerial != app.builtGfx || l.wallCaptureSerial != app.builtCapture;
-	if (gfxChanged) {
+	// Une image de lieu de plus (le jeu vient de la montrer) : seulement les textures et le maillage.
+	const bool texChanged = gfxChanged || l.placeSerial != app.builtPlaces;
+	if (texChanged) {
 		app.builtCapture = l.wallCaptureSerial;
+		app.builtPlaces = l.placeSerial;
 		lolvr::decodeDungeonTextures(g, app.dunTex);
+		for (size_t i = 0; i < l.placeTypes.size() && (i + 1) * 176 * 120 * 3 <= l.placeRgb.size(); i++)
+			lolvr::applyPlacePicture(app.dunTex, l.placeTypes[i], &l.placeRgb[i * 176 * 120 * 3]);
 		app.dungeon.setTextures(app.dunTex);
 		app.builtGfx = l.gfxSerial;
-		LOGI("donjon 3D : niveau %d, %d textures", l.level, app.dunTex.layers);
+		LOGI("donjon 3D : niveau %d, %d textures, %d lieux", l.level, app.dunTex.layers, (int)l.placeTypes.size());
 	}
-	if (gfxChanged || l.wallsSerial != app.builtWalls || (l.direction & 3) != app.builtDir) {
+	if (texChanged || l.wallsSerial != app.builtWalls || (l.direction & 3) != app.builtDir) {
 		app.builtDir = l.direction & 3;
 		std::vector<lolvr::DungeonVertex> verts;
 		lolvr::buildDungeonMesh(l.walls, g, app.dunTex, verts, app.builtDir);
@@ -3028,14 +3048,28 @@ void updateDungeon(App &app, float dt) {
 	}
 	// Porte d'une boutique, entrée d'une autre région : le jeu fait entrer le groupe dans un bloc
 	// plein. La vue reste devant, face à l'image ; le jeu montre la scène ou change de région.
-	if (gfxChanged || app.shownLevel != l.level || app.visBlock < 0 || !lolvr::isHoldBlock(l.walls, l.block, g)) {
+	const bool hold = lolvr::isHoldBlock(l.walls, l.block, g);
+	// Une scène jouée sur ce bloc (l'intérieur de la hutte de Buck) : à la fin, le jeu y laisse le
+	// groupe tourné vers la sortie. C'est une arrivée, comme dans une nouvelle région.
+	bool leftScene = false;
+	if (!hold)
+		app.holdScene = false;
+	else if (l.sceneBusy)
+		app.holdScene = true;
+	else if (app.holdScene) {
+		app.holdScene = false;
+		leftScene = true;
+	}
+	if (gfxChanged || app.shownLevel != l.level || app.visBlock < 0 || !hold || leftScene) {
 		app.visBlock = l.block;
 		// Arrivée dans une nouvelle région sur l'entrée elle-même (le bloc de l'image, à la sortie du
 		// château par exemple) : on se tient devant, dans le passage, plutôt que dans le mur.
-		if (lolvr::isHoldBlock(l.walls, l.block, g)) {
+		if (hold) {
 			static const int hdx[4] = {0, 1, 0, -1}, hdz[4] = {-1, 0, 1, 0};
 			for (int i = 0; i < 4; i++) {
-				const int k = (l.direction + (i == 0 ? 0 : i == 1 ? 1 : i == 2 ? 3 : 2)) & 3;
+				// devant d'abord ; après une scène, puis derrière (une boutique dont on ressort à reculons)
+				static const int arrive[4] = {0, 1, 3, 2}, back[4] = {0, 2, 1, 3};
+				const int k = (l.direction + (leftScene ? back[i] : arrive[i])) & 3;
 				const int nb = (l.block + hdx[k] + hdz[k] * 32) & 1023;
 				if (!lolvr::isSolidBlock(l.walls, nb, g) && !lolvr::isHoldBlock(l.walls, nb, g)) {
 					app.visBlock = nb;
@@ -3144,7 +3178,9 @@ void updateScreenShown(App &app, double now) {
 	bool need = !app.dungeonVisible || !app.splitWanted || app.charSheet || app.automapOpen;
 	if (app.level.sceneBusy)
 		app.screenNeededAt = now;
-	bool show = need || app.level.sceneBusy || now - app.screenNeededAt < 0.1;
+	if (app.cutscene)
+		app.screenNeededAt = now;
+	bool show = need || app.level.sceneBusy || app.cutscene || now - app.screenNeededAt < 0.1;
 	if (show && !app.screenShown && app.dungeonVisible && app.headValid && app.screenPlaced) {
 		// Il revient là où le joueur regarde, à sa distance et à sa hauteur habituelles.
 		Vec3 f = rotate(app.headRot, {0, 0, -1});

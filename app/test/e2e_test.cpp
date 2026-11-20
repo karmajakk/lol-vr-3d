@@ -116,7 +116,7 @@ int main(int argc, char **argv) {
 	LevelSnapshot lvl;
 	DungeonTextures tex;
 	int builtDir = -1;
-	uint32_t builtGfx = 0, builtWalls = 0, builtCapture = 0;
+	uint32_t builtGfx = 0, builtWalls = 0, builtCapture = 0, builtPlaces = 0;
 	int16_t audio[960];
 	auto pump = [&](double seconds) {
 		int steps = (int)(seconds * 100);
@@ -318,13 +318,22 @@ int main(int argc, char **argv) {
 					g.outdoor = !strcmp(gs.tileset, "FOREST1") || !strcmp(gs.tileset, "SWAMP") || !strcmp(gs.tileset, "YVEL1");
 			}
 			printf("  murs dessinés par le moteur : %d (n°%u)\n", lvl.wallSlots, lvl.wallCaptureSerial);
-			if (lvl.gfxSerial != builtGfx || lvl.wallCaptureSerial != builtCapture) {
+			if (lvl.gfxSerial != builtGfx || lvl.wallCaptureSerial != builtCapture || lvl.placeSerial != builtPlaces) {
 				builtCapture = lvl.wallCaptureSerial;
+				builtPlaces = lvl.placeSerial;
+				builtWalls = 0xFFFFFFFFu; // le maillage aussi (les couches des images de lieux)
 				decodeDungeonTextures(g, tex);
+				for (size_t i = 0; i < lvl.placeTypes.size() && (i + 1) * 176 * 120 * 3 <= lvl.placeRgb.size(); i++) {
+					applyPlacePicture(tex, lvl.placeTypes[i], &lvl.placeRgb[i * 176 * 120 * 3]);
+					printf("  image de lieu pour le type %d\n", lvl.placeTypes[i]);
+				}
 				// LOLVR_DUMP_TYPE=t : les dessins d'un type de mur (mur, porte), en images
 				if (const char *dt = getenv("LOLVR_DUMP_TYPE"))
 				for (int t = 1; t < 256; t++) {
-					if (strcmp(dt, "portes") ? t != (atoi(dt) & 255) : tex.doorLayer[t] < 0)
+					bool used = false;
+					for (int i = 0; i < 4096 && !used; i++)
+						used = lvl.walls[i] == t;
+					if (!strcmp(dt, "tous") ? !used : strcmp(dt, "portes") ? t != (atoi(dt) & 255) : tex.doorLayer[t] < 0)
 						continue;
 					printf("    type %d : genre %d couche %d porte %d profondeur face %.2f porte %.2f plan %.2f levée %.2f\n", t, tex.kind[t], tex.typeLayer[t], tex.doorLayer[t], tex.faceDepth[t], tex.doorDepth[t], tex.planeDepth[t], tex.doorLift[t]);
 					{
@@ -336,6 +345,19 @@ int main(int argc, char **argv) {
 									shown++;
 									break;
 								}
+					}
+					// le dessin brut du moteur (le seul dessin de ce type, sans le mur dessous)
+					if (g.wallSlot && g.wallSlot[t] >= 0 && g.wallSlot[t] < g.wallSlots) {
+						FILE *fo = fopen((out + "/type" + std::to_string(t) + "_brut.ppm").c_str(), "wb");
+						fprintf(fo, "P6\n128 96\n255\n");
+						const size_t base = (size_t)g.wallSlot[t] * 128 * 96;
+						for (int i = 0; i < 128 * 96; i++) {
+							const uint8_t c = g.wallPixels[base + i];
+							uint8_t px3[3] = {(uint8_t)(lvl.screenPalette[c * 3] * 255 / 63), (uint8_t)(lvl.screenPalette[c * 3 + 1] * 255 / 63), (uint8_t)(lvl.screenPalette[c * 3 + 2] * 255 / 63)};
+							if (!g.wallAlpha[base + i]) { px3[0] = 255; px3[1] = 0; px3[2] = 255; }
+							fwrite(px3, 1, 3, fo);
+						}
+						fclose(fo);
 					}
 					const int ls[2] = {tex.typeLayer[t], tex.doorLayer[t]};
 					for (int k = 0; k < 2; k++) {
@@ -500,12 +522,26 @@ int main(int argc, char **argv) {
 			}
 			float px, pz;
 			static const int bdx[4] = {0, 1, 0, -1}, bdz[4] = {-32, 0, 32, 0};
-			int vb = atBlock >= 0 ? atBlock : atBlock == -2 ? lvl.block - bdx[lvl.direction & 3] - bdz[lvl.direction & 3] : lvl.block, vd = atBlock >= 0 ? atDir : lvl.direction;
+			int vb = atBlock >= 0 ? atBlock : lvl.block, vd = atBlock >= 0 ? atDir : lvl.direction;
+			if (atBlock == -2) // comme l'app à l'arrivée sur une entrée : la case devant, sinon à droite, à gauche, derrière
+				for (int i : {0, 1, 3, 2}) {
+					const int k = (lvl.direction + i) & 3, nb = (lvl.block + bdx[k] + bdz[k]) & 1023;
+					if (!isSolidBlock(lvl.walls, nb, g) && !isHoldBlock(lvl.walls, nb, g)) {
+						vb = nb;
+						break;
+					}
+				}
 			blockCenter(vb, px, pz);
 			Mat4 model = dungeonModel({0, 0, 0}, 0.0f, px, pz, (float)vd * 1.5707963f);
 			Vec3 eye{0, 1.35f, 0};
+			float camYaw = 0.0f, camPitch = 0.0f;
+			// LOLVR_CAM=x,y,z,lacet,tangage : la tête ailleurs dans la case (mètres, degrés), pour
+			// voir un détail de près ou de biais (pied d'une porte, bas d'une image)
+			if (const char *cam = getenv("LOLVR_CAM"))
+				sscanf(cam, "%f,%f,%f,%f,%f", &eye.x, &eye.y, &eye.z, &camYaw, &camPitch);
 			// Champ de vision proche de celui du jeu, pour comparer les deux images.
-			Mat4 view = viewFromPose(eye, quatYaw(0.0f));
+			Quat camRot = multiply(quatYaw(camYaw * 3.14159265f / 180.0f), quatAxisAngle({1, 0, 0}, camPitch * 3.14159265f / 180.0f));
+			Mat4 view = viewFromPose(eye, camRot);
 			float th = tanf(45.0f * 3.14159265f / 180.0f), tv = th * (float)H / (float)W;
 			Mat4 proj = projectionFromTangents(-th, th, -tv, tv, 0.05f, 200.0f);
 			glViewport(0, 0, W, H);

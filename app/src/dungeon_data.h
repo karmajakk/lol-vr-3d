@@ -66,6 +66,12 @@ struct DungeonTextures {
 	// lignes top..foot de l'image (fractions de 128) sur toute la largeur et toute la hauteur.
 	float planeDepth[256];
 	float planeU0[256], planeU1[256], planeTop[256], planeFoot[256];
+	// Les côtés du renfoncement : pour chaque colonne de l'image, la ligne sous son dernier pixel
+	// (0 = colonne vide) ; ce pied est posé au sol, pour que montants et piliers y touchent.
+	uint8_t planeColFoot[256][kDunTexSize];
+	// Une image agrandie à tout le mur : où elle était dans le dessin du jeu (x, y, largeur, hauteur ;
+	// largeur 0 = pas agrandie). Un clic sur le mur se ramène là, où le jeu l'attend.
+	int16_t picBox[256][4];
 	// La porte dans son dessin (fraction de la texture, en hauteur) : son haut et son pied ; et une
 	// porte qui s'ouvre ou se ferme : la part de sa hauteur dont elle est levée (0 fermée, 1 ouverte).
 	float doorTopV[256], doorFootV[256], doorLift[256];
@@ -109,6 +115,9 @@ bool isSolidBlock(const uint8_t *walls, int block, const DungeonGfx &gfx);
 
 // Une case où le groupe est entré en franchissant un mur dessiné : porte d'une boutique, entrée
 // d'une autre région. La vue 3D reste devant (le jeu montre alors la scène, ou change de région).
+// L'image d'un lieu (176 x 120, RVB) à la place de la petite image d'un type de mur, sur tout le mur.
+void applyPlacePicture(DungeonTextures &tex, int type, const uint8_t *rgb);
+
 bool isHoldBlock(const uint8_t *walls, int block, const DungeonGfx &gfx);
 
 } // namespace lolvr

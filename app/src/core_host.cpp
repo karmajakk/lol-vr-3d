@@ -104,6 +104,10 @@ struct LolvrLevelData {
 	LolvrFlight flights[8];
 	int32_t magicMenu;
 	int32_t magicLevels;
+	uint32_t placeSerial;
+	int32_t placeCount;
+	int32_t placeType[16];
+	const uint8_t *placeRgb;
 };
 const LolvrLevelData *retro_lolvr_level(void);
 }
@@ -406,6 +410,13 @@ void copyLevel() {
 	l.itemInHand = s->itemInHand;
 	l.magicMenu = s->magicMenu;
 	l.magicLevels = s->magicLevels;
+	// Les images des lieux (176 x 120, RVB), à poser sur leur mur
+	if (l.placeSerial != s->placeSerial) {
+		l.placeSerial = s->placeSerial;
+		const int n = s->placeRgb && s->placeCount > 0 ? (s->placeCount > 16 ? 16 : s->placeCount) : 0;
+		l.placeTypes.assign(s->placeType, s->placeType + n);
+		l.placeRgb.assign(s->placeRgb ? s->placeRgb : (const uint8_t *)"", s->placeRgb ? s->placeRgb + (size_t)n * 176 * 120 * 3 : (const uint8_t *)"");
+	}
 	// Les objets en vol, à chaque pas
 	if (l.flightSerial != s->flightSerial) {
 		for (int i = 0; i < 8; i++) {
@@ -728,6 +739,11 @@ bool CoreHost::levelSnapshot(LevelSnapshot &out) const {
 	out.itemInHand = l.itemInHand;
 	out.magicMenu = l.magicMenu;
 	out.magicLevels = l.magicLevels;
+	if (out.placeSerial != l.placeSerial) {
+		out.placeSerial = l.placeSerial;
+		out.placeTypes = l.placeTypes;
+		out.placeRgb = l.placeRgb;
+	}
 	if (out.flightSerial != l.flightSerial) {
 		memcpy(out.flights, l.flights, sizeof(out.flights));
 		out.flightSerial = l.flightSerial;

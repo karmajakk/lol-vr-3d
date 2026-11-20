@@ -11,6 +11,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 namespace lolvr {
 
@@ -166,6 +167,8 @@ void decodeDungeonTextures(const DungeonGfx &g, DungeonTextures &out) {
 		out.typeLayer[i] = out.doorLayer[i] = out.decalLayer[i] = -1;
 		out.doorDepth[i] = 1.0f;
 		out.planeDepth[i] = 0.0f;
+		memset(out.planeColFoot[i], 0, kDunTexSize);
+		out.picBox[i][0] = out.picBox[i][1] = out.picBox[i][2] = out.picBox[i][3] = 0;
 		out.doorTopV[i] = out.doorFootV[i] = out.doorLift[i] = 0.0f;
 		out.faceDepth[i] = 1.0f;
 		out.kind[i] = kWallFace;
@@ -174,6 +177,17 @@ void decodeDungeonTextures(const DungeonGfx &g, DungeonTextures &out) {
 		return;
 	const int pages = (g.vmpLen - 330) / kPageLen;
 	const size_t layerBytes = (size_t)kDunTexSize * kDunTexSize * 4;
+
+	// Le fond (sol et plafond à perte de vue), comme le jeu le dessine quand aucun mur ne cache la vue :
+	// ce qu'il montre par une ouverture au bas d'un mur (le seuil d'une sortie).
+	std::vector<Rgba> wallBg;
+	{
+		const int page = g.vmpMap[1] ? g.vmpMap[1] : 1;
+		if ((page - 1) * kPageLen + 330 <= g.vmpLen) {
+			wallBg.assign((size_t)kBgW * kBgH, Rgba{0, 0, 0, 255});
+			drawEntries(g, wallBg.data(), kBgW, g.vmp + (page - 1) * kPageLen, 22, 15);
+		}
+	}
 
 	// Les murs : une couche par page utilisée par au moins un type de mur.
 	for (int p = 1; p <= pages && p < 64; p++) {
@@ -296,6 +310,10 @@ void decodeDungeonTextures(const DungeonGfx &g, DungeonTextures &out) {
 						}
 				const int bw = x1 - x0 + 1, bh = y1 - y0 + 1;
 				if (x1 >= 0 && bw > 16 && bh > 12 && (bw < kDunTexSize - 8 || bh < kDunWallRows - 8)) {
+					out.picBox[t][0] = (int16_t)x0;
+					out.picBox[t][1] = (int16_t)y0;
+					out.picBox[t][2] = (int16_t)bw;
+					out.picBox[t][3] = (int16_t)bh;
 					for (int y = 0; y < kDunWallRows; y++)
 						for (int x = 0; x < kDunTexSize; x++) {
 							const int sx = x0 + x * bw / kDunTexSize, sy = y0 + y * bh / kDunWallRows;
@@ -312,14 +330,27 @@ void decodeDungeonTextures(const DungeonGfx &g, DungeonTextures &out) {
 						img[i] = base[i];
 			}
 			// Un mur plein ne doit laisser passer aucun jour (le jeu y dessinait le sol, en bas) : chaque
-			// pixel transparent prend la couleur du pixel opaque au-dessus de lui.
+			// pixel transparent prend la couleur du pixel opaque au-dessus de lui. Sauf une ouverture
+			// jusqu'en bas d'un mur qui, lui, descend jusqu'au sol (une sortie, son chemin peint au fond) :
+			// le jeu y montre le sol qui continue, on y met donc son fond.
 			if (!seeThrough && out.kind[t] == kWallFace) {
+				int faceFoot = -1, lastRow[kDunTexSize];
 				for (int x = 0; x < kDunTexSize; x++) {
+					lastRow[x] = -1;
+					for (int y = 0; y < kDunWallRows; y++)
+						if (img[y * kDunTexSize + x].a)
+							lastRow[x] = y;
+					faceFoot = lastRow[x] > faceFoot ? lastRow[x] : faceFoot;
+				}
+				for (int x = 0; x < kDunTexSize; x++) {
+					const bool opening = !wallBg.empty() && faceFoot >= kDunWallRows - 4 && lastRow[x] >= 0 && lastRow[x] < kDunWallRows - 8;
 					Rgba last = {0, 0, 0, 255};
 					for (int y = 0; y < kDunWallRows; y++) {
 						Rgba &cc = img[y * kDunTexSize + x];
 						if (cc.a)
 							last = cc;
+						else if (opening && y > lastRow[x])
+							cc = wallBg[(size_t)(8 + y) * kBgW + 24 + x];
 						else
 							cc = last;
 					}
@@ -449,6 +480,13 @@ void decodeDungeonTextures(const DungeonGfx &g, DungeonTextures &out) {
 						out.planeU1[t] = (float)(c1 + 1) / kDunTexSize;
 						out.planeTop[t] = (float)pTop / kDunTexSize;
 						out.planeFoot[t] = (float)(pFoot + 1) / kDunTexSize;
+						for (int x = 0; x < kDunTexSize; x++) {
+							int t1 = -1;
+							for (int y = 0; y < kDunWallRows; y++)
+								if (al[y * kDunTexSize + x] || dal[y * kDunTexSize + x])
+									t1 = y;
+							out.planeColFoot[t][x] = t1 >= 0 ? (uint8_t)(t1 + 1) : 0;
+						}
 					}
 				}
 			}
@@ -669,7 +707,7 @@ void buildDungeonMesh(const uint8_t *walls, const DungeonGfx &g, const DungeonTe
 				// une perspective, ses coordonnées varient comme 1 / profondeur : en bandes.
 				if (tex.planeU0[t] > 0.02f && tex.planeU1[t] < 0.98f) {
 					const float rx = nz, rz = -nx, inset = 0.012f * S, vb = vBottom;
-					const int N = 6;
+					const int N = 12;
 					for (int side = 0; side < 2; side++) {
 						const float lat = (side ? 1.0f : -1.0f) * (S * 0.5f - inset);
 						const float uFace = side ? 1.0f : 0.0f, uPlane = side ? tex.planeU1[t] : tex.planeU0[t];
@@ -679,7 +717,13 @@ void buildDungeonMesh(const uint8_t *walls, const DungeonGfx &g, const DungeonTe
 								const float s = (float)(i + e) / N, d = 1.0f + s * (r - 1.0f);
 								const float w = (1.0f / d - 1.0f / r) / (1.0f - 1.0f / r); // 1 à la face, 0 au plan
 								const float u = w * uFace + (1.0f - w) * uPlane;
-								const float vTop = (1.0f - w) * tex.planeTop[t], vFoot = w * vb + (1.0f - w) * tex.planeFoot[t];
+								const float vTop = (1.0f - w) * tex.planeTop[t];
+								float vFoot = w * vb + (1.0f - w) * tex.planeFoot[t];
+								// Le pied de la colonne dessinée, au sol : le dessin n'est pas une perspective exacte,
+								// et un montant qui s'arrête avant le sol laisse voir le sol dessous.
+								const int cx = (int)fminf(fmaxf(u * kDunTexSize - (side ? 0.5f : 0.0f), 0.0f), kDunTexSize - 1.0f);
+								if (tex.planeColFoot[t][cx])
+									vFoot = (float)tex.planeColFoot[t][cx] / kDunTexSize;
 								const float cxp = fx - nx * ((d - 1.0f) * S * 0.5f) + rx * lat, czp = fz - nz * ((d - 1.0f) * S * 0.5f) + rz * lat;
 								const float lo[5] = {cxp, 0.0f, czp, u, vFoot}, hi[5] = {cxp, H, czp, u, vTop};
 								memcpy(pt[e][0], lo, sizeof lo);
@@ -762,6 +806,35 @@ void buildDungeonMesh(const uint8_t *walls, const DungeonGfx &g, const DungeonTe
 		float t0[5] = {L, top, L, 0, 0}, t1[5] = {R, top, L, 1, 0}, t2[5] = {R, top, R, 1, 0.02f}, t3[5] = {L, top, R, 0, 0.02f};
 		quad(t0, t1, t2, t3, layer, e);
 	}
+}
+
+} // namespace lolvr
+
+namespace lolvr {
+
+void applyPlacePicture(DungeonTextures &tex, int type, const uint8_t *rgb) {
+	if (type <= 0 || type > 255 || !rgb || tex.kind[type] != kWallFace || tex.planeDepth[type] > 0.0f)
+		return;
+	const size_t layerBytes = (size_t)kDunTexSize * kDunTexSize * 4;
+	tex.rgba.resize((size_t)(tex.layers + 1) * layerBytes, 0);
+	uint8_t *img = &tex.rgba[(size_t)tex.layers * layerBytes];
+	// 176 x 120 ramenés à 128 x 96 : chaque pixel du mur, la moyenne des pixels de l'image qu'il couvre
+	for (int y = 0; y < kDunTexSize; y++)
+		for (int x = 0; x < kDunTexSize; x++) {
+			uint8_t *d = img + ((size_t)y * kDunTexSize + x) * 4;
+			const int yy = y < kDunWallRows ? y : kDunWallRows - 1;
+			const int sx0 = x * 176 / kDunTexSize, sx1 = (x + 1) * 176 / kDunTexSize;
+			const int sy0 = yy * 120 / kDunWallRows, sy1 = (yy + 1) * 120 / kDunWallRows;
+			int sum[3] = {0, 0, 0}, n = 0;
+			for (int sy = sy0; sy < sy1; sy++)
+				for (int sx = sx0; sx < sx1; sx++, n++)
+					for (int k = 0; k < 3; k++)
+						sum[k] += rgb[((size_t)sy * 176 + sx) * 3 + k];
+			for (int k = 0; k < 3; k++)
+				d[k] = (uint8_t)(n ? sum[k] / n : 0);
+			d[3] = 255;
+		}
+	tex.typeLayer[type] = tex.layers++;
 }
 
 } // namespace lolvr
