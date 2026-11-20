@@ -99,7 +99,8 @@ and the ScummVM source (`engines/kyra/engine/scene_rpg.cpp`).
 ## Building
 
 Pushes are built by GitHub Actions (`.github/workflows/build.yml`, `scripts/build.sh`). A version
-is published when the `VERSION` file holds a number without a release.
+is published when the `VERSION` file holds a number without a release. To test on a Linux PC
+without the headset, see [scripts/dev](scripts/dev/README.md).
 
 ## License
 

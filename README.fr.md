@@ -105,7 +105,8 @@ et les sources de ScummVM (`engines/kyra/engine/scene_rpg.cpp`).
 ## Compilation
 
 Chaque envoi est compilé par GitHub Actions (`.github/workflows/build.yml`, `scripts/build.sh`). Une
-version est publiée quand le fichier `VERSION` contient un numéro sans version publiée.
+version est publiée quand le fichier `VERSION` contient un numéro sans version publiée. Pour
+tester sur un PC Linux sans le casque, voir [scripts/dev](scripts/dev/README.md) (en anglais).
 
 ## Licence
 

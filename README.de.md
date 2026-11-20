@@ -108,7 +108,8 @@ und der Quellcode von ScummVM (`engines/kyra/engine/scene_rpg.cpp`).
 
 Jeder Push wird von GitHub Actions gebaut (`.github/workflows/build.yml`, `scripts/build.sh`). Eine
 Version wird veröffentlicht, wenn die Datei `VERSION` eine Nummer ohne veröffentlichte Version
-enthält.
+enthält. Zum Testen auf einem Linux-PC ohne Headset siehe [scripts/dev](scripts/dev/README.md)
+(auf Englisch).
 
 ## Lizenz
 
