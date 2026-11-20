@@ -51,8 +51,8 @@ Démo en développement. Ce qui fonctionne :
 - Les effets des sorts sont montrés en 3D, comme le jeu les dessine. L'écran du jeu apparaît tout
   seul pour les scènes, les dialogues, la carte et les menus.
 
-Pas encore là : les portes qui coulissent en 3D (elles passent d'un coup de fermées à ouvertes), les
-objets lancés en vol.
+- Les portes montent dans leur cadre par étapes, comme dans le jeu ; les objets lancés et les
+  projectiles traversent le donjon en 3D à la hauteur que le jeu leur donne.
 
 Détail des versions : [CHANGELOG.md](CHANGELOG.md) (en anglais).
 

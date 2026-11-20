@@ -46,8 +46,8 @@ Early demo. What works:
 - Spell effects are shown in 3D, as the game draws them. The game screen appears by itself for
   scenes, dialogues, the map and menus.
 
-Not there yet: doors that slide open in 3D (they jump from closed to open), thrown objects in
-flight.
+- Doors rise into their frame step by step, like in the game; thrown items and projectiles fly
+  through the 3D dungeon at the height the game gives them.
 
 Version details: [CHANGELOG.md](CHANGELOG.md).
 

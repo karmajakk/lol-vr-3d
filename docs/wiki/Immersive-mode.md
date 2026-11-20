@@ -13,6 +13,6 @@ The dungeon is rebuilt in true 3D around you, at real size, from your own game f
 - **Light**: dark places stay dark until you light the lamp, following the game's own brightness.
 - **Spells**: their effects, as the game draws them over its view, appear in the dungeon in front of the party while the spell is cast.
 
-Not there yet: doors that slide open (they jump from closed to open), thrown objects in flight.
+Doors rise into their frame step by step, like in the game. Thrown items and projectiles fly through the dungeon at the height the game gives them.
 
 Switch to the classic view in "VR controls" (game menu, floppy on the left wrist): "VR mode", Classic or Mixed reality.

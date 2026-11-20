@@ -136,6 +136,29 @@ int main(int argc, char **argv) {
 			double s = 1;
 			cs >> s;
 			pump(s);
+		} else if (op == "watch") {
+			// watch S : pendant S secondes, les objets en vol (position, hauteur) à chaque capture
+			double s = 1;
+			cs >> s;
+			uint32_t seen = 0;
+			for (int i = 0; i < (int)(s * 100) && !host.finished(); i++) {
+				usleep(10000);
+				host.readAudio(audio, 480);
+				host.fetchFrame(f);
+				LevelSnapshot w;
+				if (host.levelSnapshot(w) && w.flightSerial != seen) {
+					seen = w.flightSerial;
+					for (const auto &fo : w.flights)
+						if (fo.item) {
+							int img = -1;
+							for (const LevelSprite &sp : w.sprites)
+								if (sp.kind == 1 && sp.id == fo.item)
+									img = sp.flying ? 1 : 0;
+							printf("  %4d ms : objet %d en vol à (%.3f, %.3f), hauteur %d, direction %d, image %s\n", i * 10, fo.item, fo.x / 256.0, fo.y / 256.0, fo.height, fo.dir,
+							       img < 0 ? "absente" : img ? "en vol" : "au sol");
+						}
+				}
+			}
 		} else if (op == "key") {
 			std::string k;
 			cs >> k;
@@ -145,14 +168,16 @@ int main(int argc, char **argv) {
 			host.key(c, false);
 			pump(0.25);
 		} else if (op == "click" || op == "rclick") {
-			float u = 0.5f, v = 0.5f;
+			float u = 0.5f, v = 0.5f, after = 0.3f; // click U V [attente après, 0.3 s]
 			cs >> u >> v;
+			if (!(cs >> after))
+				after = 0.3f;
 			host.setPointer(u, v);
 			pump(0.15);
 			host.setMouseButtons(op == "click", op == "rclick");
-			pump(0.12);
+			pump(0.03);
 			host.setMouseButtons(false, false);
-			pump(0.3);
+			pump(after);
 		} else if (op == "lang") {
 			int l = 0;
 			cs >> l;
@@ -215,6 +240,7 @@ int main(int argc, char **argv) {
 				if (!lvl.doorPixels.empty()) {
 					g.doorPixels = lvl.doorPixels.data();
 					g.doorAlpha = lvl.doorAlpha.data();
+					g.doorRaise = lvl.doorRaise;
 				}
 			}
 			{
@@ -231,7 +257,7 @@ int main(int argc, char **argv) {
 				for (int t = 1; t < 256; t++) {
 					if (strcmp(dt, "portes") ? t != (atoi(dt) & 255) : tex.doorLayer[t] < 0)
 						continue;
-					printf("    type %d : genre %d couche %d porte %d profondeur face %.2f porte %.2f\n", t, tex.kind[t], tex.typeLayer[t], tex.doorLayer[t], tex.faceDepth[t], tex.doorDepth[t]);
+					printf("    type %d : genre %d couche %d porte %d profondeur face %.2f porte %.2f plan %.2f levée %.2f\n", t, tex.kind[t], tex.typeLayer[t], tex.doorLayer[t], tex.faceDepth[t], tex.doorDepth[t], tex.planeDepth[t], tex.doorLift[t]);
 					const int ls[2] = {tex.typeLayer[t], tex.doorLayer[t]};
 					for (int k = 0; k < 2; k++) {
 						if (ls[k] < 0)
@@ -266,7 +292,15 @@ int main(int argc, char **argv) {
 			if (lvl.wallsSerial != builtWalls || meshDir != builtDir) {
 				builtDir = meshDir;
 				std::vector<DungeonVertex> verts;
-				buildDungeonMesh(lvl.walls, g, tex, verts, meshDir);
+				// LOLVR_FORCE_DOOR=t : les portes fermées (type 3) montrées au type t (une porte qui
+				// s'ouvre), pour voir chaque étape.
+				uint8_t wallsCopy[1024 * 4];
+				memcpy(wallsCopy, lvl.walls, sizeof(wallsCopy));
+				if (const char *fd = getenv("LOLVR_FORCE_DOOR"))
+					for (uint8_t &w : wallsCopy)
+						if (w == 3)
+							w = (uint8_t)atoi(fd);
+				buildDungeonMesh(wallsCopy, g, tex, verts, meshDir);
 				dun.setMesh(verts);
 				builtWalls = lvl.wallsSerial;
 			}
@@ -292,9 +326,19 @@ int main(int argc, char **argv) {
 					d.width = (float)(s.x1 - s.x0) * kSpritePixel;
 					d.height = (float)(s.y1 - s.y0) * kSpritePixel * 1.2f;
 					d.offset = ((float)(s.x0 + s.x1) * 0.5f - 88.0f) * kSpritePixel;
+					if (s.kind == 1 && s.flying) { // en vol, comme dans l'app : à sa position du moment
+						const float base = (float)(s.flying - 1) * 4.5f * kSpritePixel;
+						d.base = base < kWallHeight * 0.6f ? base : kWallHeight * 0.6f;
+						d.ceiling = false;
+						for (const auto &fo : lvl.flights)
+							if (fo.item == s.id) {
+								d.x = (float)fo.x / 256.0f * kBlockSize;
+								d.z = (float)fo.y / 256.0f * kBlockSize;
+							}
+					}
 					list.push_back(d);
-					printf("    sprite %zu : %s id %d à (%.2f, %.2f) bloc %d, %d x %d px\n", i, s.kind ? "objet" : "monstre", s.id, s.x / 256.0, s.y / 256.0,
-					       (s.y >> 8) * 32 + (s.x >> 8), s.x1 - s.x0, s.y1 - s.y0);
+					printf("    sprite %zu : %s id %d à (%.2f, %.2f) bloc %d, %d x %d px%s\n", i, s.kind ? "objet" : "monstre", s.id, s.x / 256.0, s.y / 256.0,
+					       (s.y >> 8) * 32 + (s.x >> 8), s.x1 - s.x0, s.y1 - s.y0, s.flying ? (" en vol, hauteur " + std::to_string(s.flying) + " direction " + std::to_string(s.flightDir)).c_str() : "");
 				}
 				dun.setSprites(list);
 			}

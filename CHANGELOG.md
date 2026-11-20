@@ -3,6 +3,21 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.13.0] — Doors that open, items in flight
+
+- Doors now rise into their frame step by step, as in the game, instead of jumping from closed to
+  open: the engine draws each door closed and reports how far up it is (patch 0003), and the 3D
+  dungeon shows the part still below the lintel, raised by that much. Before, the in-between steps
+  showed no door, or a door set too far back.
+- Thrown items and projectiles fly through the 3D dungeon: a throw lasts a fraction of a second,
+  faster than the pictures of monsters and items are taken, so the engine now publishes every step
+  of each flight and takes the flying object's picture (the game's thrown shape, seen from the
+  party's side) as soon as it is launched. The app glides between the steps, a little below eye
+  level, as if thrown from the hand.
+- Dev tools: `scripts/dev/regen_patch.sh` regenerates patch 0003; the end-to-end bench gains
+  `watch` (objects in flight, step by step), `LOLVR_FORCE_DOOR` (show each door step) and a
+  shorter `click`.
+
 ## [0.12.0] — Item on the pointer, castle door, VR controls
 
 - Immersive mode: an item taken from the inventory stays on the pointer when you aim into the

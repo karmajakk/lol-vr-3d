@@ -51,8 +51,8 @@ Frühe Demo. Was funktioniert:
 - Zaubereffekte werden in 3D gezeigt, so wie das Spiel sie zeichnet. Der Spielbildschirm erscheint
   von selbst für Szenen, Dialoge, die Karte und Menüs.
 
-Noch nicht da: Türen, die in 3D aufgleiten (sie springen von zu auf offen), geworfene Gegenstände
-im Flug.
+- Türen heben sich Schritt für Schritt in ihren Rahmen, wie im Spiel; geworfene Gegenstände und
+  Geschosse fliegen in der Höhe, die das Spiel ihnen gibt, durch den 3D-Dungeon.
 
 Versionsdetails: [CHANGELOG.md](CHANGELOG.md) (auf Englisch).
 

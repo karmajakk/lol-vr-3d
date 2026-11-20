@@ -1,5 +1,5 @@
 diff --git a/engines/kyra/engine/items_lol.cpp b/engines/kyra/engine/items_lol.cpp
-index 4c00889..4a283e5 100644
+index 4c00889..3ced5d1 100644
 --- a/engines/kyra/engine/items_lol.cpp
 +++ b/engines/kyra/engine/items_lol.cpp
 @@ -328,6 +328,7 @@ void LoLEngine::setHandItem(Item itemIndex) {
@@ -8,6 +8,18 @@ index 4c00889..4a283e5 100644
  	_itemInHand = itemIndex;
 +	g_lolvrLevel.itemInHand = itemIndex; // lol-vr-3d
  	_screen->setMouseCursor(mouseOffs, mouseOffs, getItemIconShapePtr(itemIndex));
+ }
+ 
+@@ -438,6 +439,11 @@ bool LoLEngine::launchObject(int objectType, Item item, int startX, int startY,
+ 
+ 	updateObjectFlightPosition(t);
+ 
++	// lol-vr-3d: the flight is short; its picture is taken now, then each step is published
++	if (g_lolvrLevel.gfxSerial && g_lolvrLevel.wallCaptureSerial == g_lolvrLevel.gfxSerial)
++		lolvrCaptureSprites();
++	lolvrExportFlights();
++
+ 	return true;
  }
  
 diff --git a/engines/kyra/engine/lol.cpp b/engines/kyra/engine/lol.cpp
@@ -303,10 +315,10 @@ index c4f86a3..1c06559 100644
  	uint32 delayTimer = _system->getMillis() + 8 * _tickLength;
  
 diff --git a/engines/kyra/engine/lol.h b/engines/kyra/engine/lol.h
-index a9028a2..204786a 100644
+index a9028a2..218acf3 100644
 --- a/engines/kyra/engine/lol.h
 +++ b/engines/kyra/engine/lol.h
-@@ -50,6 +50,82 @@ struct LolvrGameState {
+@@ -50,6 +50,99 @@ struct LolvrGameState {
  	int32 reserved[4];  // [0] dungeon loop ticks, [1] control mode, [2] bit 0: automap open, bit 1: game menu open
  };
  extern LolvrGameState g_lolvrState;
@@ -321,6 +333,16 @@ index a9028a2..204786a 100644
 +	int16 x0, y0, x1, y1; // drawn part of the picture (x1, y1 excluded)
 +	uint32 version;    // changes when the picture changes
 +	uint16 id;         // object number (monster | 0x8000, or item)
++	uint8 flying;      // an item in flight: its height (the game's flyingHeight), else 0
++	uint8 flightDir;   // its direction of flight, 0 north .. 3 west
++};
++
++// lol-vr-3d: an object in flight (thrown item, projectile), updated at each step of its flight.
++struct LolvrFlight {
++	uint16 item;       // 0 = none
++	uint16 x, y;       // position in the level, as LolvrSprite
++	uint8 height;      // the game's flyingHeight
++	uint8 dir;         // 0 north .. 3 west
 +};
 +
 +// lol-vr-3d: the current level, for the 3D dungeon. The frontend reads it through
@@ -384,17 +406,25 @@ index a9028a2..204786a 100644
 +	int32 cursorW, cursorH, cursorHotX, cursorHotY, cursorKey;
 +	uint8 cursorPixels[64 * 64];
 +	uint8 cursorPalette[768];
++	// A door between closed and open, per wall type: how many rows of the capture it is raised
++	// (0 = closed, or not a door). Its capture (doorPixels) shows it closed.
++	uint8 doorRaise[256];
++	// Objects in flight: they move every tick (a throw lasts a fraction of a second), faster than
++	// the sprite capture; flightSerial changes at each step.
++	uint32 flightSerial;
++	LolvrFlight flights[8];
 +};
 +extern LolvrLevelData g_lolvrLevel;
  }
  
  namespace Audio {
-@@ -335,6 +411,18 @@ private:
+@@ -335,6 +428,19 @@ private:
  
  	// main loop
  	void runLoop();
 +	void lolvrCaptureWalls(); // lol-vr-3d
-+	void lolvrCaptureSprites(); // lol-vr-3d
++	void lolvrCaptureSprites();
++	void lolvrExportFlights(); // lol-vr-3d
 +	void lolvrSpellBegin(); // lol-vr-3d
 +	void lolvrSpellEnd(); // lol-vr-3d
 +public:
@@ -409,7 +439,7 @@ index a9028a2..204786a 100644
  
  	// mouse
 diff --git a/engines/kyra/engine/scene_lol.cpp b/engines/kyra/engine/scene_lol.cpp
-index 210b482..1f3b64f 100644
+index 210b482..707dbfb 100644
 --- a/engines/kyra/engine/scene_lol.cpp
 +++ b/engines/kyra/engine/scene_lol.cpp
 @@ -405,6 +405,19 @@ void LoLEngine::loadLevelGraphics(const char *file, int specialColor, int weight
@@ -450,7 +480,7 @@ index 210b482..1f3b64f 100644
  
  	if (_dialogueField)
  		restoreAfterDialogueSequence(_currentControlMode);
-@@ -1581,6 +1598,135 @@ void LoLEngine::drawSpecialGuiShape(int pageNum) {
+@@ -1581,6 +1598,153 @@ void LoLEngine::drawSpecialGuiShape(int pageNum) {
  		_screen->drawShape(pageNum, _specialGuiShape, _specialGuiShapeX + _specialGuiShape[3], _specialGuiShapeY, 2, 1);
  }
  
@@ -541,8 +571,19 @@ index 210b482..1f3b64f 100644
 +		}
 +
 +		// 2. Decorations (on the face), then the door (alone), each drawn twice over two plain
-+		// fills: a pixel the shapes cover keeps the same colour in both.
-+		for (int part = 0; part < 2; part++) {
++		// fills: a pixel the shapes cover keeps the same colour in both. A door that is opening or
++		// closing (raised by v) is captured closed; the third part draws it where it really is,
++		// only to measure how far up it went (doorRaise, rows of the capture).
++		const bool isDoor = (_wllWallFlags[t] & 8) != 0;
++		int doorV = 0;
++		if (isDoor) {
++			doorV = 20 * (t - (t < 23 ? _dscDoorScaleOffs[t] : 0));
++			if (doorV > 80)
++				doorV = 80;
++		}
++		int footClosed = -1, footRaised = -1;
++		g_lolvrLevel.doorRaise[t] = 0;
++		for (int part = 0; part < (doorV > 0 ? 3 : 2); part++) {
 +			for (int pass = 0; pass < 2; pass++) {
 +				uint8 fill = pass ? 0xFE : 0x01;
 +				_screen->fillRect(112, 0, 112 + 175, 119, fill, _sceneDrawPage1);
@@ -552,13 +593,10 @@ index 210b482..1f3b64f 100644
 +				if (_shpDmX2 > _shpDmX1) {
 +					if (part == 0) {
 +						drawDecorations(13);
-+					} else if (_wllWallFlags[t] & 8) {
++					} else if (isDoor) {
 +						int16 dimY1 = 0, dimY2 = 0;
-+						uint16 v = 20 * (t - (t < 23 ? _dscDoorScaleOffs[t] : 0));
-+						if (v > 80)
-+							v = 80;
 +						setDoorShapeDim(13, dimY1, dimY2, _sceneShpDim);
-+						drawDoor(_doorShapes[(t < 23 ? _dscDoorShpIndex[t] : 0)], 0, 13, 10, 0, -v, 2);
++						drawDoor(_doorShapes[(t < 23 ? _dscDoorShpIndex[t] : 0)], 0, 13, 10, 0, part == 2 ? -doorV : 0, 2);
 +						setLevelShapesDim(13, dimY1, dimY2, _sceneShpDim);
 +					}
 +				}
@@ -568,11 +606,21 @@ index 210b482..1f3b64f 100644
 +						if (!pass) {
 +							shapeA[y * kW + x] = c;
 +						} else if (c == shapeA[y * kW + x] && c != fill) {
++							if (part == 2) {
++								footRaised = y;
++								continue;
++							}
++							if (part == 1)
++								footClosed = y;
 +							(part ? dpx : px)[y * kW + x] = c;
 +							(part ? dal : al)[y * kW + x] = 255;
 +						}
 +					}
 +			}
++		}
++		if (doorV > 0 && footClosed >= 0) {
++			int r = footRaised >= 0 ? footClosed - footRaised : footClosed + 1;
++			g_lolvrLevel.doorRaise[t] = (uint8)CLIP(r, 1, 255);
 +		}
 +	}
 +
@@ -587,10 +635,10 @@ index 210b482..1f3b64f 100644
  
  #endif // ENABLE_LOL
 diff --git a/engines/kyra/engine/sprites_lol.cpp b/engines/kyra/engine/sprites_lol.cpp
-index 055e4f8..830a8a4 100644
+index 055e4f8..ba0f184 100644
 --- a/engines/kyra/engine/sprites_lol.cpp
 +++ b/engines/kyra/engine/sprites_lol.cpp
-@@ -1554,6 +1554,174 @@ void LoLEngine::killMonster(LoLMonster *monster) {
+@@ -1554,6 +1554,233 @@ void LoLEngine::killMonster(LoLMonster *monster) {
  	placeMonster(monster, 0, 0);
  }
  
@@ -626,7 +674,42 @@ index 055e4f8..830a8a4 100644
 +	} else {
 +		LoLItem *i = &_itemsInPlay[id];
 +		const ItemProperty &p = _itemProperties[i->itemPropertyIndex];
-+		shp = (p.flags & 0x40) ? _gameShapes[p.shpIndex] : _itemShapes[_gameShapeMap[p.shpIndex << 1]];
++		shp = 0;
++		// An item in flight: the game's thrown shape, seen from the party's side (as drawBlockObjects)
++		if ((p.flags & 0x1000) && !(i->shpCurFrame_flg & 0xC000)) {
++			int shpIndex = p.flags & 0x800 ? 7 : p.shpIndex;
++			int ii = 0;
++			for (; ii < 8; ii++)
++				if (_flyingObjects[ii].enable && _flyingObjects[ii].item == id)
++					break;
++			if (_flyingItemShapes[shpIndex].flipFlags && ((i->x ^ i->y) & 0x20))
++				flags |= 0x20;
++			flags |= _flyingItemShapes[shpIndex].drawFlags;
++			if (ii != 8) {
++				switch (_currentDirection - (_flyingObjects[ii].direction >> 1) + 3) {
++				case 1:
++				case 5:
++					shpIndex = _flyingItemShapes[shpIndex].shapeFront;
++					break;
++				case 3:
++					shpIndex = _flyingItemShapes[shpIndex].shapeBack;
++					break;
++				case 2:
++				case 6:
++					flags |= 0x10;
++					// fall through
++				case 0:
++				case 4:
++					shpIndex = _flyingItemShapes[shpIndex].shapeLeft;
++					break;
++				default:
++					break;
++				}
++				shp = _thrownShapes[shpIndex];
++			}
++		}
++		if (!shp)
++			shp = (p.flags & 0x40) ? _gameShapes[p.shpIndex] : _itemShapes[_gameShapeMap[p.shpIndex << 1]];
 +		if (!shp)
 +			return false;
 +	}
@@ -636,7 +719,7 @@ index 055e4f8..830a8a4 100644
 +	int flg = flags & 0x10 ? 1 : 0;
 +	if (flags & 0x20)
 +		flg |= 0x1000;
-+	if (flip)
++	if (flip || (flags & 0x40))
 +		flg |= 2;
 +	if (!_flags.use16ColorMode && _currentLevel != 22)
 +		flg |= 0x2000;
@@ -668,6 +751,22 @@ index 055e4f8..830a8a4 100644
 +		}
 +	}
 +	return true;
++}
++
++// lol-vr-3d: the objects in flight, where they are now.
++void LoLEngine::lolvrExportFlights() {
++	if (!_flyingObjects)
++		return;
++	for (int i = 0; i < 8; i++) {
++		LolvrFlight &f = g_lolvrLevel.flights[i];
++		const FlyingObject &t = _flyingObjects[i];
++		f.item = t.enable && !(t.item & 0x8000) ? t.item : 0;
++		f.x = t.x;
++		f.y = t.y;
++		f.height = t.flyingHeight;
++		f.dir = (t.direction >> 1) & 3;
++	}
++	g_lolvrLevel.flightSerial++;
 +}
 +
 +// lol-vr-3d: every monster and item within a few blocks of the party, drawn at full size into a
@@ -752,6 +851,14 @@ index 055e4f8..830a8a4 100644
 +		sp.x0 = x0; sp.y0 = y0; sp.x1 = x1; sp.y1 = y1;
 +		sp.version = sum;
 +		sp.id = id;
++		sp.flying = 0;
++		sp.flightDir = 0;
++		if (!(id & 0x8000) && _itemsInPlay[id].flyingHeight) {
++			sp.flying = _itemsInPlay[id].flyingHeight;
++			for (int ii = 0; ii < 8; ii++)
++				if (_flyingObjects[ii].enable && _flyingObjects[ii].item == id)
++					sp.flightDir = (_flyingObjects[ii].direction >> 1) & 3;
++		}
 +		n++;
 +	}
 +	g_lolvrLevel.spriteCount = n;
@@ -765,6 +872,18 @@ index 055e4f8..830a8a4 100644
  } // End of namespace Kyra
  
  #endif // ENABLE_LOL
+diff --git a/engines/kyra/engine/timer_lol.cpp b/engines/kyra/engine/timer_lol.cpp
+index efe07ba..91f9d1d 100644
+--- a/engines/kyra/engine/timer_lol.cpp
++++ b/engines/kyra/engine/timer_lol.cpp
+@@ -142,6 +142,7 @@ void LoLEngine::timerProcessFlyingObjects(int timerNum) {
+ 			continue;
+ 		updateFlyingObject(&_flyingObjects[i]);
+ 	}
++	lolvrExportFlights(); // lol-vr-3d
+ }
+ 
+ void LoLEngine::timerRunSceneAnimScript(int timerNum) {
 diff --git a/engines/kyra/graphics/screen.cpp b/engines/kyra/graphics/screen.cpp
 index 2ec438c..1878094 100644
 --- a/engines/kyra/graphics/screen.cpp

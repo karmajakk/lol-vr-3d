@@ -467,6 +467,18 @@ struct App {
 	lolvr::DungeonTextures dunTex;
 	uint32_t builtGfx = 0, builtWalls = 0, builtCapture = 0, builtSprites = 0;
 	uint32_t spriteVersion[32] = {0};
+	// Objets en vol (lancés, projectiles) : le jeu les avance par petits sauts ; on glisse de l'un à
+	// l'autre. spriteList garde les images posées, flightOf[i] le vol de l'image i (-1 : aucun).
+	struct Flight {
+		int id = -1;
+		float fx = 0, fz = 0, tx = 0, tz = 0; // de, vers
+		float t0 = 0, interval = 0.1f, last = 0;
+	};
+	Flight flights[8];
+	std::vector<lolvr::DungeonSprite> spriteList;
+	int flightOf[32];
+	float clock = 0.0f;
+	uint32_t seenFlights = 0;
 	int spriteId[32] = {0};
 	int shownLevel = 0;
 	float partyX = 0, partyZ = 0, partyYaw = 0; // position affichée du groupe (glisse vers la vraie)
@@ -2579,7 +2591,69 @@ bool isOutdoorTileset(const char *t) {
 
 // Le donjon en 3D : suit le niveau publié par le moteur, reconstruit les murs quand ils changent
 // (portes) et fait glisser le groupe d'une case à l'autre.
+int findFlight(App &app, int id) {
+	for (int i = 0; i < 8; i++)
+		if (app.flights[i].id == id && app.clock - app.flights[i].last < 1.0f)
+			return i;
+	return -1;
+}
+
+// Le vol d'un objet : la position où le jeu vient de le mettre devient la nouvelle cible ; on part
+// de là où on le montre, et on y arrive au rythme des pas du jeu.
+int flightFor(App &app, int id, float x, float z) {
+	const float now = app.clock;
+	int slot = -1, freeSlot = -1;
+	for (int i = 0; i < 8; i++) {
+		App::Flight &f = app.flights[i];
+		if (f.id == id && now - f.last < 1.0f)
+			slot = i;
+		else if (freeSlot < 0 && (f.id < 0 || now - f.last >= 1.0f))
+			freeSlot = i;
+	}
+	if (slot < 0) {
+		if (freeSlot < 0)
+			return -1;
+		App::Flight &f = app.flights[freeSlot];
+		f.id = id;
+		f.fx = f.tx = x;
+		f.fz = f.tz = z;
+		f.t0 = f.last = now;
+		f.interval = 0.1f;
+		return freeSlot;
+	}
+	App::Flight &f = app.flights[slot];
+	if (x != f.tx || z != f.tz) {
+		const float k = f.interval > 0.0f ? (now - f.t0) / f.interval : 1.0f;
+		const float c = k < 1.0f ? k : 1.0f;
+		f.fx = f.fx + (f.tx - f.fx) * c;
+		f.fz = f.fz + (f.tz - f.fz) * c;
+		const float gap = now - f.t0;
+		f.interval = 0.5f * f.interval + 0.5f * (gap < 0.03f ? 0.03f : gap > 0.3f ? 0.3f : gap);
+		f.tx = x;
+		f.tz = z;
+		f.t0 = now;
+	}
+	f.last = now;
+	return slot;
+}
+
+// Pose les objets en vol à leur position du moment, entre deux pas du jeu.
+void placeFlights(App &app) {
+	for (size_t i = 0; i < app.spriteList.size() && i < 32; i++) {
+		const int fl = app.flightOf[i];
+		if (fl < 0)
+			continue;
+		const App::Flight &f = app.flights[fl];
+		const float k = f.interval > 0.0f ? (app.clock - f.t0) / f.interval : 1.0f;
+		const float c = k < 0.0f ? 0.0f : k > 1.0f ? 1.0f : k;
+		app.spriteList[i].x = f.fx + (f.tx - f.fx) * c;
+		app.spriteList[i].z = f.fz + (f.tz - f.fz) * c;
+	}
+	app.dungeon.setSprites(app.spriteList);
+}
+
 void updateDungeon(App &app, float dt) {
+	app.clock += dt;
 	app.dungeonVisible = false;
 	if (!app.dungeonOk || !app.dungeonMode || !app.coreStarted || !app.gameStarted)
 		return;
@@ -2605,6 +2679,7 @@ void updateDungeon(App &app, float dt) {
 		if (!l.doorPixels.empty() && !l.doorAlpha.empty()) {
 			g.doorPixels = l.doorPixels.data();
 			g.doorAlpha = l.doorAlpha.data();
+			g.doorRaise = l.doorRaise;
 		}
 	}
 	g.outdoor = isOutdoorTileset(app.tileset);
@@ -2696,9 +2771,37 @@ void updateDungeon(App &app, float dt) {
 				d.offset *= r;
 				d.ceiling = false;
 			}
+			int fl = -1;
+			if (s.kind == 1 && s.flying) {
+				// En vol : à la hauteur où le jeu le dessine (un peu sous les yeux, comme lancé de la main),
+				// et sa position glisse d'un pas du jeu au suivant.
+				const float base = (float)(s.flying - 1) * 4.5f * lolvr::kSpritePixel;
+				d.base = base < lolvr::kWallHeight * 0.6f ? base : lolvr::kWallHeight * 0.6f;
+				d.ceiling = false;
+				// La position vient des pas du vol (exportés à chaque pas) ; la capture, plus lente,
+				// ne sert qu'à la première image.
+				fl = findFlight(app, s.id);
+				if (fl < 0)
+					fl = flightFor(app, s.id, d.x, d.z);
+			}
+			app.flightOf[list.size()] = fl;
 			list.push_back(d);
 		}
-		app.dungeon.setSprites(list);
+		app.spriteList = list;
+		placeFlights(app);
+	}
+	if (l.flightSerial != app.seenFlights) {
+		app.seenFlights = l.flightSerial;
+		for (const auto &fo : l.flights)
+			if (fo.item)
+				flightFor(app, fo.item, (float)fo.x / 256.0f * lolvr::kBlockSize, (float)fo.y / 256.0f * lolvr::kBlockSize);
+	}
+	{
+		for (size_t i = 0; i < app.spriteList.size() && i < 32; i++)
+			if (app.flightOf[i] >= 0) {
+				placeFlights(app);
+				break;
+			}
 	}
 	// Le groupe glisse vers sa case (quelques dixièmes de seconde). Les virages ne glissent pas (cela
 	// donne mal au cœur) : un bref fondu au noir, et la pièce a pivoté. Quand le groupe se tourne de

@@ -37,6 +37,9 @@ struct DungeonGfx {
 	const uint8_t *screenPalette = nullptr; // 256 couleurs, VGA 6 bits
 	const uint8_t *doorPixels = nullptr; // la porte seule, mêmes emplacements
 	const uint8_t *doorAlpha = nullptr;
+	// Une porte entre fermée et ouverte : de combien de lignes (sur 96) elle est levée ; son dessin
+	// (doorPixels) la montre fermée.
+	const uint8_t *doorRaise = nullptr; // 256
 	// Dehors (forêt, marais...) : pas de plafond, le ciel.
 	bool outdoor = false;
 };
@@ -63,6 +66,9 @@ struct DungeonTextures {
 	// lignes top..foot de l'image (fractions de 128) sur toute la largeur et toute la hauteur.
 	float planeDepth[256];
 	float planeU0[256], planeU1[256], planeTop[256], planeFoot[256];
+	// La porte dans son dessin (fraction de la texture, en hauteur) : son haut et son pied ; et une
+	// porte qui s'ouvre ou se ferme : la part de sa hauteur dont elle est levée (0 fermée, 1 ouverte).
+	float doorTopV[256], doorFootV[256], doorLift[256];
 	uint8_t kind[256];         // WallKind
 	int skyLayer = -1;
 	int floorLayer = -1, ceilingLayer = -1;

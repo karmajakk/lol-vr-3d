@@ -9,6 +9,7 @@ app's 3D scene can be checked without a Quest. They work in `build/dev/` (or `$L
 | `build_tests.sh` | Builds `scene_test` (the app's scene and interface) and `e2e_test` (the real game through the core). |
 | `e2e.sh <out> "<actions>"` | Plays a list of actions in the real game and writes screenshots. |
 | `e2e_save.sh <out> "<actions>"` | Same, starting from a test save (made on first use). About 25 s instead of a minute or more. |
+| `regen_patch.sh` | Regenerates `patches/0003` from the engine changes in `$SCUMMVM`. |
 
 Environment: `LOLVR_GAME` = your Lands of Lore folder (needed for the game tests). Optional:
 `SCUMMVM` (a ScummVM tree with the patches applied; otherwise cloned and patched in `build/dev/`),
@@ -28,15 +29,18 @@ scripts/dev/e2e_save.sh /tmp/o "click 0.3625 0.95; wait 1; shot potion"
 ```
 
 Actions (separated by `;`): `wait S`, `key NAME` (esc, enter, up, down, left, right, space, or a
-letter), `click U V` and `rclick U V` (fractions of the 320 x 200 picture), `lang N`, `shot NAME`
-(picture, game state, and the game's cursor when it changes), `dungeon NAME` (the 3D dungeon next
-to the game picture).
+letter), `click U V [S]` and `rclick U V [S]` (fractions of the 320 x 200 picture; S = wait after the
+release, 0.3 s by default), `lang N`, `shot NAME` (picture, game state, and the game's cursor when
+it changes), `dungeon NAME` (the 3D dungeon next to the game picture), `watch S` (objects in
+flight, step by step, for S seconds).
+
+`LOLVR_DUMP_TYPE=portes` lists every door type (depth, plane, how far raised) and writes their
+pictures; `LOLVR_FORCE_DOOR=T` shows the closed doors (type 3) as type T, to see each step.
 
 The test save is the start of the game in English with one champion, Michael, in the throne room
 (slot 0). Don't save into slot 0 in your actions; `E2E_NEW_SAVE=1` remakes it.
 
 ## Regenerating patch 0003
 
-Patches 0001 and 0002 are kept as they are; 0003 holds every later engine change. To regenerate
-it, diff the changed files of the patched tree against the upstream tag with 0001 and 0002
-applied (in a scratch git repository), and replace `patches/0003-niveau-pour-le-donjon-3d.patch`.
+Patches 0001 and 0002 are kept as they are; 0003 holds every later engine change.
+`scripts/dev/regen_patch.sh` rebuilds it from the patched tree.

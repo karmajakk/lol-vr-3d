@@ -40,6 +40,15 @@ struct LolvrSprite {
 	int16_t x0, y0, x1, y1;
 	uint32_t version;
 	uint16_t id;
+	uint8_t flying;
+	uint8_t flightDir;
+};
+
+struct LolvrFlight {
+	uint16_t item;
+	uint16_t x, y;
+	uint8_t height;
+	uint8_t dir;
 };
 
 // Le niveau en cours, pour le donjon en 3D (voir patches/0003).
@@ -88,6 +97,9 @@ struct LolvrLevelData {
 	int32_t cursorW, cursorH, cursorHotX, cursorHotY, cursorKey;
 	uint8_t cursorPixels[64 * 64];
 	uint8_t cursorPalette[768];
+	uint8_t doorRaise[256];
+	uint32_t flightSerial;
+	LolvrFlight flights[8];
 };
 const LolvrLevelData *retro_lolvr_level(void);
 }
@@ -387,6 +399,17 @@ void copyLevel() {
 	l.textBox = s->textBox != 0;
 	// L'objet tenu par le pointeur, et l'image du curseur du jeu (en couleurs, le fond transparent)
 	l.itemInHand = s->itemInHand;
+	// Les objets en vol, à chaque pas
+	if (l.flightSerial != s->flightSerial) {
+		for (int i = 0; i < 8; i++) {
+			l.flights[i].item = s->flights[i].item;
+			l.flights[i].x = s->flights[i].x;
+			l.flights[i].y = s->flights[i].y;
+			l.flights[i].height = s->flights[i].height;
+			l.flights[i].dir = s->flights[i].dir;
+		}
+		l.flightSerial = s->flightSerial;
+	}
 	if (s->cursorSerial != l.cursorSerial && s->cursorW > 0 && s->cursorH > 0 && s->cursorW <= 64 && s->cursorH <= 64) {
 		const int n = s->cursorW * s->cursorH;
 		l.cursorRgba.resize((size_t)n * 4);
@@ -425,6 +448,7 @@ void copyLevel() {
 			b.x = a.x; b.y = a.y; b.kind = a.kind; b.ceiling = a.ceiling;
 			b.x0 = a.x0; b.y0 = a.y0; b.x1 = a.x1; b.y1 = a.y1;
 			b.version = a.version; b.id = a.id;
+			b.flying = a.flying; b.flightDir = a.flightDir;
 		}
 		if (s->spriteCount) {
 			memcpy(l.spritePixels.data(), s->spritePixels, s->spriteCount * one);
@@ -450,6 +474,7 @@ void copyLevel() {
 			l.doorAlpha.clear();
 		}
 		memcpy(l.wallSlot, s->wallSlot, sizeof(l.wallSlot));
+		memcpy(l.doorRaise, s->doorRaise, sizeof(l.doorRaise));
 		memcpy(l.screenPalette, s->screenPalette, sizeof(l.screenPalette));
 		l.wallSlots = s->wallSlots;
 		l.wallCaptureSerial = s->wallCaptureSerial;
@@ -691,6 +716,10 @@ bool CoreHost::levelSnapshot(LevelSnapshot &out) const {
 	out.sceneBusy = l.sceneBusy;
 	out.textBox = l.textBox;
 	out.itemInHand = l.itemInHand;
+	if (out.flightSerial != l.flightSerial) {
+		memcpy(out.flights, l.flights, sizeof(out.flights));
+		out.flightSerial = l.flightSerial;
+	}
 	if (out.cursorSerial != l.cursorSerial) {
 		out.cursorRgba = l.cursorRgba;
 		out.cursorW = l.cursorW;
@@ -722,6 +751,7 @@ bool CoreHost::levelSnapshot(LevelSnapshot &out) const {
 		out.doorPixels = l.doorPixels;
 		out.doorAlpha = l.doorAlpha;
 		memcpy(out.wallSlot, l.wallSlot, sizeof(out.wallSlot));
+		memcpy(out.doorRaise, l.doorRaise, sizeof(out.doorRaise));
 		memcpy(out.screenPalette, l.screenPalette, sizeof(out.screenPalette));
 		out.wallSlots = l.wallSlots;
 		out.wallCaptureSerial = l.wallCaptureSerial;

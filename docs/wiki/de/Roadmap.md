@@ -22,7 +22,7 @@ Das sind Ideen, keine Versprechen.
 
 ## Immersiver Modus
 
-- Aufgleitende Türen, Zauber und geworfene Gegenstände im Flug, Monster in 3D anklicken.
+- Stufenlos gleitende Türen (heute heben sie sich in den Schritten des Spiels), Monster in 3D anklicken.
 - Jede Gegend (Minen, Sumpf, Türme, Yvel) auf besondere Wände prüfen.
 
 ## Später

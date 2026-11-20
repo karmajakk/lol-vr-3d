@@ -59,6 +59,8 @@ struct LevelSprite {
 	int x0 = 0, y0 = 0, x1 = 0, y1 = 0; // partie dessinée de l'image
 	uint32_t version = 0;
 	int id = 0;
+	int flying = 0;            // objet en vol : sa hauteur dans le jeu (0 = posé)
+	int flightDir = 0;         // sa direction (0 nord .. 3 ouest)
 };
 
 // Le niveau en cours, pour le donjon en 3D (patches/0003). Les gros tableaux ne sont recopiés que
@@ -77,6 +79,13 @@ struct LevelSnapshot {
 	// L'objet tenu par le pointeur (0 = rien) et l'image du curseur du jeu (RGBA, fond transparent),
 	// point chaud compris. cursorSerial change avec l'image.
 	int itemInHand = 0;
+	// Les objets en vol (lancés, projectiles) : où ils sont à chaque pas du jeu (item 0 = aucun).
+	struct Flight {
+		int item = 0;
+		int x = 0, y = 0, height = 0, dir = 0;
+	};
+	Flight flights[8];
+	uint32_t flightSerial = 0;
 	uint32_t cursorSerial = 0;
 	int cursorW = 0, cursorH = 0, cursorHotX = 0, cursorHotY = 0;
 	std::vector<uint8_t> cursorRgba;
@@ -101,6 +110,7 @@ struct LevelSnapshot {
 	int wallSlots = 0;
 	std::vector<uint8_t> wallPixels, wallAlpha;
 	std::vector<uint8_t> doorPixels, doorAlpha; // la porte seule (elle se tient au milieu de sa case)
+	uint8_t doorRaise[256] = {0};               // porte qui s'ouvre ou se ferme : de combien de lignes elle est levée
 	uint8_t screenPalette[768] = {0};
 	uint32_t spriteSerial = 0;
 	std::vector<LevelSprite> sprites;

@@ -151,6 +151,7 @@ void decodeDungeonTextures(const DungeonGfx &g, DungeonTextures &out) {
 		out.typeLayer[i] = out.doorLayer[i] = out.decalLayer[i] = -1;
 		out.doorDepth[i] = 1.0f;
 		out.planeDepth[i] = 0.0f;
+		out.doorTopV[i] = out.doorFootV[i] = out.doorLift[i] = 0.0f;
 		out.faceDepth[i] = 1.0f;
 		out.kind[i] = kWallFace;
 	}
@@ -317,6 +318,12 @@ void decodeDungeonTextures(const DungeonGfx &g, DungeonTextures &out) {
 								dc0 = x < dc0 ? x : dc0;
 								dc1 = x > dc1 ? x : dc1;
 							}
+					out.doorTopV[t] = (float)dtop / kDunTexSize;
+					out.doorFootV[t] = (float)(foot + 1) / kDunTexSize;
+					if (g.doorRaise && g.doorRaise[t]) {
+						const float lift = (float)g.doorRaise[t] / (float)(foot - dtop + 1);
+						out.doorLift[t] = lift > 1.0f ? 1.0f : lift;
+					}
 					auto sameHeight = [&](int x) {
 						int t0 = -1, t1 = -1;
 						for (int y = 0; y < kDunWallRows; y++)
@@ -513,10 +520,17 @@ void buildDungeonMesh(const uint8_t *walls, const DungeonGfx &g, const DungeonTe
 					const float lyr = pass ? (float)tex.doorLayer[t] : layer;
 					const float off = pass ? 0.004f : 0.0f; // la porte un rien devant le cadre
 					const float px = fx - nx * ((r - 1.0f) * S * 0.5f - off), pz = fz - nz * ((r - 1.0f) * S * 0.5f - off);
-					float bl[5] = {px - rx * S * 0.5f, 0.0f, pz - rz * S * 0.5f, tex.planeU0[t], tex.planeFoot[t]};
-					float br[5] = {px + rx * S * 0.5f, 0.0f, pz + rz * S * 0.5f, tex.planeU1[t], tex.planeFoot[t]};
-					float tr[5] = {px + rx * S * 0.5f, H, pz + rz * S * 0.5f, tex.planeU1[t], tex.planeTop[t]};
-					float tl[5] = {px - rx * S * 0.5f, H, pz - rz * S * 0.5f, tex.planeU0[t], tex.planeTop[t]};
+					// Une porte qui s'ouvre glisse vers le haut, son haut caché sous le linteau : on en
+					// montre le bas, plus haut d'autant.
+					const float vt = tex.planeTop[t], vf = tex.planeFoot[t];
+					const float lift = pass ? tex.doorLift[t] * (vf - vt) : 0.0f;
+					if (lift >= (vf - vt) - 0.002f)
+						continue;
+					const float yb = H * lift / (vf - vt);
+					float bl[5] = {px - rx * S * 0.5f, yb, pz - rz * S * 0.5f, tex.planeU0[t], vf};
+					float br[5] = {px + rx * S * 0.5f, yb, pz + rz * S * 0.5f, tex.planeU1[t], vf};
+					float tr[5] = {px + rx * S * 0.5f, H, pz + rz * S * 0.5f, tex.planeU1[t], vt + lift};
+					float tl[5] = {px - rx * S * 0.5f, H, pz - rz * S * 0.5f, tex.planeU0[t], vt + lift};
 					quad(bl, br, tr, tl, lyr, faceShade[k]);
 				}
 				continue;
@@ -527,7 +541,22 @@ void buildDungeonMesh(const uint8_t *walls, const DungeonGfx &g, const DungeonTe
 			if (tex.doorLayer[t] >= 0) {
 				float r = tex.doorDepth[t];
 				float ddx = fx - nx * (r - 1.0f) * S * 0.5f, ddz = fz - nz * (r - 1.0f) * S * 0.5f;
-				upright(ddx, ddz, nx, nz, (float)tex.doorLayer[t], faceShade[k], r, false);
+				if (tex.doorLift[t] <= 0.0f) {
+					upright(ddx, ddz, nx, nz, (float)tex.doorLayer[t], faceShade[k], r, false);
+				} else {
+					// Levée en partie : seule la part restée sous le haut de l'ouverture, plus haut d'autant.
+					const float vt = tex.doorTopV[t], vf = tex.doorFootV[t], lift = tex.doorLift[t] * (vf - vt);
+					if (lift < (vf - vt) - 0.002f) {
+						const float rx = nz, rz = -nx, hw = S * 0.5f * r;
+						const float y0 = H * 0.5f - H * 0.5f * r, y1 = H * 0.5f + H * 0.5f * r;
+						auto yOf = [&](float v) { return y1 - (v / vBottom) * (y1 - y0); };
+						float bl[5] = {ddx - rx * hw, yOf(vf - lift), ddz - rz * hw, 0.0f, vf};
+						float br[5] = {ddx + rx * hw, yOf(vf - lift), ddz + rz * hw, 1.0f, vf};
+						float tr[5] = {ddx + rx * hw, yOf(vt), ddz + rz * hw, 1.0f, vt + lift};
+						float tl[5] = {ddx - rx * hw, yOf(vt), ddz - rz * hw, 0.0f, vt + lift};
+						quad(bl, br, tr, tl, (float)tex.doorLayer[t], faceShade[k]);
+					}
+				}
 			}
 		}
 		if (!solid) {

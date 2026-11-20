@@ -13,6 +13,6 @@ Der Dungeon wird in echtem 3D um dich herum nachgebaut, in Originalgröße, aus 
 - **Licht**: Dunkle Orte bleiben dunkel, bis du die Laterne anzündest, nach der Helligkeit des Spiels selbst.
 - **Zauber**: Ihre Effekte, so wie das Spiel sie über seine Ansicht zeichnet, erscheinen im Dungeon vor der Gruppe, solange der Zauber wirkt.
 
-Noch nicht da: Türen, die aufgleiten (sie springen von zu auf offen), geworfene Gegenstände im Flug.
+Türen heben sich Schritt für Schritt in ihren Rahmen, wie im Spiel. Geworfene Gegenstände und Geschosse fliegen in der Höhe, die das Spiel ihnen gibt, durch den Dungeon.
 
 Zur klassischen Ansicht wechselst du in den „VR-Optionen“ (Spielmenü, Diskette am linken Handgelenk): „VR-Modus“, Klassisch oder Mixed Reality.

@@ -22,7 +22,7 @@ These are ideas, not promises.
 
 ## Immersive mode
 
-- Doors that slide open, spells and thrown objects in flight, clicking monsters in 3D.
+- Doors that glide smoothly (they rise in the game's steps today), clicking monsters in 3D.
 - Checking every region (mines, marsh, towers, Yvel) for special walls.
 
 ## Later

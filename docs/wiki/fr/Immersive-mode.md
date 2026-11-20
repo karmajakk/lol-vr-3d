@@ -13,6 +13,6 @@ Le donjon est reconstruit en vraie 3D autour de toi, à taille réelle, à parti
 - **Lumière** : les endroits sombres restent sombres tant que tu n'as pas allumé la lanterne, selon la luminosité du jeu lui-même.
 - **Sorts** : leurs effets, tels que le jeu les dessine sur sa vue, apparaissent dans le donjon devant le groupe pendant le sort.
 
-Pas encore là : les portes qui coulissent (elles passent d'un coup de fermées à ouvertes), les objets lancés en vol.
+Les portes montent dans leur cadre par étapes, comme dans le jeu. Les objets lancés et les projectiles traversent le donjon à la hauteur que le jeu leur donne.
 
 Pour passer à la vue classique, dans « Réglages VR » (menu du jeu, disquette sur le poignet gauche) : « Mode VR », Classique ou Réalité mixte.

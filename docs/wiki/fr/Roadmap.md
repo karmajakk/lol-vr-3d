@@ -22,7 +22,7 @@ Ce sont des idées, pas des promesses.
 
 ## Mode immersif
 
-- Les portes qui coulissent, les sorts et les objets lancés en vol, cliquer sur les monstres en 3D.
+- Des portes qui glissent en continu (elles montent aujourd'hui par les étapes du jeu), cliquer sur les monstres en 3D.
 - Vérifier chaque région (mines, marais, tours, Yvel) pour les murs particuliers.
 
 ## Plus tard
