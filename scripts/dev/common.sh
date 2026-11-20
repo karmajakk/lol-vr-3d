@@ -45,7 +45,6 @@ need_sysdir() {
 savepath=$DEV/saves
 extrapath=$SYS/scummvm/extra
 libretro_playlist_path=$SYS
-subtitles=true
 INI
 }
 

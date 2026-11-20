@@ -3,6 +3,20 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.15.0] — Roland's manor: doors, alcoves, remarks
+
+- Saves made in Roland's manor no longer crash the engine when they load: some wall types of the
+  level's table point past its graphics, and the wall capture now leaves them out (patch 0003).
+- Roland's manor doors sit back between their pillars, as in the game: they no longer cover the
+  pillars and the button that opens them. (Castle doors, whose frame has pillars at the door's
+  height, keep their set-back frame.)
+- Items in an alcove sit on its shelf, at the height the game shows them, instead of at the foot
+  of the wall.
+- Text is on by default (voice and text): a character's remark, with the portrait, shows in the
+  text window under the screen. Before, the CD version only spoke, so the window stayed empty.
+  The game's options can still turn the text off.
+- The inventory row's grab bar is under the row, not at its side.
+
 ## [0.14.0] — Corridor ends, text window, cursor, side walls
 
 - Corridors that reach the edge of the map no longer end on black: like the game, the wall

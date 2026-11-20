@@ -1306,7 +1306,12 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 		float thick = clampf(0.017f * dist, 0.008f, 0.06f), longSide = clampf(0.10f * dist, 0.03f, 0.35f);
 		hq.r = q.r;
 		hq.u = q.u;
-		if (i >= kPanelKeyboard) {
+		if (i == kPanelInventory) {
+			// Rangée d'objets (longue et basse) : barrette dessous.
+			hq.hh = thick;
+			hq.hw = fminf(q.hw, longSide);
+			hq.c = q.c - q.u * (q.hh + border + hq.hh + 0.002f);
+		} else if (i >= kPanelKeyboard) {
 			// Clavier, aide : barrette au-dessus.
 			hq.hh = thick;
 			hq.hw = fminf(q.hw, longSide);

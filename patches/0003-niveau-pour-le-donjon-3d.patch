@@ -48,6 +48,21 @@ index 4c00889..3ced5d1 100644
  	return true;
  }
  
+diff --git a/engines/kyra/engine/kyra_v1.cpp b/engines/kyra/engine/kyra_v1.cpp
+index 1016080..bfba10b 100644
+--- a/engines/kyra/engine/kyra_v1.cpp
++++ b/engines/kyra/engine/kyra_v1.cpp
+@@ -557,7 +557,9 @@ void KyraEngine_v1::registerDefaultSettings() {
+ 		ConfMan.registerDefault("cdaudio", true);
+ 	else if (_flags.platform == Common::kPlatformMacintosh)
+ 		ConfMan.registerDefault("hqmusic", true);
+-	if (_flags.fanLang != Common::UNK_LANG) {
++	// lol-vr-3d: in the headset, Lands of Lore shows its text too (voice and text), unless the
++	// player chose otherwise in the game's options.
++	if (_flags.fanLang != Common::UNK_LANG || _flags.gameID == GI_LOL) {
+ 		// HACK/WORKAROUND: Since we can't use registerDefault here to overwrite
+ 		// the global subtitles settings, we're using this hack to enable subtitles
+ 		// for fan translations
 diff --git a/engines/kyra/engine/lol.cpp b/engines/kyra/engine/lol.cpp
 index c4f86a3..d678c22 100644
 --- a/engines/kyra/engine/lol.cpp
@@ -537,7 +552,7 @@ index a9028a2..58490f7 100644
  
  	// mouse
 diff --git a/engines/kyra/engine/scene_lol.cpp b/engines/kyra/engine/scene_lol.cpp
-index 210b482..707dbfb 100644
+index 210b482..b8b068f 100644
 --- a/engines/kyra/engine/scene_lol.cpp
 +++ b/engines/kyra/engine/scene_lol.cpp
 @@ -405,6 +405,19 @@ void LoLEngine::loadLevelGraphics(const char *file, int specialColor, int weight
@@ -578,7 +593,7 @@ index 210b482..707dbfb 100644
  
  	if (_dialogueField)
  		restoreAfterDialogueSequence(_currentControlMode);
-@@ -1581,6 +1598,153 @@ void LoLEngine::drawSpecialGuiShape(int pageNum) {
+@@ -1581,6 +1598,167 @@ void LoLEngine::drawSpecialGuiShape(int pageNum) {
  		_screen->drawShape(pageNum, _specialGuiShape, _specialGuiShapeX + _specialGuiShape[3], _specialGuiShapeY, 2, 1);
  }
  
@@ -644,8 +659,22 @@ index 210b482..707dbfb 100644
 +			fake[1].walls[k] = t;
 +		_visibleBlocks[13] = &fake[1];
 +
-+		// 1. The wall itself, from the VMP/VCN blocks
-+		if (_wllVmpMap[t]) {
++		// 1. The wall itself, from the VMP/VCN blocks. Some wall types of the table are not used by
++		// the level and point past its VMP/VCN data (Roland's manor): they are left out.
++		bool vmpOk = _wllVmpMap[t] != 0;
++		if (vmpOk) {
++			const int base = (_wllVmpMap[t] - 1) * 431 + _vmpVisOffs[7] + 330;
++			if (base < 0 || base + 16 * 12 > g_lolvrLevel.vmpLen) {
++				vmpOk = false;
++			} else {
++				for (int i = 0; i < 16 * 12 && vmpOk; i++) {
++					const int e = _vmpPtr[base + i] & 0x3FFF;
++					if (e >= g_lolvrLevel.vcnCount)
++						vmpOk = false;
++				}
++			}
++		}
++		if (vmpOk) {
 +			memset(_blockDrawingBuffer, 0, 660 * sizeof(uint16));
 +			generateVmpTileData(3, 1, t, _vmpVisOffs[7], 16, 12);
 +			drawVcnBlocks();

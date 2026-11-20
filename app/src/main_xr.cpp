@@ -2858,7 +2858,10 @@ void updateDungeon(App &app, float dt) {
 			// laisse voir les objets (drapeau 0x80), comme vu depuis la case voisine. On le pose alors
 			// contre le mur, là où il apparaît dans le jeu ; sinon il reste caché.
 			const int ob = ((s.y >> 8) & 31) * 32 + ((s.x >> 8) & 31);
-			if (s.kind == 1 && lolvr::isSolidBlock(l.walls, ob, g)) {
+			bool inFlight = false;
+			for (const auto &fo : l.flights)
+				inFlight = inFlight || (fo.item && fo.item == s.id);
+			if (s.kind == 1 && !inFlight && lolvr::isSolidBlock(l.walls, ob, g)) {
 				static const int sdx[4] = {0, 1, 0, -1}, sdz[4] = {-1, 0, 1, 0};
 				int best = -1;
 				float bestD = 1e9f;
@@ -2893,13 +2896,19 @@ void updateDungeon(App &app, float dt) {
 				d.x = vx + (d.x - vx) * r + nx * 0.04f;
 				d.z = vz + (d.z - vz) * r + nz * 0.04f;
 				d.base = eyeY * (1.0f - r);
+				// Posé en hauteur dans le mur (une alcôve) : le jeu le dessine plus haut, de 6 pixels par
+				// cran (pixels du mur vu de face : sa hauteur fait 96 pixels).
+				if (s.flying > 1) {
+					const float rows = (float)(s.flying - 1) * 6.0f - 13.0f;
+					d.base += (rows > 0.0f ? rows : 0.0f) * lolvr::kWallHeight / 96.0f * r;
+				}
 				d.width *= r;
 				d.height *= r;
 				d.offset *= r;
 				d.ceiling = false;
 			}
 			int fl = -1;
-			if (s.kind == 1 && s.flying) {
+			if (s.kind == 1 && s.flying && inFlight) {
 				// En vol : à la hauteur où le jeu le dessine (un peu sous les yeux, comme lancé de la main),
 				// et sa position glisse d'un pas du jeu au suivant.
 				const float base = (float)(s.flying - 1) * 4.5f * lolvr::kSpritePixel;

@@ -360,7 +360,10 @@ void decodeDungeonTextures(const DungeonGfx &g, DungeonTextures &out) {
 					while (c1 < kDunTexSize - 1 && sameHeight(c1 + 1))
 						c1++;
 					const float r = (float)kDunTexSize / (float)(c1 - c0 + 1);
-					if (dc1 >= dc0 && seeThrough && r > 1.05f && r < 3.5f && foot - dtop > 20) {
+					// Seulement si le cadre a, des deux côtés de la porte, des piliers à sa hauteur (le
+					// château) : sinon (manoir de Roland) les piliers sont sur la face, la porte derrière.
+					const bool pillars = c0 < dc0 - 2 && c1 > dc1 + 2;
+					if (dc1 >= dc0 && seeThrough && pillars && r > 1.05f && r < 3.5f && foot - dtop > 20) {
 						out.planeDepth[t] = r;
 						out.planeU0[t] = (float)c0 / kDunTexSize;
 						out.planeU1[t] = (float)(c1 + 1) / kDunTexSize;

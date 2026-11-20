@@ -365,7 +365,48 @@ int main(int argc, char **argv) {
 					d.width = (float)(s.x1 - s.x0) * kSpritePixel;
 					d.height = (float)(s.y1 - s.y0) * kSpritePixel * 1.2f;
 					d.offset = ((float)(s.x0 + s.x1) * 0.5f - 88.0f) * kSpritePixel;
-					if (s.kind == 1 && s.flying) { // en vol, comme dans l'app : à sa position du moment
+					bool inFlight = false;
+					for (const auto &fo : lvl.flights)
+						inFlight = inFlight || (fo.item && fo.item == s.id);
+					const int ob = ((s.y >> 8) & 31) * 32 + ((s.x >> 8) & 31);
+					if (s.kind == 1 && !inFlight && isSolidBlock(lvl.walls, ob, g)) {
+						// Rangé dans un mur : comme dans l'app (main_xr.cpp), contre la face vue depuis la case de la vue
+						static const int sdx[4] = {0, 1, 0, -1}, sdz[4] = {-1, 0, 1, 0};
+						float px0, pz0;
+						blockCenter(atBlock >= 0 ? atBlock : lvl.block, px0, pz0);
+						int best = -1;
+						float bestD = 1e9f;
+						for (int k = 0; k < 4; k++) {
+							int nx = (ob & 31) + sdx[k], nz = (ob >> 5) + sdz[k];
+							if (nx < 0 || nx > 31 || nz < 0 || nz > 31 || isSolidBlock(lvl.walls, nz * 32 + nx, g))
+								continue;
+							if (!(lvl.wallFlags[lvl.walls[ob * 4 + k]] & 0x80))
+								continue;
+							float cx, cz;
+							blockCenter(nz * 32 + nx, cx, cz);
+							float dd = (cx - px0) * (cx - px0) + (cz - pz0) * (cz - pz0);
+							if (dd < bestD) { bestD = dd; best = k; }
+						}
+						if (best < 0)
+							continue;
+						const float S = kBlockSize, eyeY = kWallHeight * 0.5f;
+						float vx, vz;
+						blockCenter(ob + sdz[best] * 32 + sdx[best], vx, vz);
+						float nx = (float)sdx[best], nz = (float)sdz[best];
+						float faceD = S * 0.5f, itemD = (vx - d.x) * nx + (vz - d.z) * nz;
+						if (itemD < faceD + 0.01f) itemD = faceD + 0.01f;
+						float r = faceD / itemD;
+						d.x = vx + (d.x - vx) * r + nx * 0.04f;
+						d.z = vz + (d.z - vz) * r + nz * 0.04f;
+						d.base = eyeY * (1.0f - r);
+						if (s.flying > 1) {
+							const float rows = (float)(s.flying - 1) * 6.0f - 13.0f;
+							d.base += (rows > 0.0f ? rows : 0.0f) * kWallHeight / 96.0f * r;
+						}
+						d.width *= r; d.height *= r; d.offset *= r;
+						d.ceiling = false;
+					}
+					if (s.kind == 1 && s.flying && inFlight) { // en vol, comme dans l'app : à sa position du moment
 						const float base = (float)(s.flying - 1) * 4.5f * kSpritePixel;
 						d.base = base < kWallHeight * 0.6f ? base : kWallHeight * 0.6f;
 						d.ceiling = false;
