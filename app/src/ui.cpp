@@ -1567,6 +1567,9 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 		}
 		Vec3 local{(screenU01 - 0.5f) * in.dispW, (0.5f - screenV01) * in.dispH, screenZ + 0.004f};
 		out.hit = rotate(in.screenRot, local) + in.screenPos;
+		out.hitRight = rotate(in.screenRot, Vec3{1, 0, 0});
+		out.hitUp = rotate(in.screenRot, Vec3{0, 1, 0});
+		out.hitPixel = in.cropW > 0.0f ? in.dispW / in.cropW : 0.0f;
 	} else if (hitKind == kHitHandle) {
 		handleGlow[hitIndex] = 0.7f;
 		const Quad &hq = handle[hitIndex];
@@ -1732,6 +1735,7 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 					out.buttonsToGame = true;
 					out.gu = ((float)pc.sx + (cx - (float)pc.dx) * (float)pc.sw / (float)pc.dw) / 320.0f;
 					out.gv = ((float)pc.sy + (cy - (float)pc.dy) * (float)pc.sh / (float)pc.dh) / 200.0f;
+					out.hitPixel = 2.0f * q.hw / (float)c.w * (float)pc.dw / (float)(pc.sw > 0 ? pc.sw : 1);
 					break;
 				}
 			} else {
@@ -1740,6 +1744,7 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 				out.buttonsToGame = true;
 				out.gu = (src.x + u * src.w) / 320.0f;
 				out.gv = (src.y + v * src.h) / 200.0f;
+				out.hitPixel = src.w > 0 ? 2.0f * q.hw / (float)src.w : 0.0f;
 			}
 		}
 	}
@@ -1756,7 +1761,7 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 			continue;
 		const Quad &q = content[i];
 		const Source &src = kSources[i];
-		if (np < SceneState::kMaxPanels - 1) {
+		if (np < SceneState::kMaxPanels - 2) {
 			SceneState::Panel &p = scene.panels[np++];
 			p = SceneState::Panel();
 			p.visible = true;
@@ -1826,7 +1831,7 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 	}
 	// Invitation du premier lancement : un peu sous le regard, à portée de lecture, elle suit la tête
 	// sans à-coups. Elle s'efface quand on regarde sa main (l'engrenage prend le relais).
-	if (in.gearHint && placed && !d->menuOpen && !gearVisible && d->hintTex && np < SceneState::kMaxPanels - 1) {
+	if (in.gearHint && placed && !d->menuOpen && !gearVisible && d->hintTex && np < SceneState::kMaxPanels - 2) {
 		Vec3 flat = {in.headDir.x, 0.0f, in.headDir.z};
 		float fl = length(flat);
 		flat = fl > 1e-3f ? flat * (1.0f / fl) : Vec3{0, 0, -1};
@@ -1856,7 +1861,7 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 		p.texH = kHintH;
 	}
 	for (int w = 0; w < 3; w++) {
-		if ((w == 0 ? !gearVisible : w == 1 ? !d->menuOpen : !d->noticeOpen) || np >= SceneState::kMaxPanels - 1)
+		if ((w == 0 ? !gearVisible : w == 1 ? !d->menuOpen : !d->noticeOpen) || np >= SceneState::kMaxPanels - 2)
 			continue;
 		const Quad &q = w == 0 ? gearQ : w == 1 ? menuQ : noticeQ;
 		SceneState::Panel &p = scene.panels[np++];

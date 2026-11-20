@@ -43,8 +43,8 @@ Frühe Demo. Was funktioniert:
 - Dunkle Orte bleiben dunkel, bis du die Laterne anzündest.
 - „VR-Modus“ in den „VR-Optionen“ (Spielmenü): Immersiv, Klassisch (Bibliothek) oder Mixed Reality;
   in den letzten beiden wechselt L3 die Ansicht: Großbild, Fenster, 486er-PC.
-- Gespräche: das große Textfeld des Spiels, mit dem Porträt des Sprechenden, erscheint unter dem
-  Spielbildschirm.
+- Gespräche und Bemerkungen: das Textfeld des Spiels, mit dem Porträt des Sprechenden, erscheint
+  in einem eigenen Fenster direkt unter dem Rahmen des Spielbildschirms, der die ganze Sicht behält.
 - Monster und Gegenstände nahe der Gruppe, vom Spiel selbst gezeichnet und immer dir zugewandt.
 - Klicks im 3D-Dungeon: auf die Wände um die Gruppe (Türknöpfe, Hebel, Schlüssellöcher, Büsche,
   Nester) und auf den Boden vor dir (Gegenstände).

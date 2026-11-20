@@ -321,13 +321,26 @@ void main() {
 		vec3 brass = mix(vec3(0.95, 0.72, 0.30), vec3(0.40, 0.26, 0.09), smoothstep(0.1, 1.0, e));
 		c = mix(vec3(0.08, 0.05, 0.03), brass, smoothstep(0.0, 0.18, e));
 	} else {
+		// Pixels nets quand l'image est grande ; quand un pixel du jeu tient sur moins de deux
+		// pixels du casque (fenêtre lointaine ou vue de biais), une moyenne de plusieurs prises :
+		// sinon les traits d'un pixel (les lettres l, r, i) tombent entre deux et disparaissent.
 		vec2 texel = vUv * uGameSize;
-		vec2 ti = floor(texel);
-		vec2 tc = texel - ti - 0.5;
-		vec2 region = vec2(0.5 - 0.5 / 4.0);
-		vec2 fpp = (tc - clamp(tc, -region, region)) * 4.0 + 0.5;
-		vec2 p = (ti + fpp) / uGameSize;
-		c = texture(uGame, clamp(p, uRect.xy, uRect.zw)).rgb;
+		vec2 dd = fwidth(texel);
+		float spp = max(max(dd.x, dd.y), 1e-4);
+		if (spp > 0.5) {
+			vec2 o = dd * 0.25;
+			c = (texture(uGame, clamp((texel + vec2(-o.x, -o.y)) / uGameSize, uRect.xy, uRect.zw)).rgb +
+			     texture(uGame, clamp((texel + vec2(o.x, -o.y)) / uGameSize, uRect.xy, uRect.zw)).rgb +
+			     texture(uGame, clamp((texel + vec2(-o.x, o.y)) / uGameSize, uRect.xy, uRect.zw)).rgb +
+			     texture(uGame, clamp((texel + vec2(o.x, o.y)) / uGameSize, uRect.xy, uRect.zw)).rgb) * 0.25;
+		} else {
+			float k = 1.0 / spp;
+			vec2 ti = floor(texel);
+			vec2 tc = texel - ti - 0.5;
+			vec2 region = vec2(0.5 - 0.5 / k);
+			vec2 fpp = (tc - clamp(tc, -region, region)) * k + 0.5;
+			c = texture(uGame, clamp((ti + fpp) / uGameSize, uRect.xy, uRect.zw)).rgb;
+		}
 		if (uGlow > 0.5 && uGlow < 1.5)
 			c = vec3(0.0);
 		if (vUv.x > uHot.x && vUv.x < uHot.z && vUv.y > uHot.y && vUv.y < uHot.w) {

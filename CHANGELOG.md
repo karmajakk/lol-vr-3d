@@ -3,6 +3,26 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.14.0] — Corridor ends, text window, cursor, side walls
+
+- Corridors that reach the edge of the map no longer end on black: like the game, the wall
+  across the edge (the one on the other side of the map) closes them.
+- Clicking a bush, nest or hole on a side wall now turns the party toward it first, then clicks:
+  the game only reacts to the wall in front.
+- The message line and the conversation box are now their own window just under the frame of the
+  game screen, instead of inside it. A character's remark (the portrait and text in the expanded
+  field) is shown there too: the engine now reports when the text field is expanded (patch 0003).
+- Small windows (the message line under the spellbook) no longer drop thin letters (l, r, i):
+  game pixels smaller than a headset pixel are averaged instead of sampled.
+- The game's mouse cursor is drawn by the app, only on the screen or window you point at; it no
+  longer spills onto a neighbouring window (patch 0003: the core can leave the cursor out).
+- Castle doors: the wall above the doorway (lintel) is drawn at the face, open or closed.
+- Pictures of another region or house at the end of a path now cover the whole wall.
+- Arriving in a region on its entrance (leaving Castle Gladstone, for example) puts the view in
+  front of the entrance, not inside the wall.
+- Dev: the end-to-end bench can teleport (`goto LEVEL BLOCK DIR`), print the map (`carte`) and
+  look for empty (black) views (`LOLVR_NOIR`); test games use subtitles.
+
 ## [0.13.0] — Doors that open, items in flight
 
 - Doors now rise into their frame step by step, as in the game, instead of jumping from closed to

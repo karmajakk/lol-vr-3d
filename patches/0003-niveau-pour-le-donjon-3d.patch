@@ -1,3 +1,29 @@
+diff --git a/backends/platform/libretro/src/libretro-graphics-surface.cpp b/backends/platform/libretro/src/libretro-graphics-surface.cpp
+index 8405e6c..3b04690 100644
+--- a/backends/platform/libretro/src/libretro-graphics-surface.cpp
++++ b/backends/platform/libretro/src/libretro-graphics-surface.cpp
+@@ -125,13 +125,20 @@ void LibretroGraphics::updateScreen() {
+ 	dynamic_cast<LibretroTimerManager *>(LIBRETRO_G_SYSTEM->getTimerManager())->checkThread(THREAD_SWITCH_UPDATE);
+ }
+ 
++// lol-vr-3d: the VR app can draw the game's cursor itself, only where the player points (detached
++// windows each show a part of the screen: the cursor would show in two of them at once).
++static int g_lolvrHideCursor = 0, g_lolvrCursorShown = 0;
++extern "C" __attribute__((visibility("default"))) void retro_lolvr_hide_cursor(int hide) { g_lolvrHideCursor = hide; }
++extern "C" __attribute__((visibility("default"))) int retro_lolvr_cursor_shown(void) { return g_lolvrCursorShown; }
++
+ void LibretroGraphics::realUpdateScreen(void) {
+ 	const Graphics::Surface &srcSurface = _overlayVisible ? _overlay : _gameScreen;
+ 
+ 	if (srcSurface.w && srcSurface.h)
+ 		_screen.blitFrom(srcSurface, Common::Rect(srcSurface.w, srcSurface.h), Common::Rect(_screen.w, _screen.h), &_gamePalette);
+ 
+-	if (_cursorVisible && _cursor.w && _cursor.h) {
++	g_lolvrCursorShown = _cursorVisible && _cursor.w && _cursor.h && !_overlayVisible;
++	if (_cursorVisible && _cursor.w && _cursor.h && !(g_lolvrHideCursor && !_overlayVisible)) {
+ 		Common::Point topLeft(_cursorX - _cursorHotspotXScaled, _cursorY - _cursorHotspotYScaled);
+ 		_screen.transBlitFrom(_cursor, Common::Rect(_cursor.w, _cursor.h), Common::Rect(topLeft, topLeft + Common::Point(_cursorWidthScaled, _cursorHeightScaled)),  _cursorKeyColor, false, 0xff,  _cursorPaletteEnabled ? &_cursorPalette : &_gamePalette);
+ 	}
 diff --git a/engines/kyra/engine/items_lol.cpp b/engines/kyra/engine/items_lol.cpp
 index 4c00889..3ced5d1 100644
 --- a/engines/kyra/engine/items_lol.cpp
@@ -23,7 +49,7 @@ index 4c00889..3ced5d1 100644
  }
  
 diff --git a/engines/kyra/engine/lol.cpp b/engines/kyra/engine/lol.cpp
-index c4f86a3..1c06559 100644
+index c4f86a3..d678c22 100644
 --- a/engines/kyra/engine/lol.cpp
 +++ b/engines/kyra/engine/lol.cpp
 @@ -21,6 +21,8 @@
@@ -35,7 +61,7 @@ index c4f86a3..1c06559 100644
  #include "kyra/engine/lol.h"
  #include "kyra/graphics/screen_lol.h"
  #include "kyra/resource/resource.h"
-@@ -45,6 +47,32 @@ LolvrGameState g_lolvrState = {1, 0, {0}, 0, 0, 0, 0, 0, 0, 0, {0}, {0}};
+@@ -45,6 +47,41 @@ LolvrGameState g_lolvrState = {1, 0, {0}, 0, 0, 0, 0, 0, 0, 0, {0}, {0}};
  __attribute__((visibility("default"))) const LolvrGameState *retro_lolvr_state(void) {
  	return &g_lolvrState;
  }
@@ -59,6 +85,15 @@ index c4f86a3..1c06559 100644
 +	g_lolvrLevel.cursorKey = key;
 +	g_lolvrLevel.cursorSerial++;
 +}
++// lol-vr-3d test bench: move the party to another level (level, block, direction), done in the
++// game loop. Not used by the headset app.
++static int g_lolvrTeleport[3] = {0, 0, 0};
++__attribute__((visibility("default"))) void retro_lolvr_teleport(int level, int block, int dir) {
++	g_lolvrTeleport[1] = block;
++	g_lolvrTeleport[2] = dir;
++	g_lolvrTeleport[0] = level;
++}
++
 +// The language picked in the headset (0 English, 1 French, 2 German): applied when the game
 +// starts, or at the next turn of the main loop (CD version, which has the three languages).
 +int g_lolvrLangRequest = -1;
@@ -68,7 +103,7 @@ index c4f86a3..1c06559 100644
  }
  
  namespace Kyra {
-@@ -95,6 +123,10 @@ LoLEngine::LoLEngine(OSystem *system, const GameFlags &flags) : KyraRpgEngine(sy
+@@ -95,6 +132,10 @@ LoLEngine::LoLEngine(OSystem *system, const GameFlags &flags) : KyraRpgEngine(sy
  		warning("unsupported language, switching back to English");
  		break;
  	}
@@ -79,7 +114,7 @@ index c4f86a3..1c06559 100644
  
  	_chargenFrameTable = _flags.isTalkie ? _chargenFrameTableTalkie : _chargenFrameTableFloppy;
  	_chargenWSA = 0;
-@@ -964,10 +996,75 @@ void LoLEngine::runLoop() {
+@@ -964,10 +1005,86 @@ void LoLEngine::runLoop() {
  			_nextScriptFunc = 0;
  		}
  
@@ -120,6 +155,17 @@ index c4f86a3..1c06559 100644
 +		g_lolvrLevel.textBox = lolvrTextBox(); // lol-vr-3d
 +		g_lolvrLevel.itemInHand = _itemInHand;
 +		lolvrApplyLangRequest();
++		if (g_lolvrTeleport[0] > 0) {
++			const int lv = g_lolvrTeleport[0];
++			g_lolvrTeleport[0] = 0;
++			completeDoorOperations();
++			generateTempData();
++			_currentBlock = g_lolvrTeleport[1] & 1023;
++			_currentDirection = g_lolvrTeleport[2] & 3;
++			calcCoordinates(_partyPosX, _partyPosY, _currentBlock, 0x80, 0x80);
++			loadLevel(lv);
++			enableSysTimer(2);
++		}
 +		lolvrExportLang();
 +		{
 +			const Palette &cur = _screen->lolvrScreenPalette();
@@ -155,7 +201,7 @@ index c4f86a3..1c06559 100644
  
  		_timer->update();
  
-@@ -1049,6 +1146,8 @@ void LoLEngine::readSettings() {
+@@ -1049,6 +1166,8 @@ void LoLEngine::readSettings() {
  }
  
  void LoLEngine::update() {
@@ -164,7 +210,15 @@ index c4f86a3..1c06559 100644
  	updateSequenceBackgroundAnimations();
  
  	if (_updateCharNum != -1 && _system->getMillis() > _updatePortraitNext)
-@@ -1633,6 +1732,8 @@ void LoLEngine::initSceneWindowDialogue(int controlMode) {
+@@ -1621,6 +1740,7 @@ void LoLEngine::setupScreenDims() {
+ 		_screen->modifyScreenDim(4, 11, 124, 28, 9);
+ 		_screen->modifyScreenDim(5, 85, 123, 233, 18);
+ 	}
++	g_lolvrLevel.textBox = lolvrTextBox(); // lol-vr-3d
+ }
+ 
+ void LoLEngine::initSceneWindowDialogue(int controlMode) {
+@@ -1633,6 +1753,8 @@ void LoLEngine::initSceneWindowDialogue(int controlMode) {
  	_txt->expandField();
  	setupScreenDims();
  	gui_disableControls(controlMode);
@@ -173,7 +227,7 @@ index c4f86a3..1c06559 100644
  }
  
  void LoLEngine::toggleSelectedCharacterFrame(bool mode) {
-@@ -1690,6 +1791,8 @@ void LoLEngine::gui_specialSceneRestoreControls(int restoreLamp) {
+@@ -1690,6 +1812,8 @@ void LoLEngine::gui_specialSceneRestoreControls(int restoreLamp) {
  }
  
  void LoLEngine::restoreAfterSceneWindowDialogue(int redraw) {
@@ -182,7 +236,7 @@ index c4f86a3..1c06559 100644
  	gui_enableControls();
  	_txt->setupField(false);
  	_updateFlags &= 0xFFDF;
-@@ -1711,6 +1814,8 @@ void LoLEngine::restoreAfterSceneWindowDialogue(int redraw) {
+@@ -1711,6 +1835,8 @@ void LoLEngine::restoreAfterSceneWindowDialogue(int redraw) {
  
  	_needSceneRestore = 0;
  	enableSysTimer(2);
@@ -191,7 +245,15 @@ index c4f86a3..1c06559 100644
  }
  
  void LoLEngine::initDialogueSequence(int controlMode, int pageNum) {
-@@ -1758,11 +1863,15 @@ void LoLEngine::initDialogueSequence(int controlMode, int pageNum) {
+@@ -1734,6 +1860,7 @@ void LoLEngine::initDialogueSequence(int controlMode, int pageNum) {
+ 		_txt->clearDim(4);
+ 
+ 		_updateFlags |= 2;
++		_lolvrBigBox = true; // lol-vr-3d
+ 		_currentControlMode = controlMode;
+ 		calcCharPortraitXpos();
+ 
+@@ -1758,11 +1885,16 @@ void LoLEngine::initDialogueSequence(int controlMode, int pageNum) {
  
  	_currentControlMode = controlMode;
  	_dialogueField = true;
@@ -204,10 +266,11 @@ index c4f86a3..1c06559 100644
  		return;
 +	g_lolvrLevel.sceneBusy = 0; // lol-vr-3d: the conversation is over (before the fade)
 +	g_lolvrLevel.textBox = 0; // lol-vr-3d
++	_lolvrBigBox = false;
  
  	stopPortraitSpeechAnim();
  	_currentControlMode = controlMode;
-@@ -1780,6 +1889,8 @@ void LoLEngine::restoreAfterDialogueSequence(int controlMode) {
+@@ -1780,6 +1912,8 @@ void LoLEngine::restoreAfterDialogueSequence(int controlMode) {
  	}
  
  	_dialogueField = false;
@@ -216,7 +279,37 @@ index c4f86a3..1c06559 100644
  }
  
  void LoLEngine::resetPortraitsAndDisableSysTimer() {
-@@ -2123,8 +2234,12 @@ int LoLEngine::castSpell(int charNum, int spellType, int spellLevel) {
+@@ -1922,6 +2056,21 @@ void LoLEngine::loadTalkFile(int index) {
+ 	_res->loadPakFile(Common::Path(Common::String::format("%02d.TLK", index)));
+ }
+ 
++// lol-vr-3d: see lol.h
++int LoLEngine::lolvrTextBox() {
++	if (!textEnabled())
++		return 0;
++	int x, y, w, h;
++	if (_lolvrBigBox && (_updateFlags & 2)) {
++		x = 0; y = 126; w = 320; h = 74;      // portrait at the left, text and answers to its right
++	} else if (_lolvrFieldExpanded) {
++		x = 80; y = 120; w = 240; h = 60;     // under the view, over the party's portraits
++	} else {
++		return 0;
++	}
++	return (int)((uint32)x | ((uint32)(y - 100) << 9) | ((uint32)w << 16) | ((uint32)h << 25));
++}
++
+ int LoLEngine::characterSays(int track, int charId, bool redraw) {
+ 	if (charId == 1) {
+ 		charId = _selectedCharacter;
+@@ -2020,6 +2169,7 @@ int LoLEngine::playCharacterScriptChat(int charId, int mode, int restorePortrait
+ 	_fadeText = false;
+ 	if (!skipAnim && charId < 3)
+ 		updatePortraitSpeechAnim();
++	g_lolvrLevel.textBox = lolvrTextBox(); // lol-vr-3d
+ 
+ 	return 1;
+ }
+@@ -2123,8 +2273,12 @@ int LoLEngine::castSpell(int charNum, int spellType, int spellLevel) {
  
  	if (charNum < 0) {
  		_activeSpell.charNum = (charNum * -1) - 1;
@@ -231,7 +324,7 @@ index c4f86a3..1c06559 100644
  	} else {
  		if (_activeSpell.p->mpRequired[spellLevel] > _characters[charNum].magicPointsCur)
  			return 0;
-@@ -2136,13 +2251,64 @@ int LoLEngine::castSpell(int charNum, int spellType, int spellLevel) {
+@@ -2136,13 +2290,64 @@ int LoLEngine::castSpell(int charNum, int spellType, int spellLevel) {
  		setCharacterMagicOrHitPoints(charNum, 0, -_activeSpell.p->hpRequired[spellLevel], 1);
  		gui_drawCharPortraitWithStats(charNum);
  
@@ -296,7 +389,7 @@ index c4f86a3..1c06559 100644
  int LoLEngine::castSpark(ActiveSpell *a) {
  	processMagicSpark(a->charNum, a->level);
  	return 1;
-@@ -4130,7 +4296,6 @@ uint16 LoLEngine::getNearestPartyMemberFromPos(int x, int y) {
+@@ -4130,7 +4335,6 @@ uint16 LoLEngine::getNearestPartyMemberFromPos(int x, int y) {
  // magic atlas
  
  void LoLEngine::displayAutomap() {
@@ -304,7 +397,7 @@ index c4f86a3..1c06559 100644
  	snd_playSoundEffect(105, -1);
  	gui_toggleButtonDisplayMode(_flags.isTalkie ? 78 : 76, 1);
  
-@@ -4174,6 +4339,9 @@ void LoLEngine::displayAutomap() {
+@@ -4174,6 +4378,9 @@ void LoLEngine::displayAutomap() {
  
  	_screen->copyPage(2, 0);
  	_screen->updateScreen();
@@ -315,7 +408,7 @@ index c4f86a3..1c06559 100644
  	uint32 delayTimer = _system->getMillis() + 8 * _tickLength;
  
 diff --git a/engines/kyra/engine/lol.h b/engines/kyra/engine/lol.h
-index a9028a2..218acf3 100644
+index a9028a2..58490f7 100644
 --- a/engines/kyra/engine/lol.h
 +++ b/engines/kyra/engine/lol.h
 @@ -50,6 +50,99 @@ struct LolvrGameState {
@@ -418,7 +511,7 @@ index a9028a2..218acf3 100644
  }
  
  namespace Audio {
-@@ -335,6 +428,19 @@ private:
+@@ -335,6 +428,24 @@ private:
  
  	// main loop
  	void runLoop();
@@ -432,7 +525,12 @@ index a9028a2..218acf3 100644
 +	// lol-vr-3d: the game's language (bits 16-17: 0 English, 1 French, 2 German; bit 18: known)
 +	void lolvrApplyLangRequest(); // lol-vr-3d
 +	void lolvrExportLang() { g_lolvrState.reserved[2] = (g_lolvrState.reserved[2] & ~0x70000) | ((_lang & 3) << 16) | 0x40000; }
-+	int lolvrTextBox() { return ((_needSceneRestore || _dialogueField) && (_updateFlags & 2) && textEnabled()) ? 1 : 0; } // lol-vr-3d
++	// lol-vr-3d: the text area of a conversation or of a character's remark (portrait and text),
++	// when it is larger than the message line, as an unsigned rectangle of the 320 x 200 screen:
++	// x | (y - 100) << 9 | w << 16 | h << 25 ; 0 = none.
++	int lolvrTextBox();
++	bool _lolvrFieldExpanded = false; // the message line grown into a text area (remarks, talks in the view)
++	bool _lolvrBigBox = false;        // the large box over the whole bottom of the screen (conversations)
 +private:
 +	bool lolvrDrawSprite(uint16 id, uint8 &ceiling); // lol-vr-3d
  	void update() override;
@@ -1027,3 +1125,23 @@ index 00019e9..26a51d5 100644
  
  	Button::Callback mainMenuFunctor = BUTTON_FUNCTOR(GUI_LoL, this, &GUI_LoL::clickedMainMenu);
  	for (int i = 0; i < _mainMenu.numberOfItems; ++i)
+diff --git a/engines/kyra/text/text_lol.cpp b/engines/kyra/text/text_lol.cpp
+index 22882f4..a4b226f 100644
+--- a/engines/kyra/text/text_lol.cpp
++++ b/engines/kyra/text/text_lol.cpp
+@@ -65,6 +65,7 @@ void TextDisplayer_LoL::setupField(bool mode) {
+ 			_screen->copyRegionToBuffer(3, 0, 0, 320, 40, _vm->_pageBuffer2);
+ 			_screen->copyBlockToPage(3, 0, 0, 320, 40, _vm->_pageBuffer1);
+ 		} else {
++			_vm->_lolvrFieldExpanded = false; // lol-vr-3d
+ 			_screen->setScreenDim(clearDim(4));
+ 			int cp = _screen->setCurPage(2);
+ 			_screen->copyRegionToBuffer(3, 0, 0, 320, 40, _vm->_pageBuffer1);
+@@ -97,6 +98,7 @@ void TextDisplayer_LoL::expandField() {
+ 	uint8 *tmp = _vm->_pageBuffer1 + 13000;
+ 
+ 	if (_vm->textEnabled()) {
++		_vm->_lolvrFieldExpanded = true; // lol-vr-3d
+ 		_vm->_fadeText = false;
+ 		_vm->_textColorFlag = 0;
+ 		_vm->_timer->disable(11);

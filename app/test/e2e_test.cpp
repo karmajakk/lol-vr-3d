@@ -54,6 +54,8 @@ static void saveGl(const std::string &path) {
 	printf("écrit %s\n", path.c_str());
 }
 
+extern "C" void retro_lolvr_teleport(int level, int block, int dir);
+
 static unsigned keyCode(const std::string &k) {
 	if (k == "esc") return RETROK_ESCAPE;
 	if (k == "enter") return RETROK_RETURN;
@@ -178,6 +180,30 @@ int main(int argc, char **argv) {
 			pump(0.03);
 			host.setMouseButtons(false, false);
 			pump(after);
+		} else if (op == "goto") {
+			// goto NIVEAU CASE DIR : le groupe va directement là (banc d'essai)
+			int lv = 1, b = 0, d = 0;
+			cs >> lv >> b >> d;
+			retro_lolvr_teleport(lv, b, d);
+			pump(3.0);
+		} else if (op == "carte") {
+			// carte : le plan du niveau (# plein, . passage, @ le groupe, chiffre : type de mur spécial)
+			LevelSnapshot m;
+			if (host.levelSnapshot(m) && !m.vmp.empty()) {
+				DungeonGfx g;
+				g.vmpMap = m.vmpMap;
+				g.wallFlags = m.wallFlags;
+				printf("  niveau %d, groupe en %d\n", m.level, m.block);
+				for (int z = 0; z < 32; z++) {
+					char row[33];
+					for (int x = 0; x < 32; x++) {
+						const int b = z * 32 + x;
+						row[x] = b == m.block ? '@' : isSolidBlock(m.walls, b, g) ? '#' : '.';
+					}
+					row[32] = 0;
+					printf("  %2d %s\n", z, row);
+				}
+			}
 		} else if (op == "lang") {
 			int l = 0;
 			cs >> l;
@@ -191,7 +217,9 @@ int main(int argc, char **argv) {
 			LevelSnapshot ls;
 			bool hasL = host.levelSnapshot(ls);
 			if (host.gameState(gs))
-				printf("  état : langue=%d vr=%d nom=%d niveau=%d boucle=%u mode=%d menu=%d scène=%d boîte=%d lumière=%d case=%d dir=%d sort=%d/%u\n", gs.gameLang, gs.vrMenuSerial, (int)gs.nameEntry, gs.level, gs.loopSerial, gs.controlMode, (int)gs.menuOpen, hasL ? (int)ls.sceneBusy : -1, hasL ? (int)ls.textBox : -1, hasL ? ls.light : -1, hasL ? ls.block : -1, hasL ? ls.direction : -1, hasL ? (int)ls.spellBusy : -1, hasL ? ls.spellSerial : 0);
+				printf("  état : langue=%d vr=%d nom=%d niveau=%d boucle=%u mode=%d menu=%d scène=%d boîte=%u lumière=%d case=%d dir=%d sort=%d/%u\n", gs.gameLang, gs.vrMenuSerial, (int)gs.nameEntry, gs.level, gs.loopSerial, gs.controlMode, (int)gs.menuOpen, hasL ? (int)ls.sceneBusy : -1, hasL ? (int)ls.textBox : -1, hasL ? ls.light : -1, hasL ? ls.block : -1, hasL ? ls.direction : -1, hasL ? (int)ls.spellBusy : -1, hasL ? ls.spellSerial : 0);
+			if (hasL && ls.textRect)
+					printf("  zone de texte : x %u y %u, %u x %u\n", ls.textRect & 511, ((ls.textRect >> 9) & 127) + 100, (ls.textRect >> 16) & 511, (ls.textRect >> 25) & 127);
 			if (hasL)
 				printf("  tenu=%d curseur=%dx%d chaud=%d,%d n°%u\n", ls.itemInHand, ls.cursorW, ls.cursorH, ls.cursorHotX, ls.cursorHotY, ls.cursorSerial);
 			if (hasL && ls.cursorW > 0 && ls.cursorRgba.size() >= (size_t)ls.cursorW * ls.cursorH * 4) {
@@ -258,6 +286,16 @@ int main(int argc, char **argv) {
 					if (strcmp(dt, "portes") ? t != (atoi(dt) & 255) : tex.doorLayer[t] < 0)
 						continue;
 					printf("    type %d : genre %d couche %d porte %d profondeur face %.2f porte %.2f plan %.2f levée %.2f\n", t, tex.kind[t], tex.typeLayer[t], tex.doorLayer[t], tex.faceDepth[t], tex.doorDepth[t], tex.planeDepth[t], tex.doorLift[t]);
+					{
+						int shown = 0;
+						for (int bb = 0; bb < 1024 && shown < 3; bb++)
+							for (int k = 0; k < 4; k++)
+								if (lvl.walls[bb * 4 + k] == t) {
+									printf("      en case %d face %d\n", bb, k);
+									shown++;
+									break;
+								}
+					}
 					const int ls[2] = {tex.typeLayer[t], tex.doorLayer[t]};
 					for (int k = 0; k < 2; k++) {
 						if (ls[k] < 0)
@@ -304,6 +342,7 @@ int main(int argc, char **argv) {
 				dun.setMesh(verts);
 				builtWalls = lvl.wallsSerial;
 			}
+			if (!getenv("LOLVR_NOIR"))
 			for (int b : {lvl.block - 33, lvl.block - 32, lvl.block - 31, lvl.block - 1, lvl.block, lvl.block + 1})
 				if (b >= 0 && b < 1024)
 					printf("    bloc %d (%d,%d) : %d %d %d %d\n", b, b & 31, b >> 5, lvl.walls[b * 4], lvl.walls[b * 4 + 1], lvl.walls[b * 4 + 2], lvl.walls[b * 4 + 3]);
@@ -337,7 +376,7 @@ int main(int argc, char **argv) {
 							}
 					}
 					list.push_back(d);
-					printf("    sprite %zu : %s id %d à (%.2f, %.2f) bloc %d, %d x %d px%s\n", i, s.kind ? "objet" : "monstre", s.id, s.x / 256.0, s.y / 256.0,
+					if (!getenv("LOLVR_NOIR")) printf("    sprite %zu : %s id %d à (%.2f, %.2f) bloc %d, %d x %d px%s\n", i, s.kind ? "objet" : "monstre", s.id, s.x / 256.0, s.y / 256.0,
 					       (s.y >> 8) * 32 + (s.x >> 8), s.x1 - s.x0, s.y1 - s.y0, s.flying ? (" en vol, hauteur " + std::to_string(s.flying) + " direction " + std::to_string(s.flightDir)).c_str() : "");
 				}
 				dun.setSprites(list);
@@ -394,8 +433,23 @@ int main(int argc, char **argv) {
 				dun.setEffect(nullptr, 0, 0, 0);
 			}
 			dun.render(multiply(proj, view), model, eye, 1.0f);
-			saveGl(out + "/" + name + "_3d.ppm");
-			saveFrame(f, out + "/" + name + "_jeu.ppm");
+			if (getenv("LOLVR_NOIR")) {
+				// Pas d'image : la part de vide (rien de dessiné, la couleur de fond) au milieu de la vue
+				std::vector<uint8_t> px((size_t)W * H * 4);
+				glReadPixels(0, 0, W, H, GL_RGBA, GL_UNSIGNED_BYTE, px.data());
+				int empty = 0, n = 0;
+				for (int y = H / 4; y < H * 3 / 4; y++)
+					for (int x = W / 4; x < W * 3 / 4; x++, n++) {
+						const uint8_t *c = &px[((size_t)y * W + x) * 4];
+						if (c[0] >= 34 && c[0] <= 44 && c[1] < 4 && c[2] >= 50 && c[2] <= 62)
+							empty++;
+					}
+				if (empty * 100 > n * 3)
+					printf("  VIDE case %d dir %d : %d %%\n", vb, vd, empty * 100 / n);
+			} else {
+				saveGl(out + "/" + name + "_3d.ppm");
+				saveFrame(f, out + "/" + name + "_jeu.ppm");
+			}
 		}
 	}
 	host.stop();

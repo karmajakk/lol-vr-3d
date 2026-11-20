@@ -105,6 +105,7 @@ struct UiFrameOutput {
 	bool hitValid = false;
 	Vec3 hit = {0, 0, 0}, hitRight = {0, 0, 0}, hitUp = {0, 0, 0};
 	float hitRadius = 0.0f;
+	float hitPixel = 0.0f;    // l'écran ou une fenêtre du jeu visé : mètres par pixel du jeu (0 : autre chose)
 	bool pointerLong = false; // le doigt ne vise ni l'écran ni un panneau : rayon entier, pour viser les poignées
 	// Déplacement à la poignée
 	bool dragging = false;        // un panneau ou l'écran est tenu (le joystick droit le règle)

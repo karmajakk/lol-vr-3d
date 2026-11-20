@@ -42,8 +42,8 @@ Démo en développement. Ce qui fonctionne :
 - Les endroits sombres restent sombres tant que tu n'as pas allumé la lanterne.
 - « Mode VR » dans « Réglages VR » (menu du jeu) : Immersif, Classique (bibliothèque) ou Réalité
   mixte ; dans les deux derniers, L3 change la vue : grand écran, fenêtres, PC 486.
-- Les conversations : la grande boîte de texte du jeu, avec le portrait de celui qui parle, est
-  collée sous l'écran du jeu.
+- Les conversations et les remarques : la boîte de texte du jeu, avec le portrait de celui qui
+  parle, apparaît dans sa propre fenêtre juste sous le cadre de l'écran, qui garde toute la vue.
 - Les monstres et les objets près du groupe, dessinés par le jeu lui-même et toujours tournés vers
   toi.
 - Les clics dans le donjon en 3D : sur les murs autour du groupe (boutons de porte, leviers,

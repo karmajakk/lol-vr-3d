@@ -502,6 +502,7 @@ struct App {
 	float dispW = 2.4f, dispH = 1.8f;
 	float bandH = 0;   // hauteur (pixels du jeu, à la largeur de la vue) de la ligne de messages collée sous la scène
 	float bandRect[4] = {83, 122, 234, 20}; // ce qu'elle montre de l'image du jeu (x, y, largeur, hauteur)
+	bool bandShown = false;              // la bande (messages, conversation) : fenêtre sous le cadre de l'écran
 	int quadRectW = 0, quadRectH = 0; // zone du calque quad réellement utilisée
 	float quadScaleX = 1.0f, quadScaleY = 1.0f; // marge noire comprise
 
@@ -522,6 +523,13 @@ struct App {
 	int characters = 0, selectedChar = 0;
 	bool attackDown = false, magicDown = false, charFlick = false;
 	double synthClickUntil = 0;   // clic envoyé au jeu à la place du pointeur (bouton de magie)
+	// Un clic sur un mur de côté (buisson, nid, trou d'arbre) : le jeu ne clique que sur le mur
+	// d'en face. Le groupe se tourne d'abord vers ce mur, puis le clic part.
+	int pickFace = -1;            // le mur visé : 0 nord .. 3 ouest (-1 : sol, au loin)
+	int pendingFace = -1;
+	float pendingU = 0, pendingV = 0;
+	double pendingUntil = 0;
+	bool holdTrigger = false;     // la gâchette du clic reporté est encore enfoncée
 	float synthU = 0, synthV = 0;
 	bool keyboardOpen = false, keyboardButtonDown = false;
 	// Le clavier ouvert tout seul pour écrire le nom d'une sauvegarde : il se referme à la fin.
@@ -1584,9 +1592,11 @@ void updateGameEvents(App &app, double now) {
 // L'objet tenu par le pointeur, posé sur le point visé du donjon en 3D : le curseur du jeu (l'icône
 // de l'objet) que le jeu ne dessine que sur son image à plat. Face au joueur, il garde la même
 // taille apparente quelle que soit la distance ; son point chaud tombe sur le point visé.
-void showHeldItem(App &app, Vec3 hit) {
+// Le curseur du jeu (flèche, ou l'objet tenu), posé à plat au point visé : son point chaud sur le
+// point, « pixel » mètres par pixel du jeu. Dessiné par-dessus tout, dans le dernier panneau.
+void drawGameCursor(App &app, Vec3 pos, Vec3 right, Vec3 up, float pixel) {
 	const lolvr::LevelSnapshot &l = app.level;
-	if (!l.itemInHand || l.cursorW <= 0 || l.cursorH <= 0 || l.cursorRgba.size() < (size_t)l.cursorW * l.cursorH * 4)
+	if (l.cursorW <= 0 || l.cursorH <= 0 || l.cursorRgba.size() < (size_t)l.cursorW * l.cursorH * 4)
 		return;
 	if (app.cursorTexSerial != l.cursorSerial || !app.cursorTex) {
 		if (!app.cursorTex)
@@ -1601,17 +1611,6 @@ void showHeldItem(App &app, Vec3 hit) {
 		glBindTexture(GL_TEXTURE_2D, 0);
 		app.cursorTexSerial = l.cursorSerial;
 	}
-	Vec3 toEye = app.headPos - hit;
-	const float dist = length(toEye);
-	if (dist < 0.05f)
-		return;
-	toEye = toEye * (1.0f / dist);
-	Vec3 right = cross(Vec3{0, 1, 0}, toEye);
-	if (length(right) < 0.01f)
-		right = rotate(app.headRot, {1, 0, 0});
-	right = normalize(right);
-	const Vec3 up = normalize(cross(toEye, right));
-	const float px = 0.0032f * dist; // un pixel du jeu : à peu près la taille qu'il a sur le grand écran
 	lolvr::SceneState::Panel &p = app.ss.panels[lolvr::SceneState::kMaxPanels - 1];
 	p = lolvr::SceneState::Panel();
 	p.visible = true;
@@ -1622,13 +1621,86 @@ void showHeldItem(App &app, Vec3 hit) {
 	p.texH = l.cursorH;
 	p.right = right;
 	p.up = up;
-	p.halfW = l.cursorW * px * 0.5f;
-	p.halfH = l.cursorH * px * 0.5f;
-	p.center = hit + toEye * 0.01f + right * ((l.cursorW * 0.5f - l.cursorHotX) * px) - up * ((l.cursorH * 0.5f - l.cursorHotY) * px);
+	p.halfW = l.cursorW * pixel * 0.5f;
+	p.halfH = l.cursorH * pixel * 0.5f;
+	p.center = pos + cross(right, up) * 0.002f + right * ((l.cursorW * 0.5f - l.cursorHotX) * pixel) - up * ((l.cursorH * 0.5f - l.cursorHotY) * pixel);
 }
+
+// L'objet tenu par le pointeur, posé sur le point visé du donjon en 3D : le curseur du jeu (l'icône
+// de l'objet) que le jeu ne dessine que sur son image à plat. Face au joueur, il garde la même
+// taille apparente quelle que soit la distance ; son point chaud tombe sur le point visé.
+void showHeldItem(App &app, Vec3 hit) {
+	if (!app.level.itemInHand)
+		return;
+	Vec3 toEye = app.headPos - hit;
+	const float dist = length(toEye);
+	if (dist < 0.05f)
+		return;
+	toEye = toEye * (1.0f / dist);
+	Vec3 right = cross(Vec3{0, 1, 0}, toEye);
+	if (length(right) < 0.01f)
+		right = rotate(app.headRot, {1, 0, 0});
+	right = normalize(right);
+	const Vec3 up = normalize(cross(toEye, right));
+	drawGameCursor(app, hit + toEye * 0.01f, right, up, 0.0032f * dist); // un pixel du jeu : à peu près sa taille sur le grand écran
+}
+
+// La bande de texte (messages, conversation, remarque) : une fenêtre sous le cadre de l'écran, à
+// sa largeur au plus. Un clic dessus va au jeu, à cet endroit de la zone de texte.
+void placeBand(App &app, const lolvr::UiFrameInput &in, lolvr::UiFrameOutput &out);
 
 Vec3 viewCenter(const App &app) {
 	return app.screenPos + Vec3{0, app.viewLift, 0} + rotate(screenRot(app), {app.viewShift, 0, 0});
+}
+
+void placeBand(App &app, const lolvr::UiFrameInput &in, lolvr::UiFrameOutput &out) {
+	if (!app.bandShown || !app.screenPlaced)
+		return;
+	const float bw = app.bandRect[2], bh = app.bandRect[3];
+	const float viewPx = app.dispW / (app.cropW > 0.0f ? app.cropW : 176.0f);
+	const float px = fminf(viewPx, app.dispW * 1.25f / bw); // mètres par pixel du jeu
+	const Quat rot = screenRot(app);
+	const Vec3 r = rotate(rot, {1, 0, 0}), u = rotate(rot, {0, 1, 0}), n = rotate(rot, {0, 0, 1});
+	const float halfW = bw * px * 0.5f, halfH = bh * px * 1.2f * 0.5f;
+	// Sous le cadre doré (il déborde de 9 % de la largeur sous l'image), un peu en avant.
+	const Vec3 c = viewCenter(app) - u * (app.dispH * 0.5f + app.dispW * 0.105f + halfH + 0.012f) + n * 0.03f;
+	lolvr::SceneState::Panel &p = app.ss.panels[lolvr::SceneState::kMaxPanels - 2];
+	p = lolvr::SceneState::Panel();
+	p.visible = true;
+	p.center = c;
+	p.right = r;
+	p.up = u;
+	p.halfW = halfW;
+	p.halfH = halfH;
+	p.u0 = app.bandRect[0] / 320.0f;
+	p.v0 = app.bandRect[1] / 200.0f;
+	p.u1 = (app.bandRect[0] + bw) / 320.0f;
+	p.v1 = (app.bandRect[1] + bh) / 200.0f;
+	p.border = 0.010f;
+	// Le pointeur sur la bande (si rien d'autre n'est visé)
+	if (!in.aimValid || out.hitValid || out.dragging)
+		return;
+	const float den = dot(in.dir, n);
+	if (fabsf(den) < 1e-4f)
+		return;
+	const float t = dot(c - in.tip, n) / den;
+	if (t <= 0.0f)
+		return;
+	const Vec3 h = in.tip + in.dir * t;
+	const float hx = dot(h - c, r) / halfW, hy = dot(h - c, u) / halfH;
+	if (fabsf(hx) > 1.0f || fabsf(hy) > 1.0f)
+		return;
+	out.pointerValid = true;
+	out.buttonsToGame = true;
+	out.hitValid = true;
+	out.hit = h + n * 0.002f;
+	out.hitRight = r;
+	out.hitUp = u;
+	out.hitRadius = 0.010f * t;
+	out.hitPixel = px;
+	out.pointerLong = false;
+	out.gu = (app.bandRect[0] + (hx + 1.0f) * 0.5f * bw) / 320.0f;
+	out.gv = (app.bandRect[1] + (1.0f - hy) * 0.5f * bh) / 200.0f;
 }
 
 // ---------------------------------------------------------------------------
@@ -1637,7 +1709,6 @@ Vec3 viewCenter(const App &app) {
 // La ligne de messages dans l'image du jeu (320 x 200) ; agrandie (conversations, boutiques), la
 // zone de texte descend jusqu'à la ligne 179, sur les portraits du groupe.
 const float kBandX = 83, kBandY = 122, kBandW = 234, kBandH = 20;
-const float kBoxW = 235, kBoxH = 57;
 
 void updateLayout(App &app, double now) {
 	const float kViewX = 112, kViewY = 0, kViewW = 176, kViewH = 120; // vue du donjon dans l'image 320x200
@@ -1665,14 +1736,21 @@ void updateLayout(App &app, double now) {
 		app.cropX = kViewX; app.cropY = kViewY; app.cropW = cw; app.cropH = kViewH;
 		// Mode immersif, boutique ou rencontre : la ligne de messages (les choix à faire) est collée
 		// sous la scène, à sa largeur.
-		const bool band = app.dungeonMode && app.level.sceneBusy && !app.charSheet;
-		// Une conversation : toute la zone de texte agrandie, avec le portrait de celui qui parle.
-		const bool box = band && app.level.textBox;
-		app.bandRect[0] = kBandX;
-		app.bandRect[1] = kBandY;
-		app.bandRect[2] = box ? kBoxW : kBandW;
-		app.bandRect[3] = box ? kBoxH : kBandH;
-		app.bandH = band ? app.bandRect[3] * cw / app.bandRect[2] : 0.0f;
+		const bool band = app.dungeonMode && (app.level.sceneBusy || app.level.textRect != 0) && !app.charSheet;
+		// Une conversation ou la remarque d'un personnage : toute la zone de texte, avec le portrait de
+		// celui qui parle (le moteur dit où elle est). La bande est une fenêtre à part, sous le cadre :
+		// collée dans le cadre, elle bouchait la vue.
+		const uint32_t tr = app.level.textRect;
+		const bool box = band && tr != 0;
+		app.bandRect[0] = box ? (float)(tr & 511) : kBandX;
+		app.bandRect[1] = box ? (float)(((tr >> 9) & 127) + 100) : kBandY;
+		app.bandRect[2] = box ? (float)((tr >> 16) & 511) : kBandW;
+		app.bandRect[3] = box ? (float)((tr >> 25) & 127) : kBandH;
+		if (app.bandRect[2] < 8.0f || app.bandRect[3] < 8.0f || app.bandRect[0] + app.bandRect[2] > 320.0f || app.bandRect[1] + app.bandRect[3] > 200.0f) {
+			app.bandRect[0] = kBandX; app.bandRect[1] = kBandY; app.bandRect[2] = kBandW; app.bandRect[3] = kBandH;
+		}
+		app.bandShown = band;
+		app.bandH = 0.0f;
 		const float viewOnlyH = w * lolvr::kSplitViewHeight;
 		app.dispH = viewOnlyH * (kViewH + app.bandH) / kViewH;
 		app.dispW = viewOnlyH * cw / (kViewH * 1.2f);
@@ -1681,6 +1759,7 @@ void updateLayout(App &app, double now) {
 	} else {
 		app.viewShift = 0.0f;
 		app.bandH = 0.0f;
+		app.bandShown = false;
 		app.cropX = 0; app.cropY = 0; app.cropW = 320; app.cropH = 200;
 		app.dispW = w;
 		app.dispH = w * 0.75f;
@@ -1888,6 +1967,8 @@ int portraitX(int count, int index) {
 // Renvoie la position correspondante dans l'image du jeu (0..1), et le point touché (monde).
 bool dungeonPick(App &app, Vec3 tip, Vec3 dir, float &gu, float &gv, Vec3 &hitW, Vec3 &rightW, Vec3 &upW) {
 	const lolvr::LevelSnapshot &l = app.level;
+	app.pickFace = -1;
+	int face = -1;
 	if (l.level <= 0)
 		return false;
 	const float S = lolvr::kBlockSize, H = lolvr::kWallHeight;
@@ -1939,6 +2020,7 @@ bool dungeonPick(App &app, Vec3 tip, Vec3 dir, float &gu, float &gv, Vec3 &hitW,
 			px = 136.0f + (dt.planeU0[backT] + u * (dt.planeU1[backT] - dt.planeU0[backT])) * 128.0f;
 			py = 8.0f + (dt.planeTop[backT] + (1.0f - hh.y / H) * (dt.planeFoot[backT] - dt.planeTop[backT])) * 128.0f;
 			finalF = f;
+			face = k;
 			finalR = r;
 		} else if (app.dunTex.kind[backT] == lolvr::kWallFace) {
 			float wfr = app.dunTex.faceDepth[backT];
@@ -1960,6 +2042,7 @@ bool dungeonPick(App &app, Vec3 tip, Vec3 dir, float &gu, float &gv, Vec3 &hitW,
 			px = 136.0f + u * 128.0f;
 			py = 8.0f + row;
 			finalF = f;
+			face = k;
 			finalR = r;
 		} else if (app.dunTex.kind[backT] == lolvr::kWallObject) {
 			// Un objet au milieu de la case voisine (buisson, nid...) : deux images croisées.
@@ -1986,6 +2069,7 @@ bool dungeonPick(App &app, Vec3 tip, Vec3 dir, float &gu, float &gv, Vec3 &hitW,
 				py = 8.0f + row;
 				finalF = pf;
 				finalR = pr;
+				face = k;
 			}
 		}
 	}
@@ -2030,6 +2114,7 @@ bool dungeonPick(App &app, Vec3 tip, Vec3 dir, float &gu, float &gv, Vec3 &hitW,
 	}
 	if (px < 0.0f)
 		return false;
+	app.pickFace = face;
 	gu = px / 320.0f;
 	gv = py / 200.0f;
 	hitW = transformPoint(model, hit);
@@ -2113,6 +2198,7 @@ void updateUi(App &app, XrTime time, float dt, double now, bool pointer, bool tr
 		app.chooserPlaced = true;
 	}
 	app.ui.update(in, out, app.ss);
+	placeBand(app, in, out);
 	// Donjon 3D : le doigt qui ne vise ni l'écran ni une fenêtre peut viser le mur droit devant le
 	// groupe (boutons, leviers, serrures, portes) ou le sol devant lui (objets à ramasser). Le clic
 	// part dans le jeu, là où le jeu dessinerait ce point.
@@ -2320,6 +2406,47 @@ void updateInput(App &app, XrTime time, float dt, double now) {
 	lolvr::UiFrameOutput ui;
 	updateUi(app, time, dt, now, true, clicked[hand] && app.triggerDown[hand], right, ui);
 	bool toGame = ui.buttonsToGame && !ui.dragging;
+	// Le curseur du jeu : l'app le dessine elle-même sur l'écran ou la fenêtre visée, et nulle part
+	// ailleurs (dans l'image du jeu, il débordait sur deux fenêtres voisines).
+	{
+		const bool own = app.level.cursorW > 0 && app.level.cursorRgba.size() >= (size_t)app.level.cursorW * app.level.cursorH * 4;
+		CoreHost::get().setOwnCursor(own);
+		if (own && ui.pointerValid && ui.hitPixel > 0.0f && CoreHost::get().cursorShown())
+			drawGameCursor(app, ui.hit, ui.hitRight, ui.hitUp, ui.hitPixel);
+	}
+	// Un mur de côté visé en 3D : se tourner vers lui, puis cliquer (voir pendingFace).
+	if (clicked[hand] && toGame && app.dungeonVisible && !app.aimOnUi && app.pickFace >= 0 && app.inDungeon &&
+	    app.pickFace != (app.level.direction & 3) && app.alignTurn == 0) {
+		const int pd = app.level.direction & 3, diff = (app.pickFace - pd) & 3;
+		if (diff == 1 || diff == 3) {
+			const bool leftTurn = diff == 3;
+			typeKey(app, leftTurn ? RETROK_HOME : RETROK_PAGEUP, 0, now);
+			app.alignTurn = leftTurn ? 1 : -1;
+			app.alignExpect = app.pickFace;
+			app.alignUntil = now + 1.0;
+			app.moveBlockUntil = now + 0.30;
+			app.pendingFace = app.pickFace;
+			app.pendingU = ui.gu;
+			app.pendingV = ui.gv;
+			app.pendingUntil = now + 1.5;
+			app.holdTrigger = true;
+		}
+	}
+	if (app.holdTrigger) {
+		if (!app.triggerDown[hand])
+			app.holdTrigger = false;
+		toGame = false;
+	}
+	if (app.pendingFace >= 0) {
+		if (now > app.pendingUntil) {
+			app.pendingFace = -1;
+		} else if ((app.level.direction & 3) == app.pendingFace && app.alignTurn == 0 && now >= app.synthClickUntil) {
+			app.synthU = app.pendingU;
+			app.synthV = app.pendingV;
+			app.synthClickUntil = now + 0.16;
+			app.pendingFace = -1;
+		}
+	}
 	if (now < app.synthClickUntil) {
 		// Bouton de magie : un clic bref sur le bouton du personnage, à la place du pointeur.
 		CoreHost::get().setPointer(app.synthU, app.synthV);
@@ -2829,8 +2956,22 @@ void updateDungeon(App &app, float dt) {
 	}
 	// Porte d'une boutique, entrée d'une autre région : le jeu fait entrer le groupe dans un bloc
 	// plein. La vue reste devant, face à l'image ; le jeu montre la scène ou change de région.
-	if (gfxChanged || app.shownLevel != l.level || app.visBlock < 0 || !lolvr::isHoldBlock(l.walls, l.block, g))
+	if (gfxChanged || app.shownLevel != l.level || app.visBlock < 0 || !lolvr::isHoldBlock(l.walls, l.block, g)) {
 		app.visBlock = l.block;
+		// Arrivée dans une nouvelle région sur l'entrée elle-même (le bloc de l'image, à la sortie du
+		// château par exemple) : on se tient devant, dans le passage, plutôt que dans le mur.
+		if (lolvr::isHoldBlock(l.walls, l.block, g)) {
+			static const int hdx[4] = {0, 1, 0, -1}, hdz[4] = {-1, 0, 1, 0};
+			for (int i = 0; i < 4; i++) {
+				const int k = (l.direction + (i == 0 ? 0 : i == 1 ? 1 : i == 2 ? 3 : 2)) & 3;
+				const int nb = (l.block + hdx[k] + hdz[k] * 32) & 1023;
+				if (!lolvr::isSolidBlock(l.walls, nb, g) && !lolvr::isHoldBlock(l.walls, nb, g)) {
+					app.visBlock = nb;
+					break;
+				}
+			}
+		}
+	}
 	float tx, tz;
 	lolvr::blockCenter(app.visBlock, tx, tz);
 	const int dir = l.direction & 3;

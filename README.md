@@ -38,8 +38,8 @@ Early demo. What works:
 - Dark places stay dark until you light the lamp.
 - "VR mode" in "VR controls" (game menu): Immersive, Classic (library) or Mixed reality; in the last
   two, L3 switches the view: big screen, windows, 486 PC.
-- Conversations: the game's large text box, with the speaker's portrait, is joined under the game
-  screen.
+- Conversations and remarks: the game's text box, with the speaker's portrait, appears in its own
+  window just under the frame of the game screen, which keeps the whole view.
 - Monsters and items near the party, drawn by the game itself and always facing you.
 - Clicks in the 3D dungeon: on the walls around the party (door buttons, levers, keyholes, bushes,
   nests) and on the floor in front of you (items).

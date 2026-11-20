@@ -76,6 +76,7 @@ struct LevelSnapshot {
 	// La zone de texte est agrandie (83,122 à 318,179) : conversation, boutique ; le portrait de celui
 	// qui parle y est souvent dessiné.
 	bool textBox = false;
+	uint32_t textRect = 0;     // la zone de texte (et portrait) : x | (y - 100) << 9 | w << 16 | h << 25
 	// L'objet tenu par le pointeur (0 = rien) et l'image du curseur du jeu (RGBA, fond transparent),
 	// point chaud compris. cursorSerial change avec l'image.
 	int itemInHand = 0;
@@ -124,6 +125,9 @@ public:
 	bool start(const HostConfig &cfg);
 	// Change la langue du jeu (version CD) : appliquée au prochain tour de sa boucle.
 	void setGameLanguage(int language);
+	// L'app dessine elle-même le curseur du jeu, là où vise le joueur (le cœur ne le met plus dans l'image).
+	void setOwnCursor(bool own);
+	bool cursorShown() const; // le jeu montre son curseur (ni caché, ni menu de ScummVM)
 	void stop();
 	bool running() const;
 	// Vrai quand ScummVM s'est terminé de lui-même (bouton « Quitter »).

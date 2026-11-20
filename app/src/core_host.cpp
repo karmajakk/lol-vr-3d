@@ -31,6 +31,8 @@ struct LolvrGameState {
 };
 const LolvrGameState *retro_lolvr_state(void);
 void retro_lolvr_set_lang(int lang);
+void retro_lolvr_hide_cursor(int hide);
+int retro_lolvr_cursor_shown(void);
 
 // Un monstre ou un objet près du groupe (voir patches/0003).
 struct LolvrSprite {
@@ -397,6 +399,7 @@ void copyLevel() {
 	l.nearObjects = s->nearObjects;
 	l.sceneBusy = s->sceneBusy != 0;
 	l.textBox = s->textBox != 0;
+	l.textRect = (uint32_t)s->textBox;
 	// L'objet tenu par le pointeur, et l'image du curseur du jeu (en couleurs, le fond transparent)
 	l.itemInHand = s->itemInHand;
 	// Les objets en vol, à chaque pas
@@ -577,6 +580,8 @@ CoreHost &CoreHost::get() {
 }
 
 void CoreHost::setGameLanguage(int language) { retro_lolvr_set_lang(language); }
+void CoreHost::setOwnCursor(bool own) { retro_lolvr_hide_cursor(own ? 1 : 0); }
+bool CoreHost::cursorShown() const { return retro_lolvr_cursor_shown() != 0; }
 
 bool CoreHost::start(const HostConfig &cfg) {
 	if (g.running)
@@ -715,6 +720,7 @@ bool CoreHost::levelSnapshot(LevelSnapshot &out) const {
 	out.nearObjects = l.nearObjects;
 	out.sceneBusy = l.sceneBusy;
 	out.textBox = l.textBox;
+	out.textRect = l.textRect;
 	out.itemInHand = l.itemInHand;
 	if (out.flightSerial != l.flightSerial) {
 		memcpy(out.flights, l.flights, sizeof(out.flights));

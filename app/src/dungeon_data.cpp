@@ -269,7 +269,27 @@ void decodeDungeonTextures(const DungeonGfx &g, DungeonTextures &out) {
 			for (int i = 0; i < n; i++)
 				if (al[i])
 					img[i] = rgb(px[i]);
-			// Une image (une maison au bout d'un chemin) : posée sur le mur ordinaire du niveau.
+			// Une image (une maison au bout d'un chemin, l'entrée d'une autre région) : le jeu la montre
+			// au loin, petite au milieu du mur ; ici, de près, elle couvre tout le mur.
+			if (picture && out.kind[t] == kWallFace) {
+				int x0 = kDunTexSize, y0 = kDunWallRows, x1 = -1, y1 = -1;
+				for (int y = 0; y < kDunWallRows; y++)
+					for (int x = 0; x < kDunTexSize; x++)
+						if (al[y * kDunTexSize + x]) {
+							x0 = x < x0 ? x : x0; x1 = x > x1 ? x : x1;
+							y0 = y < y0 ? y : y0; y1 = y > y1 ? y : y1;
+						}
+				const int bw = x1 - x0 + 1, bh = y1 - y0 + 1;
+				if (x1 >= 0 && bw > 16 && bh > 12 && (bw < kDunTexSize - 8 || bh < kDunWallRows - 8)) {
+					for (int y = 0; y < kDunWallRows; y++)
+						for (int x = 0; x < kDunTexSize; x++) {
+							const int sx = x0 + x * bw / kDunTexSize, sy = y0 + y * bh / kDunWallRows;
+							const int si = sy * kDunTexSize + sx;
+							img[y * kDunTexSize + x] = al[si] ? rgb(px[si]) : Rgba{0, 0, 0, 0};
+						}
+				}
+			}
+			// … posée sur le mur ordinaire du niveau (ce qui reste transparent).
 			if (picture && out.kind[t] == kWallFace && baseLayer >= 0) {
 				const Rgba *base = (const Rgba *)&out.rgba[(size_t)baseLayer * layerBytes];
 				for (int i = 0; i < n; i++)
@@ -501,15 +521,22 @@ void buildDungeonMesh(const uint8_t *walls, const DungeonGfx &g, const DungeonTe
 				if (page <= 0 || page >= 64 || tex.pageLayer[page] < 0)
 					continue;
 			}
-			// Un mur n'est visible que depuis la case voisine, si l'on peut s'y tenir.
-			int bx = (b & 31) + dx[k], bz = (b >> 5) + dz[k];
-			if (bx < 0 || bx > 31 || bz < 0 || bz > 31)
+			// Un mur n'est visible que depuis la case voisine, si l'on peut s'y tenir. Au bord du plan,
+			// le jeu passe de l'autre côté (la case voisine d'un bord est celle du bord opposé) : un
+			// couloir qui touche le bord finit sur ce mur-là, qu'on pose alors au bout du couloir.
+			const int nb = (b + dx[k] + dz[k] * 32) & 1023;
+			if (isSolidBlock(walls, nb, g))
 				continue;
-			if (isSolidBlock(walls, bz * 32 + bx, g))
-				continue;
+			float wcx = cx, wcz = cz;
+			const int bx = (b & 31) + dx[k], bz = (b >> 5) + dz[k];
+			if (bx < 0 || bx > 31 || bz < 0 || bz > 31) {
+				blockCenter(nb, wcx, wcz);
+				wcx -= (float)dx[k] * S;
+				wcz -= (float)dz[k] * S;
+			}
 			// Normale sortante n ; vu de la case voisine, la droite du spectateur est (n.z, 0, -n.x).
 			float nx = (float)dx[k], nz = (float)dz[k];
-			float fx = cx + nx * S * 0.5f, fz = cz + nz * S * 0.5f;
+			float fx = wcx + nx * S * 0.5f, fz = wcz + nz * S * 0.5f;
 			float layer = tex.typeLayer[t] >= 0 ? typeLayer : (float)tex.pageLayer[page];
 			if (tex.planeDepth[t] > 0.0f && tex.typeLayer[t] >= 0) {
 				// La porte dans son renfoncement : le cadre (les piliers) et la porte, au fond, sur toute
@@ -532,6 +559,25 @@ void buildDungeonMesh(const uint8_t *walls, const DungeonGfx &g, const DungeonTe
 					float tr[5] = {px + rx * S * 0.5f, H, pz + rz * S * 0.5f, tex.planeU1[t], vt + lift};
 					float tl[5] = {px - rx * S * 0.5f, H, pz - rz * S * 0.5f, tex.planeU0[t], vt + lift};
 					quad(bl, br, tr, tl, lyr, faceShade[k]);
+				}
+				// Le linteau : au-dessus de l'ouverture, le haut du mur reste sur la face (sinon on voit
+				// le plafond de la case de la porte par-dessus, surtout porte ouverte).
+				const float topRows = tex.planeTop[t] * (float)kDunTexSize;
+				if (topRows > 1.0f) {
+					const float yb = H * (1.0f - topRows / (float)kDunWallRows);
+					float bl[5] = {fx - rx * S * 0.5f, yb, fz - rz * S * 0.5f, 0.0f, tex.planeTop[t]};
+					float br[5] = {fx + rx * S * 0.5f, yb, fz + rz * S * 0.5f, 1.0f, tex.planeTop[t]};
+					float tr[5] = {fx + rx * S * 0.5f, H, fz + rz * S * 0.5f, 1.0f, 0.0f};
+					float tl[5] = {fx - rx * S * 0.5f, H, fz - rz * S * 0.5f, 0.0f, 0.0f};
+					quad(bl, br, tr, tl, layer, faceShade[k]);
+					// et son dessous, du linteau au plan de la porte
+					const float px2 = fx - nx * ((r - 1.0f) * S * 0.5f), pz2 = fz - nz * ((r - 1.0f) * S * 0.5f);
+					const float yp = H; // le haut du plan
+					float a0[5] = {fx - rx * S * 0.5f, yb, fz - rz * S * 0.5f, 0.0f, tex.planeTop[t]};
+					float a1[5] = {px2 - rx * S * 0.5f, yp, pz2 - rz * S * 0.5f, 0.0f, tex.planeTop[t] * 0.5f};
+					float a2[5] = {px2 + rx * S * 0.5f, yp, pz2 + rz * S * 0.5f, 1.0f, tex.planeTop[t] * 0.5f};
+					float a3[5] = {fx + rx * S * 0.5f, yb, fz + rz * S * 0.5f, 1.0f, tex.planeTop[t]};
+					quad(a0, a3, a2, a1, layer, faceShade[k] * 0.7f, true);
 				}
 				continue;
 			}

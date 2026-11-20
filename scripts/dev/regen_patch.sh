@@ -26,5 +26,5 @@ git add -A
 git -c user.email=dev@local -c user.name=dev commit -qm base
 for f in $FILES; do cp "$SCUMMVM/$f" "$T/$f"; done
 OUT="$(ls "$ROOT/patches/0003-"*.patch)"
-git diff -- engines > "$OUT"
-git diff --stat -- engines | tail -1
+git diff > "$OUT"
+git diff --stat | tail -1

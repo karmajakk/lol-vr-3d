@@ -32,10 +32,13 @@ Actions (separated by `;`): `wait S`, `key NAME` (esc, enter, up, down, left, ri
 letter), `click U V [S]` and `rclick U V [S]` (fractions of the 320 x 200 picture; S = wait after the
 release, 0.3 s by default), `lang N`, `shot NAME` (picture, game state, and the game's cursor when
 it changes), `dungeon NAME` (the 3D dungeon next to the game picture), `watch S` (objects in
-flight, step by step, for S seconds).
+flight, step by step, for S seconds), `goto LEVEL BLOCK DIR` (move the party there),
+`carte` (print the map: `#` solid, `.` open, `@` the party).
 
 `LOLVR_DUMP_TYPE=portes` lists every door type (depth, plane, how far raised) and writes their
-pictures; `LOLVR_FORCE_DOOR=T` shows the closed doors (type 3) as type T, to see each step.
+pictures; `LOLVR_FORCE_DOOR=T` shows the closed doors (type 3) as type T, to see each step;
+`LOLVR_NOIR=1` makes `dungeon`/`dungeonat` report views with empty (black) areas instead of
+writing pictures.
 
 The test save is the start of the game in English with one champion, Michael, in the throne room
 (slot 0). Don't save into slot 0 in your actions; `E2E_NEW_SAVE=1` remakes it.
