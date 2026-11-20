@@ -193,6 +193,11 @@ int main(int argc, char **argv) {
 				DungeonGfx g;
 				g.vmpMap = m.vmpMap;
 				g.wallFlags = m.wallFlags;
+				if (m.wallCaptureSerial == m.gfxSerial && m.wallSlots > 0) { // comme l'appli : les dessins du moteur
+					g.wallSlot = m.wallSlot;
+					g.wallAlpha = m.wallAlpha.data();
+					g.wallSlots = m.wallSlots;
+				}
 				printf("  niveau %d, groupe en %d\n", m.level, m.block);
 				for (int z = 0; z < 32; z++) {
 					char row[33];
@@ -203,6 +208,9 @@ int main(int argc, char **argv) {
 					row[32] = 0;
 					printf("  %2d %s\n", z, row);
 				}
+				if (getenv("LOLVR_MURS")) // les types de mur de chaque case (N E S O)
+					for (int b = 0; b < 1024; b++)
+						printf("    murs %d (%d,%d) : %d %d %d %d\n", b, b & 31, b >> 5, m.walls[b * 4], m.walls[b * 4 + 1], m.walls[b * 4 + 2], m.walls[b * 4 + 3]);
 			}
 		} else if (op == "lang") {
 			int l = 0;
@@ -242,8 +250,15 @@ int main(int argc, char **argv) {
 			std::string name;
 			cs >> name;
 			int atBlock = -1, atDir = 0;
-			if (op == "dungeonat")
+			// dungeonat NOM CASE DIR [CASE2 FACE TYPE] : vue depuis une case ; le mur FACE de CASE2 montré au type TYPE
+			int ovBlock = -1, ovFace = 0, ovType = 0;
+			if (op == "dungeonat") {
 				cs >> atBlock >> atDir;
+				if (!(cs >> ovBlock >> ovFace >> ovType))
+					ovBlock = -1;
+			}
+			static int builtOverride = -2;
+			const int overrideKey = ovBlock < 0 ? -1 : (ovBlock * 4 + ovFace) * 256 + ovType;
 			if (!host.levelSnapshot(lvl)) {
 				printf("ÉCHEC pas de niveau publié par le moteur\n");
 				failures++;
@@ -329,8 +344,9 @@ int main(int argc, char **argv) {
 				builtWalls = 0;
 			}
 			const int meshDir = atBlock >= 0 ? atDir : lvl.direction;
-			if (lvl.wallsSerial != builtWalls || meshDir != builtDir) {
+			if (lvl.wallsSerial != builtWalls || meshDir != builtDir || overrideKey != builtOverride) {
 				builtDir = meshDir;
+				builtOverride = overrideKey;
 				std::vector<DungeonVertex> verts;
 				// LOLVR_FORCE_DOOR=t : les portes fermées (type 3) montrées au type t (une porte qui
 				// s'ouvre), pour voir chaque étape.
@@ -340,6 +356,14 @@ int main(int argc, char **argv) {
 					for (uint8_t &w : wallsCopy)
 						if (w == 3)
 							w = (uint8_t)atoi(fd);
+				if (ovBlock >= 0) {
+					// la face vue depuis l'autre côté porte le même type (le jeu les tient ensemble)
+					static const int odx[4] = {0, 1, 0, -1}, odz[4] = {-1, 0, 1, 0};
+					wallsCopy[(ovBlock & 1023) * 4 + (ovFace & 3)] = (uint8_t)ovType;
+					const int nb = (ovBlock + odx[ovFace & 3] + odz[ovFace & 3] * 32) & 1023;
+					if (lvl.walls[nb * 4 + ((ovFace + 2) & 3)] == lvl.walls[(ovBlock & 1023) * 4 + (ovFace & 3)])
+						wallsCopy[nb * 4 + ((ovFace + 2) & 3)] = (uint8_t)ovType;
+				}
 				buildDungeonMesh(wallsCopy, g, tex, verts, meshDir);
 				dun.setMesh(verts);
 				builtWalls = lvl.wallsSerial;

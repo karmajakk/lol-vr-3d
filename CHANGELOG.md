@@ -3,6 +3,25 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.17.0] — Whole-game check: doors, mines, the looping forest
+
+Every level was checked on the PC (a new tool renders each door series closed, half open and
+open next to the game's own picture, and looks for empty views from every block):
+
+- Mines: no more holes in the tunnels. Blocks with rails counted as walls, so they had no floor
+  and no ceiling; the rails now lie on the floor, turned the way the game draws them.
+- The forest that loops on itself: walking off one side of the map leads on to the next row, as in
+  the game. The 3D dungeon now shows what lies past the edge instead of an empty view, and the
+  party walks across smoothly.
+- Doors set back in their frame: the sides of the recess, between the face and the door, are
+  now the game's own drawing (posts, carved stone, rock) instead of the plain wall next to it.
+  The mines' opening buttons, drawn on the post beside the door, now show and can be clicked.
+- The doors of the white marble levels (18 to 20) and of level 27 now sit back in their frame,
+  between their pillars, like the castle and manor doors, instead of standing flush. Their frames
+  have a one-piece lintel over the door, which the earlier rule did not recognise.
+- The other doors (castle, manor, ruins, caves, volcano) were checked against the game and keep
+  their look.
+
 ## [0.16.0] — Spell levels on the buttons, manor doors flush, text box apart
 
 - Magic with the controllers: **B** opens the levels of the chosen spell with level 1 framed in the

@@ -2,3 +2,4 @@
 /android/jni/prebuilt/
 /android/libs/
 /android/obj/
+__pycache__/

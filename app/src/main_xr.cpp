@@ -2007,6 +2007,35 @@ bool dungeonPick(App &app, Vec3 tip, Vec3 dir, float &gu, float &gv, Vec3 &hitW,
 		if (app.dunTex.kind[backT] == lolvr::kWallFace && app.dunTex.planeDepth[backT] > 0.0f) {
 			// Une porte dans son renfoncement : le plan du fond (porte et piliers) sur toute la case.
 			const lolvr::DungeonTextures &dt = app.dunTex;
+			if (dt.planeU0[backT] > 0.02f && dt.planeU1[backT] < 0.98f) {
+				// Les côtés du renfoncement (montants, bouton d'ouverture), comme le maillage les pose.
+				const float rd = dt.planeDepth[backT];
+				for (int side = 0; side < 2; side++) {
+					const float sg = side ? 1.0f : -1.0f;
+					float den = dot(v, r);
+					if (fabsf(den) < 1e-4f)
+						continue;
+					Vec3 sidePt = center + f * (S * 0.5f) + r * (sg * S * 0.5f);
+					float tt = dot(sidePt - o, r) / den;
+					if (tt <= 0.0f || tt >= bestT)
+						continue;
+					Vec3 hh = o + v * tt;
+					const float dd = dot(hh - center, f) / (S * 0.5f);
+					if (dd < 1.0f || dd > rd || hh.y < 0.0f || hh.y > H)
+						continue;
+					const float w = (1.0f / dd - 1.0f / rd) / (1.0f - 1.0f / rd);
+					const float uu = w * (side ? 1.0f : 0.0f) + (1.0f - w) * (side ? dt.planeU1[backT] : dt.planeU0[backT]);
+					const float vTop = (1.0f - w) * dt.planeTop[backT];
+					const float vFoot = w * (96.0f / 128.0f) + (1.0f - w) * dt.planeFoot[backT];
+					bestT = tt;
+					hit = hh;
+					px = 136.0f + uu * 128.0f;
+					py = 8.0f + (vTop + (1.0f - hh.y / H) * (vFoot - vTop)) * 128.0f;
+					finalF = r * sg;
+					finalR = f * (side ? -1.0f : 1.0f);
+					face = k;
+				}
+			}
 			float den = dot(v, f);
 			if (den <= 1e-4f)
 				continue;
@@ -3019,6 +3048,27 @@ void updateDungeon(App &app, float dt) {
 	lolvr::blockCenter(app.visBlock, tx, tz);
 	const int dir = l.direction & 3;
 	float dx = tx - app.partyX, dz = tz - app.partyZ;
+	{
+		// Pas au-delà du bord du plan (le jeu passe à la case suivante de sa suite de 1024 : une forêt
+		// qui boucle) : la case d'arrivée est à côté, dans la bordure recopiée ; on y reporte le groupe
+		// pour qu'il y marche comme ailleurs.
+		const float S = lolvr::kBlockSize;
+		const int cbx = (int)floorf(app.partyX / S), cbz = (int)floorf(app.partyZ / S);
+		const int vbx = app.visBlock & 31, vbz = app.visBlock >> 5;
+		if (!gfxChanged && app.shownLevel == l.level && (abs(vbx - cbx) > 16 || abs(vbz - cbz) > 16)) {
+			int delta = (app.visBlock - (cbz * 32 + cbx)) & 1023;
+			if (delta >= 512)
+				delta -= 1024;
+			const int dzv = (int)lroundf((float)delta / 32.0f), dxv = delta - dzv * 32;
+			if (abs(dxv) <= 2 && abs(dzv) <= 2) {
+				const float vtx = ((float)(cbx + dxv) + 0.5f) * S, vtz = ((float)(cbz + dzv) + 0.5f) * S;
+				app.partyX += tx - vtx;
+				app.partyZ += tz - vtz;
+				dx = tx - app.partyX;
+				dz = tz - app.partyZ;
+			}
+		}
+	}
 	bool snap = gfxChanged || app.shownLevel != l.level || app.shownDir < 0 ||
 	            dx * dx + dz * dz > 1.6f * lolvr::kBlockSize * 1.6f * lolvr::kBlockSize;
 	auto wrapPi = [](float a) {
@@ -3072,7 +3122,7 @@ void updateDungeon(App &app, float dt) {
 		for (int k = 0; k < 4 && !inWall; k++) {
 			float sx = lx + ((k & 1) ? m : -m), sz = lz + ((k & 2) ? m : -m);
 			int bx = (int)floorf(sx / S), bz = (int)floorf(sz / S);
-			inWall = bx < 0 || bx > 31 || bz < 0 || bz > 31 || lolvr::isSolidBlock(l.walls, bz * 32 + bx, g);
+			inWall = lolvr::isSolidBlock(l.walls, (bz * 32 + bx) & 1023, g); // au bord, la case suivante
 		}
 		app.wallDim += ((inWall ? 1.0f : 0.0f) - app.wallDim) * clampf(dt * 8.0f, 0.0f, 1.0f);
 		light *= 1.0f - 0.92f * app.wallDim;

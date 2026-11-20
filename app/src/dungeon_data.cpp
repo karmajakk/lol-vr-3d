@@ -99,8 +99,23 @@ bool isPictureType(const DungeonGfx &g, uint8_t t) {
 bool hasSolidWall(const DungeonGfx &g, uint8_t t) {
 	if (t == 0 || (g.wallFlags[t] & 8))
 		return false;
-	if (g.wallSlot && g.wallSlot[t] >= 0 && !g.vmpMap[t])
-		return isPictureType(g, t);
+	if (g.wallSlot && g.wallSlot[t] >= 0 && !g.vmpMap[t]) {
+		if (!isPictureType(g, t))
+			return false;
+		// Un dessin seulement sous l'horizon (rails d'une mine, dalle) : quelque chose au sol, pas un
+		// mur ; la case reste un passage (sinon ni sol ni plafond : un trou dans la vue).
+		const int slot = g.wallSlot[t];
+		if (g.wallAlpha && slot < g.wallSlots) {
+			const uint8_t *al = g.wallAlpha + (size_t)slot * kDunTexSize * kDunWallRows;
+			for (int i = 0; i < 62 * kDunTexSize; i++)
+				if (al[i])
+					return true;
+			for (int i = 62 * kDunTexSize; i < kDunWallRows * kDunTexSize; i++)
+				if (al[i])
+					return false;
+		}
+		return true;
+	}
 	return true;
 }
 
@@ -394,6 +409,34 @@ void decodeDungeonTextures(const DungeonGfx &g, DungeonTextures &out) {
 									pFoot = t1 > pFoot ? t1 : pFoot;
 								}
 							}
+						} else {
+							// Piliers qui montent jusqu'à un linteau d'une seule pièce au-dessus de la porte,
+							// les côtés du renfoncement en biais au-delà (dernier niveau) : les piliers sont
+							// les colonnes droites, au même pied, de part et d'autre de la porte ; le plan va
+							// du haut de la porte au pied des piliers, le linteau reste sur la face.
+							int l0, l1, r0, r1;
+							column(dc0 - 1 >= 0 ? dc0 - 1 : 0, l0, l1);
+							column(dc1 + 1 < kDunTexSize ? dc1 + 1 : kDunTexSize - 1, r0, r1);
+							auto straight = [&](int x, int f) {
+								int t0, t1;
+								column(x, t0, t1);
+								return t0 >= 0 && t0 <= dtop + 3 && abs(t1 - f) <= 1;
+							};
+							if (dc0 > 0 && dc1 < kDunTexSize - 1 && l0 >= 0 && r0 >= 0 &&
+							    l1 >= foot - 1 && l1 <= foot + 12 && r1 >= foot - 1 && r1 <= foot + 12) {
+								int b0 = dc0 - 1, b1 = dc1 + 1;
+								while (b0 > 0 && straight(b0 - 1, l1))
+									b0--;
+								while (b1 < kDunTexSize - 1 && straight(b1 + 1, r1))
+									b1++;
+								if (b0 < dc0 - 2 && b1 > dc1 + 2 && b0 > 0 && b1 < kDunTexSize - 1) {
+									c0 = b0;
+									c1 = b1;
+									pTop = dtop;
+									pFoot = l1 > r1 ? l1 : r1;
+									pFoot = pFoot > foot ? pFoot : foot;
+								}
+							}
 						}
 					}
 					const float r = (float)kDunTexSize / (float)(c1 - c0 + 1);
@@ -514,10 +557,25 @@ void buildDungeonMesh(const uint8_t *walls, const DungeonGfx &g, const DungeonTe
 	// grande boîte autour du niveau ne rendait pas bien.
 	const bool sky = false;
 
-	for (int b = 0; b < 1024; b++) {
-		float cx, cz;
-		blockCenter(b, cx, cz);
+	// Le plan du jeu est une suite de 1024 cases : à l'est de la dernière colonne vient la première
+	// de la rangée suivante, au nord de la première rangée la dernière (une forêt qui boucle sur
+	// elle-même). Autour du plan, une bordure de cases recopiées là où le jeu les montre.
+	const int G = 6;
+	for (int vz = -G; vz < 32 + G; vz++)
+	for (int vx = -G; vx < 32 + G; vx++) {
+		const int b = (vz * 32 + vx) & 1023;
+		const float cx = ((float)vx + 0.5f) * S, cz = ((float)vz + 0.5f) * S;
 		const bool solid = isSolidBlock(walls, b, g);
+		if (solid && (vx < 0 || vx > 31 || vz < 0 || vz > 31)) {
+			// Une case pleine recopiée ne sert qu'à poser ses murs devant une case de passage voisine.
+			bool any = false;
+			for (int k = 0; k < 4 && !any; k++) {
+				const int ux = vx + (k == 1) - (k == 3), uz = vz + (k == 2) - (k == 0);
+				any = !isSolidBlock(walls, (uz * 32 + ux) & 1023, g);
+			}
+			if (!any)
+				continue;
+		}
 		const uint8_t *w = walls + b * 4;
 		bool objectDone = false, decalDone = false;
 		for (int k = 0; k < 4; k++) {
@@ -535,15 +593,21 @@ void buildDungeonMesh(const uint8_t *walls, const DungeonGfx &g, const DungeonTe
 				}
 				continue;
 			}
-			// Un dessin au sol, posé juste au-dessus des dalles.
+			// Un dessin au sol, posé juste au-dessus des dalles. Le jeu montre celui du côté qu'on regarde
+			// (rails d'une mine le long du couloir) ; sinon celui d'un autre côté, tourné comme vu de là.
 			if (tex.kind[t] == kWallDecal) {
+				int r = viewDir & 3, kk = (r + 2) & 3;
+				if (!(w[kk] && tex.kind[w[kk]] == kWallDecal && tex.decalLayer[w[kk]] >= 0)) {
+					kk = k;
+					r = (k + 2) & 3;
+				}
+				t = w[kk];
 				if (!decalDone && tex.decalLayer[t] >= 0) {
 					decalDone = true;
 					float x0 = cx - S * 0.5f, x1 = cx + S * 0.5f, z0 = cz - S * 0.5f, z1 = cz + S * 0.5f, y = 0.015f;
 					// Coins nord-ouest, nord-est, sud-est, sud-ouest ; le haut de l'image (le bord lointain)
 					// est du côté où regarde le groupe.
 					const float cxs[4] = {x0, x1, x1, x0}, czs[4] = {z0, z0, z1, z1};
-					const int r = viewDir & 3;
 					float a[5] = {cxs[r], y, czs[r], 0, 0}, d[5] = {cxs[(r + 1) & 3], y, czs[(r + 1) & 3], 1, 0};
 					float c[5] = {cxs[(r + 2) & 3], y, czs[(r + 2) & 3], 1, 1}, bb[5] = {cxs[(r + 3) & 3], y, czs[(r + 3) & 3], 0, 1};
 					quad(a, bb, c, d, (float)tex.decalLayer[t], 0.95f);
@@ -561,19 +625,12 @@ void buildDungeonMesh(const uint8_t *walls, const DungeonGfx &g, const DungeonTe
 				if (page <= 0 || page >= 64 || tex.pageLayer[page] < 0)
 					continue;
 			}
-			// Un mur n'est visible que depuis la case voisine, si l'on peut s'y tenir. Au bord du plan,
-			// le jeu passe de l'autre côté (la case voisine d'un bord est celle du bord opposé) : un
-			// couloir qui touche le bord finit sur ce mur-là, qu'on pose alors au bout du couloir.
+			// Un mur n'est visible que depuis la case voisine, si l'on peut s'y tenir (au bord du plan,
+			// celle d'après dans la suite des cases : la bordure recopiée l'y montre).
 			const int nb = (b + dx[k] + dz[k] * 32) & 1023;
 			if (isSolidBlock(walls, nb, g))
 				continue;
-			float wcx = cx, wcz = cz;
-			const int bx = (b & 31) + dx[k], bz = (b >> 5) + dz[k];
-			if (bx < 0 || bx > 31 || bz < 0 || bz > 31) {
-				blockCenter(nb, wcx, wcz);
-				wcx -= (float)dx[k] * S;
-				wcz -= (float)dz[k] * S;
-			}
+			const float wcx = cx, wcz = cz;
 			// Normale sortante n ; vu de la case voisine, la droite du spectateur est (n.z, 0, -n.x).
 			float nx = (float)dx[k], nz = (float)dz[k];
 			float fx = wcx + nx * S * 0.5f, fz = wcz + nz * S * 0.5f;
@@ -606,6 +663,31 @@ void buildDungeonMesh(const uint8_t *walls, const DungeonGfx &g, const DungeonTe
 					float tr[5] = {px + rx * S * 0.5f, y1, pz + rz * S * 0.5f, tex.planeU1[t], dt + lift};
 					float tl[5] = {px - rx * S * 0.5f, y1, pz - rz * S * 0.5f, tex.planeU0[t], dt + lift};
 					quad(bl, br, tr, tl, lyr, faceShade[k]);
+				}
+				// Les côtés du renfoncement, de la face au plan : le jeu les dessine en biais dans le cadre,
+				// à gauche et à droite des piliers (montants, rocher, boutons d'ouverture). Le dessin étant
+				// une perspective, ses coordonnées varient comme 1 / profondeur : en bandes.
+				if (tex.planeU0[t] > 0.02f && tex.planeU1[t] < 0.98f) {
+					const float rx = nz, rz = -nx, inset = 0.012f * S, vb = vBottom;
+					const int N = 6;
+					for (int side = 0; side < 2; side++) {
+						const float lat = (side ? 1.0f : -1.0f) * (S * 0.5f - inset);
+						const float uFace = side ? 1.0f : 0.0f, uPlane = side ? tex.planeU1[t] : tex.planeU0[t];
+						for (int i = 0; i < N; i++) {
+							float pt[2][4][5];
+							for (int e = 0; e < 2; e++) {
+								const float s = (float)(i + e) / N, d = 1.0f + s * (r - 1.0f);
+								const float w = (1.0f / d - 1.0f / r) / (1.0f - 1.0f / r); // 1 à la face, 0 au plan
+								const float u = w * uFace + (1.0f - w) * uPlane;
+								const float vTop = (1.0f - w) * tex.planeTop[t], vFoot = w * vb + (1.0f - w) * tex.planeFoot[t];
+								const float cxp = fx - nx * ((d - 1.0f) * S * 0.5f) + rx * lat, czp = fz - nz * ((d - 1.0f) * S * 0.5f) + rz * lat;
+								const float lo[5] = {cxp, 0.0f, czp, u, vFoot}, hi[5] = {cxp, H, czp, u, vTop};
+								memcpy(pt[e][0], lo, sizeof lo);
+								memcpy(pt[e][1], hi, sizeof hi);
+							}
+							quad(pt[0][0], pt[1][0], pt[1][1], pt[0][1], layer, faceShade[(k + 1) & 3], true);
+						}
+					}
 				}
 				// Le linteau : au-dessus de l'ouverture, le haut du mur reste sur la face (sinon on voit
 				// le plafond de la case de la porte par-dessus, surtout porte ouverte).
