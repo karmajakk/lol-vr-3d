@@ -64,7 +64,7 @@ index 1016080..bfba10b 100644
  		// the global subtitles settings, we're using this hack to enable subtitles
  		// for fan translations
 diff --git a/engines/kyra/engine/lol.cpp b/engines/kyra/engine/lol.cpp
-index c4f86a3..97ab82b 100644
+index c4f86a3..4472540 100644
 --- a/engines/kyra/engine/lol.cpp
 +++ b/engines/kyra/engine/lol.cpp
 @@ -21,6 +21,8 @@
@@ -129,7 +129,7 @@ index c4f86a3..97ab82b 100644
  
  	_chargenFrameTable = _flags.isTalkie ? _chargenFrameTableTalkie : _chargenFrameTableFloppy;
  	_chargenWSA = 0;
-@@ -964,10 +1005,87 @@ void LoLEngine::runLoop() {
+@@ -964,10 +1005,69 @@ void LoLEngine::runLoop() {
  			_nextScriptFunc = 0;
  		}
  
@@ -166,6 +166,7 @@ index c4f86a3..97ab82b 100644
 +		g_lolvrLevel.block = _currentBlock;
 +		g_lolvrLevel.direction = _currentDirection;
 +		g_lolvrLevel.inDungeon = 1;
++		_lolvrTurnPending = false; // the dungeon is running: the headset follows as usual
 +		g_lolvrLevel.sceneBusy = (_needSceneRestore || _dialogueField) ? 1 : 0;
 +		g_lolvrLevel.textBox = lolvrTextBox(); // lol-vr-3d
 +		g_lolvrLevel.itemInHand = _itemInHand;
@@ -183,16 +184,7 @@ index c4f86a3..97ab82b 100644
 +			enableSysTimer(2);
 +		}
 +		lolvrExportLang();
-+		{
-+			const Palette &cur = _screen->lolvrScreenPalette();
-+			const Palette &base = _screen->getPalette(0);
-+			uint32 lit = 0, full = 0;
-+			for (int i = 3; i < 384; i++) {
-+				lit += cur[i];
-+				full += base[i];
-+			}
-+			g_lolvrLevel.light = full ? (int32)MIN<uint32>(256, lit * 256 / full) : 256;
-+		}
++		lolvrExportLight();
 +		{
 +			int nearObj = 0;
 +			uint16 nb = _currentBlock;
@@ -203,30 +195,21 @@ index c4f86a3..97ab82b 100644
 +			}
 +			g_lolvrLevel.nearObjects = nearObj;
 +		}
-+		{
-+			bool changed = false;
-+			for (int i = 0; i < 1024; i++)
-+				for (int k = 0; k < 4; k++)
-+					if (g_lolvrLevel.walls[i * 4 + k] != _levelBlockProperties[i].walls[k]) {
-+						g_lolvrLevel.walls[i * 4 + k] = _levelBlockProperties[i].walls[k];
-+						changed = true;
-+					}
-+			if (changed)
-+				g_lolvrLevel.wallsSerial++;
-+		}
++		lolvrExportWalls();
  
  		_timer->update();
  
-@@ -1049,6 +1167,8 @@ void LoLEngine::readSettings() {
+@@ -1049,6 +1149,9 @@ void LoLEngine::readSettings() {
  }
  
  void LoLEngine::update() {
 +	g_lolvrLevel.sceneBusy = (_needSceneRestore || _dialogueField) ? 1 : 0; // lol-vr-3d
 +	g_lolvrLevel.textBox = lolvrTextBox(); // lol-vr-3d
++	lolvrExportLight(); // lol-vr-3d: also during scenes (the guard's welcome comes before the dungeon loop)
  	updateSequenceBackgroundAnimations();
  
  	if (_updateCharNum != -1 && _system->getMillis() > _updatePortraitNext)
-@@ -1621,6 +1741,7 @@ void LoLEngine::setupScreenDims() {
+@@ -1621,6 +1724,7 @@ void LoLEngine::setupScreenDims() {
  		_screen->modifyScreenDim(4, 11, 124, 28, 9);
  		_screen->modifyScreenDim(5, 85, 123, 233, 18);
  	}
@@ -234,7 +217,7 @@ index c4f86a3..97ab82b 100644
  }
  
  void LoLEngine::initSceneWindowDialogue(int controlMode) {
-@@ -1633,6 +1754,8 @@ void LoLEngine::initSceneWindowDialogue(int controlMode) {
+@@ -1633,6 +1737,8 @@ void LoLEngine::initSceneWindowDialogue(int controlMode) {
  	_txt->expandField();
  	setupScreenDims();
  	gui_disableControls(controlMode);
@@ -243,7 +226,15 @@ index c4f86a3..97ab82b 100644
  }
  
  void LoLEngine::toggleSelectedCharacterFrame(bool mode) {
-@@ -1690,6 +1813,8 @@ void LoLEngine::gui_specialSceneRestoreControls(int restoreLamp) {
+@@ -1649,6 +1755,7 @@ void LoLEngine::toggleSelectedCharacterFrame(bool mode) {
+ }
+ 
+ void LoLEngine::gui_prepareForSequence(int x, int y, int w, int h, int buttonFlags) {
++	lolvrTurnPause(); // lol-vr-3d
+ 	setSequenceButtons(x, y, w, h, buttonFlags);
+ 
+ 	_seqWindowX1 = x;
+@@ -1690,6 +1797,8 @@ void LoLEngine::gui_specialSceneRestoreControls(int restoreLamp) {
  }
  
  void LoLEngine::restoreAfterSceneWindowDialogue(int redraw) {
@@ -252,7 +243,7 @@ index c4f86a3..97ab82b 100644
  	gui_enableControls();
  	_txt->setupField(false);
  	_updateFlags &= 0xFFDF;
-@@ -1711,6 +1836,8 @@ void LoLEngine::restoreAfterSceneWindowDialogue(int redraw) {
+@@ -1711,9 +1820,12 @@ void LoLEngine::restoreAfterSceneWindowDialogue(int redraw) {
  
  	_needSceneRestore = 0;
  	enableSysTimer(2);
@@ -261,7 +252,11 @@ index c4f86a3..97ab82b 100644
  }
  
  void LoLEngine::initDialogueSequence(int controlMode, int pageNum) {
-@@ -1734,6 +1861,7 @@ void LoLEngine::initDialogueSequence(int controlMode, int pageNum) {
++	lolvrTurnPause(); // lol-vr-3d
+ 	if (controlMode) {
+ 		_timer->disable(11);
+ 		_fadeText = false;
+@@ -1734,6 +1846,7 @@ void LoLEngine::initDialogueSequence(int controlMode, int pageNum) {
  		_txt->clearDim(4);
  
  		_updateFlags |= 2;
@@ -269,7 +264,7 @@ index c4f86a3..97ab82b 100644
  		_currentControlMode = controlMode;
  		calcCharPortraitXpos();
  
-@@ -1758,11 +1886,16 @@ void LoLEngine::initDialogueSequence(int controlMode, int pageNum) {
+@@ -1758,11 +1871,16 @@ void LoLEngine::initDialogueSequence(int controlMode, int pageNum) {
  
  	_currentControlMode = controlMode;
  	_dialogueField = true;
@@ -286,7 +281,7 @@ index c4f86a3..97ab82b 100644
  
  	stopPortraitSpeechAnim();
  	_currentControlMode = controlMode;
-@@ -1780,6 +1913,8 @@ void LoLEngine::restoreAfterDialogueSequence(int controlMode) {
+@@ -1780,6 +1898,8 @@ void LoLEngine::restoreAfterDialogueSequence(int controlMode) {
  	}
  
  	_dialogueField = false;
@@ -295,7 +290,7 @@ index c4f86a3..97ab82b 100644
  }
  
  void LoLEngine::resetPortraitsAndDisableSysTimer() {
-@@ -1922,6 +2057,21 @@ void LoLEngine::loadTalkFile(int index) {
+@@ -1922,6 +2042,21 @@ void LoLEngine::loadTalkFile(int index) {
  	_res->loadPakFile(Common::Path(Common::String::format("%02d.TLK", index)));
  }
  
@@ -317,7 +312,7 @@ index c4f86a3..97ab82b 100644
  int LoLEngine::characterSays(int track, int charId, bool redraw) {
  	if (charId == 1) {
  		charId = _selectedCharacter;
-@@ -2020,6 +2170,7 @@ int LoLEngine::playCharacterScriptChat(int charId, int mode, int restorePortrait
+@@ -2020,6 +2155,7 @@ int LoLEngine::playCharacterScriptChat(int charId, int mode, int restorePortrait
  	_fadeText = false;
  	if (!skipAnim && charId < 3)
  		updatePortraitSpeechAnim();
@@ -325,7 +320,7 @@ index c4f86a3..97ab82b 100644
  
  	return 1;
  }
-@@ -2123,8 +2274,12 @@ int LoLEngine::castSpell(int charNum, int spellType, int spellLevel) {
+@@ -2123,8 +2259,12 @@ int LoLEngine::castSpell(int charNum, int spellType, int spellLevel) {
  
  	if (charNum < 0) {
  		_activeSpell.charNum = (charNum * -1) - 1;
@@ -340,7 +335,7 @@ index c4f86a3..97ab82b 100644
  	} else {
  		if (_activeSpell.p->mpRequired[spellLevel] > _characters[charNum].magicPointsCur)
  			return 0;
-@@ -2136,13 +2291,64 @@ int LoLEngine::castSpell(int charNum, int spellType, int spellLevel) {
+@@ -2136,13 +2276,108 @@ int LoLEngine::castSpell(int charNum, int spellType, int spellLevel) {
  		setCharacterMagicOrHitPoints(charNum, 0, -_activeSpell.p->hpRequired[spellLevel], 1);
  		gui_drawCharPortraitWithStats(charNum);
  
@@ -358,6 +353,50 @@ index c4f86a3..97ab82b 100644
 +static uint8 g_lolvrSpellRef[176 * 120], g_lolvrSpellPx[176 * 120], g_lolvrSpellAl[176 * 120];
 +
 +// lol-vr-3d: the language picked in the headset during the game, as the options menu does it
++void LoLEngine::lolvrPartyMoved() {
++	if (g_lolvrLevel.block == _currentBlock && g_lolvrLevel.direction == _currentDirection)
++		return;
++	g_lolvrLevel.block = _currentBlock;
++	g_lolvrLevel.direction = _currentDirection;
++	// The game draws the new view at once, with the scene that follows; in the headset the party
++	// turns or steps in the 3D dungeon, which takes a moment: a scene starting now waits for it.
++	if (!_needSceneRestore && !_dialogueField)
++		_lolvrTurnPending = true;
++}
++
++void LoLEngine::lolvrTurnPause() {
++	// (the party's place as the scene starts, even when no script moved it: a step onto the block)
++	g_lolvrLevel.block = _currentBlock;
++	g_lolvrLevel.direction = _currentDirection;
++	if (!_lolvrTurnPending)
++		return;
++	_lolvrTurnPending = false;
++	delay(700, true);
++}
++
++void LoLEngine::lolvrExportLight() {
++	const Palette &cur = _screen->lolvrScreenPalette();
++	const Palette &base = _screen->getPalette(0);
++	uint32 lit = 0, full = 0;
++	for (int i = 3; i < 384; i++) {
++		lit += cur[i];
++		full += base[i];
++	}
++	g_lolvrLevel.light = full ? (int32)MIN<uint32>(256, lit * 256 / full) : 256;
++}
++
++void LoLEngine::lolvrExportWalls() {
++	bool changed = false;
++	for (int i = 0; i < 1024; i++)
++		for (int k = 0; k < 4; k++)
++			if (g_lolvrLevel.walls[i * 4 + k] != _levelBlockProperties[i].walls[k]) {
++				g_lolvrLevel.walls[i * 4 + k] = _levelBlockProperties[i].walls[k];
++				changed = true;
++			}
++	if (changed)
++		g_lolvrLevel.wallsSerial++;
++}
++
 +void LoLEngine::lolvrApplyLangRequest() {
 +	const int req = g_lolvrLangRequest;
 +	g_lolvrLangRequest = -1;
@@ -405,7 +444,7 @@ index c4f86a3..97ab82b 100644
  int LoLEngine::castSpark(ActiveSpell *a) {
  	processMagicSpark(a->charNum, a->level);
  	return 1;
-@@ -4130,7 +4336,6 @@ uint16 LoLEngine::getNearestPartyMemberFromPos(int x, int y) {
+@@ -4130,7 +4365,6 @@ uint16 LoLEngine::getNearestPartyMemberFromPos(int x, int y) {
  // magic atlas
  
  void LoLEngine::displayAutomap() {
@@ -413,7 +452,7 @@ index c4f86a3..97ab82b 100644
  	snd_playSoundEffect(105, -1);
  	gui_toggleButtonDisplayMode(_flags.isTalkie ? 78 : 76, 1);
  
-@@ -4174,6 +4379,9 @@ void LoLEngine::displayAutomap() {
+@@ -4174,6 +4408,9 @@ void LoLEngine::displayAutomap() {
  
  	_screen->copyPage(2, 0);
  	_screen->updateScreen();
@@ -424,7 +463,7 @@ index c4f86a3..97ab82b 100644
  	uint32 delayTimer = _system->getMillis() + 8 * _tickLength;
  
 diff --git a/engines/kyra/engine/lol.h b/engines/kyra/engine/lol.h
-index a9028a2..53810d1 100644
+index a9028a2..01cd4e2 100644
 --- a/engines/kyra/engine/lol.h
 +++ b/engines/kyra/engine/lol.h
 @@ -50,6 +50,103 @@ struct LolvrGameState {
@@ -531,11 +570,13 @@ index a9028a2..53810d1 100644
  }
  
  namespace Audio {
-@@ -335,6 +432,25 @@ private:
+@@ -335,6 +432,30 @@ private:
  
  	// main loop
  	void runLoop();
 +	void lolvrCaptureWalls(); // lol-vr-3d
++	void lolvrExportWalls(); // lol-vr-3d: the walls of every block, for the 3D dungeon
++	void lolvrExportLight(); // lol-vr-3d: how bright the screen palette is
 +	void lolvrCaptureSprites();
 +	void lolvrExportFlights();
 +	void lolvrExportMagicMenu(); // lol-vr-3d
@@ -552,16 +593,36 @@ index a9028a2..53810d1 100644
 +	int lolvrTextBox();
 +	bool _lolvrFieldExpanded = false; // the message line grown into a text area (remarks, talks in the view)
 +	bool _lolvrBigBox = false;        // the large box over the whole bottom of the screen (conversations)
++	bool _lolvrTurnPending = false;   // the party just turned or moved: let the headset show it first
++	void lolvrPartyMoved();           // lol-vr-3d: called wherever the party's block or direction changes
++	void lolvrTurnPause();            // lol-vr-3d: before a scene starts, the time to turn
 +private:
 +	bool lolvrDrawSprite(uint16 id, uint8 &ceiling); // lol-vr-3d
  	void update() override;
  
  	// mouse
 diff --git a/engines/kyra/engine/scene_lol.cpp b/engines/kyra/engine/scene_lol.cpp
-index 210b482..b8b068f 100644
+index 210b482..893a234 100644
 --- a/engines/kyra/engine/scene_lol.cpp
 +++ b/engines/kyra/engine/scene_lol.cpp
-@@ -405,6 +405,19 @@ void LoLEngine::loadLevelGraphics(const char *file, int specialColor, int weight
+@@ -76,6 +76,16 @@ void LoLEngine::loadLevel(int index) {
+ 	if (f)
+ 		restoreBlockTempData(index);
+ 
++	// lol-vr-3d: the party's place and the walls, before the level's own script runs: it may start
++	// with a scene (the guard's welcome of a new game), which the 3D dungeon shows in place
++	g_lolvrLevel.level = _currentLevel;
++	g_lolvrLevel.block = _currentBlock;
++	g_lolvrLevel.direction = _currentDirection;
++	g_lolvrLevel.inDungeon = 1;
++	lolvrExportWalls();
++	if (g_lolvrLevel.gfxSerial && g_lolvrLevel.wallCaptureSerial != g_lolvrLevel.gfxSerial)
++		lolvrCaptureWalls();
++
+ 	filename = Common::String::format("LEVEL%d.INF", index);
+ 	runInfScript(filename.c_str());
+ 
+@@ -405,6 +415,19 @@ void LoLEngine::loadLevelGraphics(const char *file, int specialColor, int weight
  	for (int i = 0; i < vmpLen; i++)
  		_vmpPtr[i] = READ_LE_UINT16(&v[i << 1]);
  
@@ -581,7 +642,15 @@ index 210b482..b8b068f 100644
  	Palette tpal(256);
  	if (_flags.use16ColorMode) {
  		uint8 *dst = tpal.getData();
-@@ -1309,6 +1322,8 @@ void LoLEngine::prepareSpecialScene(int fieldType, int hasDialogue, int suspendG
+@@ -660,6 +683,7 @@ void LoLEngine::moveParty(uint16 direction, int unk1, int unk2, int buttonShape)
+ 
+ 	_scriptDirection = direction;
+ 	_currentBlock = npos;
++	lolvrPartyMoved(); // lol-vr-3d: a scene on the new block waits for the step
+ 	_sceneDefaultUpdate = 1;
+ 
+ 	calcCoordinates(_partyPosX, _partyPosY, _currentBlock, 0x80, 0x80);
+@@ -1309,6 +1333,8 @@ void LoLEngine::prepareSpecialScene(int fieldType, int hasDialogue, int suspendG
  
  		setSpecialSceneButtons(112, 0, 176, 120, controlMode);
  	}
@@ -590,7 +659,7 @@ index 210b482..b8b068f 100644
  }
  
  int LoLEngine::restoreAfterSpecialScene(int fadeFlag, int redrawPlayField, int releaseTimScripts, int sceneUpdateMode) {
-@@ -1317,6 +1332,8 @@ int LoLEngine::restoreAfterSpecialScene(int fadeFlag, int redrawPlayField, int r
+@@ -1317,6 +1343,8 @@ int LoLEngine::restoreAfterSpecialScene(int fadeFlag, int redrawPlayField, int r
  
  	_needSceneRestore = 0;
  	enableSysTimer(2);
@@ -599,7 +668,7 @@ index 210b482..b8b068f 100644
  
  	if (_dialogueField)
  		restoreAfterDialogueSequence(_currentControlMode);
-@@ -1581,6 +1598,167 @@ void LoLEngine::drawSpecialGuiShape(int pageNum) {
+@@ -1581,6 +1609,167 @@ void LoLEngine::drawSpecialGuiShape(int pageNum) {
  		_screen->drawShape(pageNum, _specialGuiShape, _specialGuiShapeX + _specialGuiShape[3], _specialGuiShapeY, 2, 1);
  }
  
@@ -1068,10 +1137,26 @@ index 92605cd..627378d 100644
  
  	// gui specific (processing on _curPage)
 diff --git a/engines/kyra/gui/gui_lol.cpp b/engines/kyra/gui/gui_lol.cpp
-index b2732d2..5b84b66 100644
+index b2732d2..fbd3188 100644
 --- a/engines/kyra/gui/gui_lol.cpp
 +++ b/engines/kyra/gui/gui_lol.cpp
-@@ -1085,6 +1085,7 @@ int LoLEngine::clickedMagicButton(Button *button) {
+@@ -988,6 +988,7 @@ int LoLEngine::clickedTurnLeftArrow(Button *button) {
+ 
+ 	gui_toggleButtonDisplayMode(_flags.isTalkie ? 79 : 77, 1);
+ 	_currentDirection = (_currentDirection - 1) & 3;
++	lolvrPartyMoved(); // lol-vr-3d: a scene this turn starts waits for the turn
+ 
+ 	_sceneDefaultUpdate = 1;
+ 
+@@ -1010,6 +1011,7 @@ int LoLEngine::clickedTurnRightArrow(Button *button) {
+ 
+ 	gui_toggleButtonDisplayMode(_flags.isTalkie ? 81 : 79, 1);
+ 	_currentDirection = (_currentDirection + 1) & 3;
++	lolvrPartyMoved(); // lol-vr-3d: a scene this turn starts waits for the turn
+ 
+ 	_sceneDefaultUpdate = 1;
+ 
+@@ -1085,6 +1087,7 @@ int LoLEngine::clickedMagicButton(Button *button) {
  	gui_drawCharPortraitWithStats(c);
  	gui_initMagicSubmenu(c);
  	_activeMagicMenu = c;
@@ -1079,7 +1164,7 @@ index b2732d2..5b84b66 100644
  
  	return 1;
  }
-@@ -1112,6 +1113,7 @@ int LoLEngine::clickedMagicSubmenu(Button *button) {
+@@ -1112,6 +1115,7 @@ int LoLEngine::clickedMagicSubmenu(Button *button) {
  	}
  
  	_activeMagicMenu = -1;
@@ -1087,7 +1172,7 @@ index b2732d2..5b84b66 100644
  	return 1;
  }
  
-@@ -1119,6 +1121,7 @@ int LoLEngine::clickedScreen(Button *button) {
+@@ -1119,6 +1123,7 @@ int LoLEngine::clickedScreen(Button *button) {
  	_characters[_activeMagicMenu].flags &= 0xFFEF;
  	gui_drawCharPortraitWithStats(_activeMagicMenu);
  	_activeMagicMenu = -1;
@@ -1095,7 +1180,7 @@ index b2732d2..5b84b66 100644
  
  	if (!(button->flags2 & 0x80)) {
  		if (button->flags2 & 0x100)
-@@ -2212,7 +2215,7 @@ int GUI_LoL::runMenu(Menu &menu) {
+@@ -2212,7 +2217,7 @@ int GUI_LoL::runMenu(Menu &menu) {
  	// lol-vr: a game menu covers the middle of the screen while this function runs
  	struct LolvrMenuFlag {
  		LolvrMenuFlag() { g_lolvrState.reserved[2] |= 2; }
@@ -1104,7 +1189,7 @@ index b2732d2..5b84b66 100644
  	} lolvrMenuFlag;
  	_currentMenu = &menu;
  	_lastMenu = _currentMenu;
-@@ -2369,7 +2372,7 @@ int GUI_LoL::runMenu(Menu &menu) {
+@@ -2369,7 +2374,7 @@ int GUI_LoL::runMenu(Menu &menu) {
  			_screen->updateScreen();
  		}
  
@@ -1113,7 +1198,7 @@ index b2732d2..5b84b66 100644
  			Screen::FontId f = _screen->setFont(Screen::FID_6_FNT);
  			_screen->fprintString("v%s", menu.x + 8, menu.y + menu.height - 12, 204, 0, 8, _vm->_versionString.c_str());
  			_screen->setFont(f);
-@@ -2592,6 +2595,12 @@ int GUI_LoL::getInput() {
+@@ -2592,6 +2597,12 @@ int GUI_LoL::getInput() {
  	_vm->_mouseX = p.x;
  	_vm->_mouseY = p.y;
  
@@ -1126,7 +1211,7 @@ index b2732d2..5b84b66 100644
  	if (_currentMenu == &_savenameMenu) {
  		_vm->updateInput();
  
-@@ -2656,6 +2665,11 @@ int GUI_LoL::clickedMainMenu(Button *button) {
+@@ -2656,6 +2667,11 @@ int GUI_LoL::clickedMainMenu(Button *button) {
  	case 0x4005:
  		_displayMenu = false;
  		break;
@@ -1138,7 +1223,7 @@ index b2732d2..5b84b66 100644
  	default:
  		break;
  	}
-@@ -2756,6 +2770,7 @@ int GUI_LoL::clickedOptionsMenu(Button *button) {
+@@ -2756,6 +2772,7 @@ int GUI_LoL::clickedOptionsMenu(Button *button) {
  		break;
  	case 0xFFF4:
  		_vm->_lang = (_vm->_lang + 1) % 3;
@@ -1146,7 +1231,7 @@ index b2732d2..5b84b66 100644
  		break;
  	case 0xFFF3:
  		_vm->_configVoice ^= 3;
-@@ -2934,6 +2949,9 @@ Common::String GUI_LoL::getMenuTitle(const Menu &menu) {
+@@ -2934,6 +2951,9 @@ Common::String GUI_LoL::getMenuTitle(const Menu &menu) {
  }
  
  Common::String GUI_LoL::getMenuItemTitle(const MenuItem &menuItem) {
@@ -1198,6 +1283,86 @@ index 00019e9..26a51d5 100644
  
  	Button::Callback mainMenuFunctor = BUTTON_FUNCTOR(GUI_LoL, this, &GUI_LoL::clickedMainMenu);
  	for (int i = 0; i < _mainMenu.numberOfItems; ++i)
+diff --git a/engines/kyra/script/script_lol.cpp b/engines/kyra/script/script_lol.cpp
+index 30c59a7..d647c83 100644
+--- a/engines/kyra/script/script_lol.cpp
++++ b/engines/kyra/script/script_lol.cpp
+@@ -497,6 +497,7 @@ int LoLEngine::olol_loadDoorShapes(EMCState *script) {
+ 
+ int LoLEngine::olol_initAnimStruct(EMCState *script) {
+ 	debugC(3, kDebugLevelScriptFuncs, "LoLEngine::olol_initAnimStruct(%p) (%s, %d, %d, %d, %d, %d)", (const void *)script, stackPosString(0), stackPos(1), stackPos(2), stackPos(3), stackPos(4), stackPos(5));
++	lolvrTurnPause(); // lol-vr-3d: a scene starting right after a turn waits for it
+ 	if (_tim->initAnimStruct(stackPos(1), stackPosString(0), stackPos(2), stackPos(3), stackPos(4), 0, stackPos(5)))
+ 		return 1;
+ 	return 0;
+@@ -585,6 +586,7 @@ int LoLEngine::olol_startBackgroundAnimation(EMCState *script) {
+ 
+ int LoLEngine::olol_fadeToBlack(EMCState *script) {
+ 	debugC(3, kDebugLevelScriptFuncs, "LoLEngine::olol_fadeToBlack(%p) (%d)", (const void *)script, stackPos(0));
++	lolvrTurnPause(); // lol-vr-3d: a scene starting right after a turn waits for it
+ 	_screen->fadeToBlack(10);
+ 	return 1;
+ }
+@@ -601,6 +603,7 @@ int LoLEngine::olol_fadePalette(EMCState *script) {
+ 
+ int LoLEngine::olol_loadBitmap(EMCState *script) {
+ 	debugC(3, kDebugLevelScriptFuncs, "LoLEngine::olol_loadBitmap(%p) (%s, %d)", (const void *)script, stackPosString(0), stackPos(1));
++	lolvrTurnPause(); // lol-vr-3d: a scene starting right after a turn waits for it
+ 	_screen->loadBitmap(stackPosString(0), 3, 3, &_screen->getPalette(3));
+ 	if (stackPos(1) != 2)
+ 		_screen->copyPage(3, stackPos(1));
+@@ -675,10 +678,12 @@ int LoLEngine::olol_setGlobalVar(EMCState *script) {
+ 		_currentBlock = b;
+ 		calcCoordinates(_partyPosX, _partyPosY, _currentBlock, 0x80, 0x80);
+ 		updateAutoMap(_currentBlock);
++		lolvrPartyMoved(); // lol-vr-3d
+ 		break;
+ 
+ 	case 1:
+ 		_currentDirection = b;
++		lolvrPartyMoved(); // lol-vr-3d
+ 		break;
+ 
+ 	case 2:
+@@ -852,6 +857,7 @@ int LoLEngine::olol_initMonster(EMCState *script) {
+ 
+ int LoLEngine::olol_fadeClearSceneWindow(EMCState *script) {
+ 	debugC(3, kDebugLevelScriptFuncs, "LoLEngine::olol_fadeClearSceneWindow(%p)", (const void *)script);
++	lolvrTurnPause(); // lol-vr-3d: a scene starting right after a turn waits for it
+ 	_screen->fadeClearSceneWindow(10);
+ 	return 1;
+ }
+@@ -1118,6 +1124,7 @@ int LoLEngine::olol_loadTimScript(EMCState *script) {
+ 
+ int LoLEngine::olol_runTimScript(EMCState *script) {
+ 	debugC(3, kDebugLevelScriptFuncs, "LoLEngine::olol_runTimScript(%p) (%d, %d)", (const void *)script, stackPos(0), stackPos(1));
++	lolvrTurnPause(); // lol-vr-3d: a scene starting right after a turn waits for it
+ 	return _tim->exec(_activeTim[stackPos(0)], stackPos(1));
+ }
+ 
+@@ -2279,6 +2286,7 @@ int LoLEngine::olol_calcNewBlockPosition(EMCState *script) {
+ 
+ int LoLEngine::olol_crossFadeScene(EMCState *script) {
+ 	debugC(3, kDebugLevelScriptFuncs, "LoLEngine::olol_crossFadeScene(%p)", (const void *)script);
++	lolvrTurnPause(); // lol-vr-3d: a scene starting right after a turn waits for it
+ 	gui_drawScene(2);
+ 	_screen->crossFadeRegion(112, 0, 112, 0, 176, 120, 2, 0);
+ 	updateDrawPage2();
+@@ -2443,12 +2451,14 @@ int LoLEngine::tlol_setPartyPosition(const TIM *tim, const uint16 *param) {
+ 		_currentBlock = param[1];
+ 		calcCoordinates(_partyPosX, _partyPosY, _currentBlock, 0x80, 0x80);
+ 	}
++	lolvrPartyMoved(); // lol-vr-3d
+ 
+ 	return 1;
+ }
+ 
+ int LoLEngine::tlol_fadeClearWindow(const TIM *tim, const uint16 *param) {
+ 	debugC(3, kDebugLevelScriptFuncs, "LoLEngine::tlol_fadeClearWindow(%p, %p) (%d)", (const void *)tim, (const void *)param, param[0]);
++	lolvrTurnPause(); // lol-vr-3d: a scene starting right after a turn waits for it
+ 
+ 	switch (param[0]) {
+ 	case 0:
 diff --git a/engines/kyra/text/text_lol.cpp b/engines/kyra/text/text_lol.cpp
 index 22882f4..a4b226f 100644
 --- a/engines/kyra/text/text_lol.cpp

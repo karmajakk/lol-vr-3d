@@ -161,6 +161,30 @@ int main(int argc, char **argv) {
 						}
 				}
 			}
+		} else if (op == "etat") {
+			// etat S [NOM] : pendant S secondes, chaque changement de l'état du jeu (vue, scène, texte,
+			// case, direction) ; avec NOM, une image NOM_<ms>.ppm à chaque changement
+			double s = 1;
+			std::string name;
+			cs >> s >> name;
+			std::string last;
+			for (int i = 0; i < (int)(s * 100) && !host.finished(); i++) {
+				usleep(10000);
+				host.readAudio(audio, 480);
+				host.fetchFrame(f);
+				GameState gs;
+				LevelSnapshot w;
+				host.gameState(gs);
+				host.levelSnapshot(w);
+				char line[256];
+				snprintf(line, sizeof line, "niveau %d mode %d scène %d texte %08x case %d dir %d", gs.level, gs.controlMode, w.sceneBusy, w.textRect, w.block, w.direction);
+				if (last != line) {
+					last = line;
+					printf("  %5d ms : %s\n", i * 10, line);
+					if (!name.empty())
+						saveFrame(f, out + "/" + name + "_" + std::to_string(i * 10) + ".ppm");
+				}
+			}
 		} else if (op == "key") {
 			std::string k;
 			cs >> k;

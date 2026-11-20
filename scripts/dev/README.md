@@ -35,7 +35,9 @@ release, 0.3 s by default), `lang N`, `shot NAME` (picture, game state, and the 
 it changes), `dungeon NAME` (the 3D dungeon next to the game picture), `watch S` (objects in
 flight, step by step, for S seconds), `goto LEVEL BLOCK DIR` (move the party there),
 `carte` (print the map: `#` solid, `.` open, `@` the party), `dungeonat NAME BLOCK DIR [B FACE TYPE]`
-(the 3D dungeon seen from any block, optionally with one wall face set to another type).
+(the 3D dungeon seen from any block, optionally with one wall face set to another type),
+`etat SECONDS [NAME]` (every change of the game state: view, scene, text box, block, direction;
+with NAME, a picture at each change).
 
 `LOLVR_DUMP_TYPE=portes` lists every door type (depth, plane, how far raised) and writes their
 pictures; `LOLVR_FORCE_DOOR=T` shows the closed doors (type 3) as type T, to see each step;

@@ -3,6 +3,19 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.18.0] — The guard's welcome in 3D, scenes wait for the turn, messages letter for letter
+
+- New game: the guard's welcome at the castle gate is already in immersive mode, the castle in 3D
+  around his picture. The engine now hands over the party's place and the walls as soon as the
+  level is loaded, before its first scene (patch 0003).
+- When the game turns or moves the party and a scene follows (meeting someone, a cutscene), the
+  scene now waits a moment: the party turns in the 3D dungeon first, then the scene starts. Before,
+  the scene came first and the party turned only once it was over (patch 0003).
+- The message line in the left window (under the spellbook) is now copied pixel for pixel. It was
+  squeezed by a few pixels and lost one column in twenty, which cut pieces out of letters and read
+  like typos (resting, remarks).
+- Dev: `etat` in the end-to-end bench follows the game state over time.
+
 ## [0.17.0] — Whole-game check: doors, mines, the looping forest
 
 Every level was checked on the PC (a new tool renders each door series closed, half open and

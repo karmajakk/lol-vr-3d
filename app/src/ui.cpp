@@ -45,7 +45,7 @@ const int kKbW = kCellW * kCols, kKbH = kCellH * kRows + kInfoH;
 const Source kSources[kUiPanelCount] = {
 	{0, 0, 100, 150},    // à droite : recomposé (voir compose), taille variable
 	{83, 178, 237, 22},  // inventaire
-	{0, 0, 224, 41},     // à gauche : recomposé, bandeau, (parchemin des sorts,) messages
+	{0, 0, 236, 40},     // à gauche : recomposé, bandeau, (parchemin des sorts,) messages
 	{0, 0, (float)kKbW, (float)kKbH},
 	{0, 0, (float)kHelpW, (float)kHelpH},
 };
@@ -66,7 +66,7 @@ struct Composite {
 	int key = -1;          // nombre de personnages, fenêtre éteinte... : refaire si cela change
 };
 const int kCompParty = 0, kCompSpells = 1;
-const int kCompTexW[2] = {104, 224}, kCompTexH[2] = {200, 288};
+const int kCompTexW[2] = {104, 240}, kCompTexH[2] = {200, 288};
 const int kSpellTabH = 18; // bandeau du haut de la fenêtre de gauche : ouvrir ou replier le livre de sorts
 
 // Les pixels du jeu sont 1,2 fois plus hauts que larges ; ceux du clavier sont carrés.
@@ -527,12 +527,14 @@ void Ui::Impl::compose(int which, const UiFrameInput &in) {
 		// Le bandeau (dessiné plus bas), puis le parchemin s'il est ouvert, puis les messages.
 		int y = kSpellTabH;
 		if (!spellsCollapsed) {
-			c.pieces.push_back({0, y, 224, 242, 0, 0, 112, 121});
+			c.pieces.push_back({6, y, 224, 242, 0, 0, 112, 121});
 			y += 244;
 		}
-		c.pieces.push_back({0, y, 224, 21, 82, 121, 236, 22});
-		c.w = 224;
-		c.h = y + 21;
+		// La ligne de messages pixel pour pixel : resserrée, elle perdait une colonne sur vingt (des
+		// morceaux de lettres, comme des fautes de frappe).
+		c.pieces.push_back({0, y, 236, 22, 82, 121, 236, 22});
+		c.w = 236;
+		c.h = y + 22;
 	}
 	c.px.assign((size_t)c.texW * c.texH * 4, 0);
 	for (int i = 0; i < c.texW * c.texH; i++) {
@@ -1170,7 +1172,7 @@ void Ui::resetLayout(const UiFrameInput &in) {
 	// À gauche : le parchemin des sorts et les messages (pixels doublés dans la fenêtre recomposée).
 	// Le bas de la fenêtre (les messages) est à la hauteur où il serait, livre de sorts ouvert, sous
 	// le haut de la vue : ouvert ou replié, le livre garde ses messages au même endroit.
-	const float sSpells = 0.0018f, openH = (float)(kSpellTabH + 244 + 21) * 1.2f * sSpells;
+	const float sSpells = 0.0018f, openH = (float)(kSpellTabH + 244 + 22) * 1.2f * sSpells;
 	set(kPanelSpells, -(viewW * 0.5f + frame + 0.035f + halfW(kPanelSpells, sSpells)), top - openH + halfH(kPanelSpells, sSpells), sSpells);
 	// À droite : les personnages, l'atlas, les options et le repos.
 	const float sParty = 0.0034f;
