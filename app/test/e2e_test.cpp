@@ -334,7 +334,7 @@ int main(int argc, char **argv) {
 						used = lvl.walls[i] == t;
 					if (!strcmp(dt, "tous") ? !used : strcmp(dt, "portes") ? t != (atoi(dt) & 255) : tex.doorLayer[t] < 0)
 						continue;
-					printf("    type %d : genre %d couche %d porte %d profondeur face %.2f porte %.2f plan %.2f levée %.2f%s\n", t, tex.kind[t], tex.typeLayer[t], tex.doorLayer[t], tex.faceDepth[t], tex.doorDepth[t], tex.planeDepth[t], tex.doorLift[t], tex.footFit[t] ? " ouverture au sol" : "");
+					printf("    type %d : drapeaux %02x vmp %d genre %d couche %d porte %d profondeur face %.2f porte %.2f plan %.2f levée %.2f%s\n", t, lvl.wallFlags[t], lvl.vmpMap[t], tex.kind[t], tex.typeLayer[t], tex.doorLayer[t], tex.faceDepth[t], tex.doorDepth[t], tex.planeDepth[t], tex.doorLift[t], tex.footFit[t] ? " ouverture au sol" : tex.picBox[t][2] > 0 ? " image agrandie" : "");
 					{
 						int shown = 0;
 						for (int bb = 0; bb < 1024 && shown < 3; bb++)
@@ -391,7 +391,8 @@ int main(int argc, char **argv) {
 			const int meshDir = atBlock >= 0 ? atDir : lvl.direction;
 			// comme l'app à l'arrivée sur une entrée (sortie du manoir, de la hutte) : le groupe s'y tient,
 			// le bloc montré ouvert
-			const int openBlock = atBlock < 0 && isHoldBlock(lvl.walls, lvl.block, g) ? lvl.block : -1;
+			const int viewBlock = atBlock >= 0 ? atBlock : lvl.block;
+			const int openBlock = isHoldBlock(lvl.walls, viewBlock & 1023, g) ? (viewBlock & 1023) : -1;
 			const int overrideKey = (ovBlock < 0 ? -1 : (ovBlock * 4 + ovFace) * 256 + ovType) * 2048 + openBlock;
 			if (lvl.wallsSerial != builtWalls || meshDir != builtDir || overrideKey != builtOverride) {
 				builtDir = meshDir;
@@ -519,12 +520,11 @@ int main(int argc, char **argv) {
 			}
 			if (openBlock >= 0)
 				printf("  le groupe est dans une entrée : le bloc est montré ouvert\n");
-			if (atBlock == -1 && openBlock < 0 && isSolidBlock(lvl.walls, lvl.block, g)) {
+			if (atBlock < 0 && openBlock < 0 && isSolidBlock(lvl.walls, lvl.block, g)) {
 				printf("ÉCHEC le groupe est dans un bloc plein\n");
 				failures++;
 			}
 			float px, pz;
-			static const int bdx[4] = {0, 1, 0, -1}, bdz[4] = {-32, 0, 32, 0};
 			int vb = atBlock >= 0 ? atBlock : lvl.block, vd = atBlock >= 0 ? atDir : lvl.direction;
 			blockCenter(vb, px, pz);
 			Mat4 model = dungeonModel({0, 0, 0}, 0.0f, px, pz, (float)vd * 1.5707963f);
@@ -571,6 +571,68 @@ int main(int argc, char **argv) {
 			} else {
 				saveGl(out + "/" + name + "_3d.ppm");
 				saveFrame(f, out + "/" + name + "_jeu.ppm");
+			}
+			bool placeAhead = false; // une image de lieu en grand : la 3D ne montre pas le même dessin que le jeu
+			{
+				static const int adx[4] = {0, 1, 0, -1}, adz[4] = {-32, 0, 32, 0};
+				const int ab = (vb + adx[vd & 3] + adz[vd & 3]) & 1023;
+				for (int pt : lvl.placeTypes)
+					placeAhead = placeAhead || lvl.walls[ab * 4 + ((vd + 2) & 3)] == pt;
+			}
+			if (getenv("LOLVR_CLIC") && placeAhead)
+				printf("  CLIC case %d dir %d : image de lieu en grand, non comparée\n", vb, vd);
+			if (getenv("LOLVR_CLIC") && !placeAhead && vb == lvl.block && vd == lvl.direction && f.width == 320 && f.height == 200) {
+				// Les clics tombent-ils sur ce qu'on voit ? Des rayons à travers l'image 3D, comme le doigt :
+				// le mur devant visé, le point du jeu où l'appli enverrait le clic ; sa couleur dans l'image
+				// du jeu comparée à celle de l'image 3D (à un facteur d'éclairage près). Témoin : le même
+				// calcul avec le point du jeu décalé de 8 pixels.
+				std::vector<uint8_t> img((size_t)W * H * 4);
+				glReadPixels(0, 0, W, H, GL_RGBA, GL_UNSIGNED_BYTE, img.data());
+				Vec3 c0{model.m[0], model.m[1], model.m[2]}, c1{model.m[4], model.m[5], model.m[6]}, c2{model.m[8], model.m[9], model.m[10]};
+				Vec3 tr{model.m[12], model.m[13], model.m[14]};
+				auto toLevel = [&](Vec3 p) { Vec3 r = p - tr; return Vec3{dot(c0, r), dot(c1, r), dot(c2, r)}; };
+				auto dirLevel = [&](Vec3 v) { return Vec3{dot(c0, v), dot(c1, v), dot(c2, v)}; };
+				double err[2] = {0, 0}, sab[2] = {0, 0}, sbb[2] = {0, 0}, saa = 0;
+				std::vector<float> A, B[2];
+				int n = 0;
+				for (int sy = 0; sy < 40; sy++)
+					for (int sx = 0; sx < 40; sx++) {
+						const int x = W / 8 + sx * (W * 3 / 4) / 40, y = H / 8 + sy * (H * 3 / 4) / 40;
+						Vec3 dcam{(2.0f * (x + 0.5f) / W - 1.0f) * th, (2.0f * (y + 0.5f) / H - 1.0f) * tv, -1.0f};
+						Vec3 dir = rotate(camRot, normalize(dcam));
+						DungeonPick pk;
+						if (!pickDungeon(lvl.walls, vb, vd, tex, toLevel(eye), dirLevel(dir), pk) || pk.face != (vd & 3))
+							continue;
+						const uint8_t *a = &img[((size_t)y * W + x) * 4];
+						for (int k = 0; k < 2; k++) {
+							const int gx = (int)pk.px + (k ? 8 : 0), gy = (int)pk.py;
+							if (gx < 112 || gx > 287 || gy < 0 || gy > 119)
+								goto next;
+						}
+						for (int k = 0; k < 2; k++) {
+							const uint8_t *b = &f.rgba[((size_t)(int)pk.py * 320 + (int)pk.px + (k ? 8 : 0)) * 4];
+							for (int c = 0; c < 3; c++)
+								B[k].push_back(b[c]);
+						}
+						for (int c = 0; c < 3; c++)
+							A.push_back(a[c]);
+						n++;
+					next:;
+					}
+				if (n >= 30) {
+					for (size_t i = 0; i < A.size(); i++) {
+						saa += A[i] * A[i];
+						for (int k = 0; k < 2; k++) { sab[k] += A[i] * B[k][i]; sbb[k] += B[k][i] * B[k][i]; }
+					}
+					for (int k = 0; k < 2; k++) {
+						const double sc = sbb[k] > 0 ? sab[k] / sbb[k] : 1.0; // le jeu ramené à l'éclairage de la 3D
+						double e = 0, m = 0;
+						for (size_t i = 0; i < A.size(); i++) { e += fabs(A[i] - sc * B[k][i]); m += A[i]; }
+						err[k] = m > 0 ? e / m : 0;
+					}
+					printf("  CLIC case %d dir %d : %d rayons sur le mur devant, écart %.0f %% (décalé de 8 px : %.0f %%)%s\n", vb, vd, n,
+					       err[0] * 100, err[1] * 100, err[0] > err[1] * 0.8 ? " MAUVAIS" : "");
+				}
 			}
 		}
 	}

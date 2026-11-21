@@ -8,6 +8,7 @@
 // face, à un pas, occupe les 192 dernières entrées d'une page (16 x 12 blocs, soit 128 x 96 pixels) :
 // c'est lui qui habille les murs en 3D.
 #include "dungeon_data.h"
+#include "vecmath.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -97,8 +98,14 @@ bool isPictureType(const DungeonGfx &g, uint8_t t) {
 	return !(g.wallFlags[t] & 0x89);
 }
 
+// Un mur invisible : ni dessin ni image pour le moteur, et franchissable (drapeau 0x80). Le jeu
+// n'en dessine rien (des cases de forêt qu'on traverse, comme le passage au sud du niveau 3).
+static bool invisibleWall(const DungeonGfx &g, uint8_t t) {
+	return t && !g.vmpMap[t] && (g.wallFlags[t] & 0x80) && g.wallSlot && g.wallSlot[t] < 0;
+}
+
 bool hasSolidWall(const DungeonGfx &g, uint8_t t) {
-	if (t == 0 || (g.wallFlags[t] & 8))
+	if (t == 0 || (g.wallFlags[t] & 8) || invisibleWall(g, t))
 		return false;
 	if (g.wallSlot && g.wallSlot[t] >= 0 && !g.vmpMap[t]) {
 		if (!isPictureType(g, t))
@@ -170,6 +177,7 @@ void decodeDungeonTextures(const DungeonGfx &g, DungeonTextures &out) {
 		memset(out.planeColFoot[i], 0, kDunTexSize);
 		out.picBox[i][0] = out.picBox[i][1] = out.picBox[i][2] = out.picBox[i][3] = 0;
 		out.footFit[i] = false;
+		out.hidden[i] = invisibleWall(g, (uint8_t)i);
 		out.doorTopV[i] = out.doorFootV[i] = out.doorLift[i] = 0.0f;
 		out.faceDepth[i] = 1.0f;
 		out.kind[i] = kWallFace;
@@ -657,6 +665,8 @@ void buildDungeonMesh(const uint8_t *walls, const DungeonGfx &g, const DungeonTe
 				}
 				continue;
 			}
+			if (invisibleWall(g, t))
+				continue;
 			int page = g.vmpMap[t];
 			float typeLayer = (float)tex.typeLayer[t];
 			if (tex.typeLayer[t] < 0 && (page <= 0 || page >= 64 || tex.pageLayer[page] < 0)) {
@@ -882,6 +892,207 @@ void applyPlacePicture(DungeonTextures &tex, int type, const uint8_t *rgb) {
 			d[3] = 255;
 		}
 	tex.typeLayer[type] = tex.layers++;
+}
+
+
+// Le rayon d'un doigt dans le donjon (coordonnées du niveau) : le mur touché autour de la case où se
+// tient le groupe, le sol devant, ou au loin ; et le point correspondant dans la vue du jeu (pixels
+// de l'écran 320 x 200), là où le jeu attend le clic. Partagé par l'appli et le banc d'essai.
+bool pickDungeon(const uint8_t *walls, int block, int direction, const DungeonTextures &tex, Vec3 o, Vec3 v, DungeonPick &out) {
+	const float S = kBlockSize, H = kWallHeight;
+	int face = -1;
+	static const int dx[4] = {0, 1, 0, -1}, dz[4] = {-1, 0, 1, 0};
+	const int d = direction & 3;
+	Vec3 fAhead{(float)dx[d], 0.0f, (float)dz[d]}, rAhead{-fAhead.z, 0.0f, fAhead.x};
+	float cx, cz;
+	blockCenter(block, cx, cz);
+	Vec3 center{cx, 0.0f, cz};
+	int ahead = block + dz[d] * 32 + dx[d];
+	const uint8_t faceType = ahead >= 0 && ahead < 1024 ? walls[ahead * 4 + ((d + 2) & 3)] : 0;
+	bool faceWall = faceType != 0 && !tex.hidden[faceType] && tex.kind[faceType] == kWallFace;
+	// Le mur (ou le cadre de porte) se tient à cette profondeur dans la case devant : 1 = sur sa face.
+	const float fr = faceWall ? tex.faceDepth[faceType] : 1.0f;
+	Vec3 hit{0.0f, 0.0f, 0.0f}, finalF = fAhead, finalR = rAhead;
+	float px = -1, py = -1, bestT = 1e30f;
+	// 1. Les murs autour de la case où se tient le groupe : la face devant (le passage bloqué) comme
+	// les côtés (buissons, nids, trous dans les arbres) qu'on ne voit qu'en tournant la tête vers eux.
+	for (int k = 0; k < 4; k++) {
+		int nb = block + dz[k] * 32 + dx[k];
+		if (nb < 0 || nb >= 1024)
+			continue;
+		uint8_t backT = walls[nb * 4 + ((k + 2) & 3)];
+		if (!backT || tex.hidden[backT])
+			continue;
+		Vec3 f{(float)dx[k], 0.0f, (float)dz[k]}, r{-f.z, 0.0f, f.x};
+		if (tex.kind[backT] == kWallFace && tex.planeDepth[backT] > 0.0f) {
+			// Une porte dans son renfoncement : le plan du fond (porte et piliers) sur toute la case.
+			const DungeonTextures &dt = tex;
+			if (dt.planeU0[backT] > 0.02f && dt.planeU1[backT] < 0.98f) {
+				// Les côtés du renfoncement (montants, bouton d'ouverture), comme le maillage les pose.
+				const float rd = dt.planeDepth[backT];
+				for (int side = 0; side < 2; side++) {
+					const float sg = side ? 1.0f : -1.0f;
+					float den = dot(v, r);
+					if (fabsf(den) < 1e-4f)
+						continue;
+					Vec3 sidePt = center + f * (S * 0.5f) + r * (sg * S * 0.5f);
+					float tt = dot(sidePt - o, r) / den;
+					if (tt <= 0.0f || tt >= bestT)
+						continue;
+					Vec3 hh = o + v * tt;
+					const float dd = dot(hh - center, f) / (S * 0.5f);
+					if (dd < 1.0f || dd > rd || hh.y < 0.0f || hh.y > H)
+						continue;
+					const float w = (1.0f / dd - 1.0f / rd) / (1.0f - 1.0f / rd);
+					const float uu = w * (side ? 1.0f : 0.0f) + (1.0f - w) * (side ? dt.planeU1[backT] : dt.planeU0[backT]);
+					const float vTop = (1.0f - w) * dt.planeTop[backT];
+					float vFoot = w * (96.0f / 128.0f) + (1.0f - w) * dt.planeFoot[backT];
+					const int cx = (int)fminf(fmaxf(uu * 128.0f - (side ? 0.5f : 0.0f), 0.0f), 127.0f);
+					if (dt.planeColFoot[backT][cx]) // comme le maillage : le pied dessiné de la colonne au sol
+						vFoot = (float)dt.planeColFoot[backT][cx] / 128.0f;
+					bestT = tt;
+					hit = hh;
+					px = 136.0f + uu * 128.0f;
+					py = 8.0f + (vTop + (1.0f - hh.y / H) * (vFoot - vTop)) * 128.0f;
+					finalF = r * sg;
+					finalR = f * (side ? -1.0f : 1.0f);
+					face = k;
+				}
+			}
+			float den = dot(v, f);
+			if (den <= 1e-4f)
+				continue;
+			Vec3 facePt = center + f * (S * 0.5f * dt.planeDepth[backT]);
+			float tt = dot(facePt - o, f) / den;
+			if (tt <= 0.0f || tt >= bestT)
+				continue;
+			Vec3 hh = o + v * tt;
+			float u = 0.5f + dot(hh - facePt, r) / S;
+			if (u < 0.0f || u > 1.0f || hh.y < 0.0f || hh.y > H)
+				continue;
+			bestT = tt;
+			hit = hh;
+			const float uu = dt.planeU0[backT] + u * (dt.planeU1[backT] - dt.planeU0[backT]);
+			// comme le maillage : le pied dessiné de chaque colonne est au sol
+			float vf = dt.planeFoot[backT];
+			const int col = (int)fminf(fmaxf(uu * 128.0f, 0.0f), 127.0f);
+			if (dt.planeColFoot[backT][col]) {
+				const float f = (float)dt.planeColFoot[backT][col] / 128.0f;
+				if (f > dt.planeTop[backT] + 0.2f && f < vf)
+					vf = f;
+			}
+			px = 136.0f + uu * 128.0f;
+			py = 8.0f + (dt.planeTop[backT] + (1.0f - hh.y / H) * (vf - dt.planeTop[backT])) * 128.0f;
+			finalF = f;
+			face = k;
+			finalR = r;
+		} else if (tex.kind[backT] == kWallFace) {
+			float wfr = tex.faceDepth[backT];
+			float den = dot(v, f);
+			if (den <= 1e-4f)
+				continue;
+			Vec3 facePt = center + f * (S * 0.5f * wfr);
+			float tt = dot(facePt - o, f) / den;
+			if (tt <= 0.0f || tt >= bestT)
+				continue;
+			Vec3 hh = o + v * tt;
+			// L'image du mur (128 x 96, horizon au milieu) est agrandie de wfr autour de mi-hauteur.
+			float u = 0.5f + dot(hh - facePt, r) / (S * wfr);
+			float row = 48.0f - (hh.y - H * 0.5f) / (H * 0.5f * wfr) * 48.0f;
+			if (tex.footFit[backT] && wfr == 1.0f && tex.doorLayer[backT] < 0) {
+				// comme le maillage : la colonne descend jusqu'à son pied dessiné
+				const uint8_t f = tex.planeColFoot[backT][(int)fminf(fmaxf(u * 128.0f, 0.0f), 127.0f)];
+				row = (1.0f - hh.y / H) * (f ? (float)f : 96.0f);
+			}
+			if (u < 0.0f || u > 1.0f || row < 0.0f || row > 96.0f || hh.y < 0.0f || hh.y > H)
+				continue;
+			bestT = tt;
+			hit = hh;
+			px = 136.0f + u * 128.0f;
+			py = 8.0f + row;
+			// Une image agrandie à tout le mur (un buisson, un lieu) : le clic va là où le jeu la dessine.
+			if (const int16_t *pb = tex.picBox[backT]; pb[2] > 0) {
+				px = 136.0f + (float)pb[0] + u * (float)pb[2];
+				py = 8.0f + (float)pb[1] + row / 96.0f * (float)pb[3];
+			}
+			finalF = f;
+			face = k;
+			finalR = r;
+		} else if (tex.kind[backT] == kWallObject) {
+			// Un objet au milieu de la case voisine (buisson, nid...) : deux images croisées.
+			float ncx, ncz;
+			blockCenter(nb, ncx, ncz);
+			Vec3 ocenter{ncx, 0.0f, ncz};
+			const Vec3 planes[2] = {Vec3{0.0f, 0.0f, 1.0f}, Vec3{1.0f, 0.0f, 0.0f}};
+			for (int pi = 0; pi < 2; pi++) {
+				Vec3 pf = planes[pi], pr{-pf.z, 0.0f, pf.x};
+				float den = dot(v, pf);
+				if (fabsf(den) < 1e-4f)
+					continue;
+				float tt = dot(ocenter - o, pf) / den;
+				if (tt <= 0.0f || tt >= bestT)
+					continue;
+				Vec3 hh = o + v * tt;
+				float u = 0.5f + dot(hh - ocenter, pr) / S;
+				float row = 48.0f - (hh.y - H * 0.5f) / (H * 0.5f) * 48.0f;
+				if (u < 0.0f || u > 1.0f || row < 0.0f || row > 96.0f || hh.y < 0.0f || hh.y > H)
+					continue;
+				bestT = tt;
+				hit = hh;
+				px = 136.0f + u * 128.0f;
+				py = 8.0f + row;
+				finalF = pf;
+				finalR = pr;
+				face = k;
+			}
+		}
+	}
+	// 2. Le sol, de sous le joueur jusqu'au bout de la case devant (ou jusqu'au mur)
+	if (px < 0.0f && v.y < -1e-4f) {
+		float tt = -o.y / v.y;
+		Vec3 hh = o + v * tt;
+		float fw = dot(hh - center, fAhead) / S, lat = dot(hh - center, rAhead) / S;
+		float maxF = faceWall ? 0.5f * fr : 1.5f;
+		if (fw >= 0.0f && fw <= maxF && fabsf(lat) <= 0.6f) {
+			float y, w;
+			if (fw >= 0.5f) {
+				float k = fw - 0.5f;
+				y = 104.0f - 24.0f * k;
+				w = 128.0f - 48.0f * k;
+			} else {
+				y = 120.0f - 32.0f * fw;
+				w = 176.0f - 96.0f * fw;
+			}
+			px = 112.0f + 88.0f + clampf(lat, -0.5f, 0.5f) * w;
+			py = clampf(y, 1.0f, 119.0f);
+			hit = hh;
+			// Le point du sol est montré à plat
+			finalF = Vec3{0, 1, 0};
+			finalR = rAhead;
+		}
+	}
+	// 3. Ailleurs devant le groupe (au loin, en l'air) : la vue du jeu, selon l'angle. C'est là qu'on
+	// lance un objet tenu (on peut ainsi sortir un objet de l'inventaire vers le donjon).
+	if (px < 0.0f) {
+		Vec3 flat{v.x, 0.0f, v.z};
+		float fl = length(flat);
+		if (fl > 1e-3f && dot(flat, fAhead) / fl > 0.5f) {
+			float side = dot(v, rAhead) / dot(v, fAhead), up = v.y / dot(v, fAhead);
+			// Le mur à une case montre 128 x 96 pixels pour S x H mètres, à S/2 du groupe.
+			px = clampf(200.0f + side * 64.0f, 113.0f, 287.0f);
+			py = clampf(56.0f - up * 48.0f * S / H, 2.0f, 100.0f);
+			hit = o + v * 3.0f;
+			finalF = fAhead;
+			finalR = rAhead;
+		}
+	}
+	out.px = px;
+	out.py = py;
+	out.face = face;
+	out.hit = hit;
+	out.forward = finalF;
+	out.right = finalR;
+	return px >= 0.0f;
 }
 
 } // namespace lolvr

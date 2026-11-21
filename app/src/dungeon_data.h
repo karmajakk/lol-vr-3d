@@ -6,6 +6,8 @@
 #include <stdint.h>
 #include <vector>
 
+#include "vecmath.h"
+
 namespace lolvr {
 
 // Taille d'un bloc du donjon en mètres, et hauteur sous plafond. Les murs du jeu font 128 x 96
@@ -75,6 +77,8 @@ struct DungeonTextures {
 	// Une ouverture jusqu'au sol dans un mur (une sortie, une porte de boutique) : chaque colonne
 	// posée au sol par son pied (planeColFoot).
 	bool footFit[256];
+	// Un mur que le jeu ne dessine pas (invisible et franchissable) : ni maillage ni clic.
+	bool hidden[256];
 	// La porte dans son dessin (fraction de la texture, en hauteur) : son haut et son pied ; et une
 	// porte qui s'ouvre ou se ferme : la part de sa hauteur dont elle est levée (0 fermée, 1 ouverte).
 	float doorTopV[256], doorFootV[256], doorLift[256];
@@ -122,5 +126,15 @@ bool isSolidBlock(const uint8_t *walls, int block, const DungeonGfx &gfx);
 void applyPlacePicture(DungeonTextures &tex, int type, const uint8_t *rgb);
 
 bool isHoldBlock(const uint8_t *walls, int block, const DungeonGfx &gfx);
+
+// Ce que vise un rayon dans le donjon (voir pickDungeon) : px, py dans l'écran du jeu (-1 : rien),
+// face = mur visé (0 nord .. 3 ouest, -1 sol ou au loin), le point touché et l'orientation de la
+// surface (coordonnées du niveau).
+struct DungeonPick {
+	float px = -1.0f, py = -1.0f;
+	int face = -1;
+	Vec3 hit{0, 0, 0}, forward{0, 0, 1}, right{1, 0, 0};
+};
+bool pickDungeon(const uint8_t *walls, int block, int direction, const DungeonTextures &tex, Vec3 o, Vec3 v, DungeonPick &out);
 
 } // namespace lolvr
