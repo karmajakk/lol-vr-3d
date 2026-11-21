@@ -36,16 +36,21 @@ struct Source {
 // Clavier : grille de 11 colonnes sur 6 rangées.
 const int kCellW = 46, kCellH = 40, kCols = 11, kRows = 6;
 // Menu du poignet : engrenage et petit menu
-const int kGearSize = 64, kHintW = 440, kHintH = 84, kMenuW = 360, kMenuRowH = 44, kMenuMaxRows = 5;
+const int kGearSize = 64, kHintW = 440, kHintH = 84, kMenuW = 360, kMenuRowH = 44, kMenuMaxRows = 6;
 // Panneau d'aide
 const int kHelpW = 640, kHelpH = 520;
 const int kInfoH = 0; // (plus de lignes d'information sous les touches)
 const int kKbW = kCellW * kCols, kKbH = kCellH * kRows + kInfoH;
 
+// L'atlas : le bandeau, le nom du niveau, la carte (carrée), la légende.
+const int kAtlasW = 264, kAtlasMap = 256, kAtlasMapY = 18 + 16, kAtlasLegendY = kAtlasMapY + kAtlasMap + 4, kAtlasLines = 10, kAtlasLineH = 11;
+const int kAtlasH = kAtlasLegendY + kAtlasLines * kAtlasLineH + 2;
+
 const Source kSources[kUiPanelCount] = {
 	{0, 0, 100, 150},    // à droite : recomposé (voir compose), taille variable
 	{83, 178, 237, 22},  // inventaire
 	{0, 0, 236, 40},     // à gauche : recomposé, bandeau, (parchemin des sorts,) messages
+	{0, 0, (float)kAtlasW, (float)kAtlasH}, // l'atlas, dessiné par l'application
 	{0, 0, (float)kKbW, (float)kKbH},
 	{0, 0, (float)kHelpW, (float)kHelpH},
 };
@@ -65,13 +70,13 @@ struct Composite {
 	uint32_t serial = 0;
 	int key = -1;          // nombre de personnages, fenêtre éteinte... : refaire si cela change
 };
-const int kCompParty = 0, kCompSpells = 1;
-const int kCompTexW[2] = {104, 240}, kCompTexH[2] = {200, 288};
+const int kCompParty = 0, kCompSpells = 1, kCompAtlas = 2;
+const int kCompTexW[3] = {104, 240, kAtlasW}, kCompTexH[3] = {200, 288, kAtlasH};
 const int kSpellTabH = 18; // bandeau du haut de la fenêtre de gauche : ouvrir ou replier le livre de sorts
 
 // Les pixels du jeu sont 1,2 fois plus hauts que larges ; ceux du clavier sont carrés.
 float pixelAspect(int id) {
-	return id >= kPanelKeyboard ? 1.0f : 1.2f;
+	return id >= kPanelKeyboard || id == kPanelAtlas ? 1.0f : 1.2f;
 }
 
 struct Key {
@@ -253,6 +258,37 @@ struct Canvas {
 		gameLine(s, x, y, scale, col);
 	}
 	void gcenter(const std::string &s, int x0, int x1, int y, int scale, Rgb col) { gtext(s, x0 + (x1 - x0 - textW(s, scale)) / 2, y, scale, col); }
+	// Un texte du jeu, déjà dans sa page de code (noms des niveaux, légende de l'atlas), coupé à maxW.
+	static int rawW(const std::string &s, int scale) {
+		if (!g_font.ok())
+			return (int)s.size() * 8;
+		int w = 0;
+		for (unsigned char ch : s)
+			w += g_font.width(ch);
+		return w * scale;
+	}
+	void graw(const std::string &s, int x, int y, int scale, int maxW, Rgb col, Rgb shadow) {
+		if (!g_font.ok()) {
+			std::string t;
+			for (unsigned char ch : s)
+				t += ch < 128 ? (char)ch : '?';
+			text(t.substr(0, (size_t)(maxW / 8)), x, y - 3, 1, col.r, col.g, col.b);
+			return;
+		}
+		for (int pass = 0; pass < 2; pass++) {
+			int cx = x;
+			for (unsigned char ch : s) {
+				const int w = g_font.width(ch) * scale;
+				if (cx + w > x + maxW)
+					break;
+				if (pass == 0)
+					glyph(ch, cx + scale, y + scale, scale, shadow);
+				else
+					glyph(ch, cx, y, scale, col);
+				cx += w;
+			}
+		}
+	}
 	// La plus grande échelle (jusqu'à maxScale) où le texte tient dans maxW.
 	static int fit(const std::string &s, int maxW, int maxScale) {
 		int sc = maxScale;
@@ -341,18 +377,25 @@ struct Ui::Impl {
 	Vec3 menuPos = {0, 0, 0}, menuRight = {1, 0, 0}, menuUp = {0, 1, 0};
 	int menuHot = -1;
 	// Mode immersif : pas de ligne « vue » (l'écran du jeu n'apparaît que quand il le faut).
-	int menuRows() const { return dungeonMode ? 4 : 5; }
+	// Lignes : le titre, le mode VR, la vue, l'atlas, les manettes, fermer.
+	int menuRows() const { return dungeonMode ? 5 : 6; }
 	int menuH() const { return kMenuRowH * menuRows(); }
-	int menuItem(int row) const { return menuRows() == 4 && row >= 2 ? row + 1 : row; }
+	int menuItem(int row) const { return menuRows() == 5 && row >= 2 ? row + 1 : row; }
 	// Colonne du groupe recomposée
 	int chooserHot = -1; // bouton visé dans la fenêtre du choix de la vue
-	Composite comp[2];
+	Composite comp[3];
+	bool atlasCollapsed = false, atlasTabHot = false, atlasOn = true;
+	uint32_t atlasSerial = 0;
+	int atlasKey = -1;
+	void composeAtlas(const UiFrameInput &in);
 	std::vector<uint8_t> heldFrame; // l'image du jeu d'avant la boîte de texte (voir textBoxActive)
 	int heldW = 0, heldH = 0;
 	bool spellsCollapsed = true; // livre de sorts replié : seuls le bandeau et les messages restent
 	bool spellTabHot = false;
 	void compose(int which, const UiFrameInput &in);
-	int compOf(int panel) const { return panel == kPanelParty ? kCompParty : panel == kPanelSpells ? kCompSpells : -1; }
+	int compOf(int panel) const { return panel == kPanelParty ? kCompParty : panel == kPanelSpells ? kCompSpells : panel == kPanelAtlas ? kCompAtlas : -1; }
+	// L'atlas à droite de la fenêtre des personnages, haut contre haut.
+	void placeAtlas(UiPlacement *placement);
 	int drag = -1;
 	float grabDist = 1.0f;
 	Vec3 grabOffset = {0, 0, 0};
@@ -595,6 +638,145 @@ void Ui::Impl::compose(int which, const UiFrameInput &in) {
 			memcpy(&c.px[(size_t)y * c.texW * 4], &cv.px[(size_t)y * c.w * 4], (size_t)c.w * 4);
 	}
 	upload(c.tex, c.px, c.texW, c.texH, which == kCompParty ? "groupe" : "sorts");
+}
+
+// L'atlas, comme la carte du jeu : le parchemin, les cases vues, leurs murs, les portes, les lieux
+// nommés (un losange de couleur, et leur nom dans la légende), et la flèche du groupe.
+void Ui::Impl::composeAtlas(const UiFrameInput &in) {
+	const UiMap &m = *in.map;
+	Composite &c = comp[kCompAtlas];
+	const int key = (atlasCollapsed ? 1 : 0) + (atlasTabHot ? 2 : 0) + language * 4;
+	if (c.tex && atlasSerial == m.serial && atlasKey == key)
+		return;
+	atlasSerial = m.serial;
+	atlasKey = key;
+	c.texW = kAtlasW;
+	c.texH = kAtlasH;
+	c.pieces.clear();
+	c.w = kAtlasW;
+	c.h = atlasCollapsed ? kSpellTabH : kAtlasH;
+	Canvas cv{kAtlasW, kAtlasH, std::vector<uint8_t>((size_t)kAtlasW * kAtlasH * 4)};
+	cv.bevel(0, 0, kAtlasW, kSpellTabH, 2, true, atlasTabHot ? kLight : kFace);
+	cv.gcenter(atlasCollapsed ? "Atlas  +" : "Atlas  -", 0, kAtlasW, 1, g_font.ok() ? 2 : 1, atlasTabHot ? kWhite : kGold);
+	if (!atlasCollapsed) {
+		const Rgb parch = {222, 199, 152}, edge = {176, 140, 96}, floor = {188, 154, 106}, wall = {72, 44, 24}, door = {156, 50, 30}, ink = {84, 52, 28}, arrow = {200, 26, 18};
+		static const Rgb kMarks[8] = {{40, 90, 190}, {20, 130, 60}, {170, 40, 150}, {200, 120, 10}, {20, 140, 150}, {120, 70, 30}, {90, 60, 170}, {190, 30, 70}};
+		cv.rect(0, kSpellTabH, kAtlasW, kAtlasH, edge);
+		cv.rect(2, kSpellTabH + 2, kAtlasW - 2, kAtlasH - 2, parch);
+		// Le nom du niveau
+		cv.graw(m.title, (kAtlasW - std::min(Canvas::rawW(m.title, 1), kAtlasW - 8)) / 2, kSpellTabH + 4, 1, kAtlasW - 8, ink, parch);
+		auto seen = [&](int b) { return b >= 0 && b < 1024 && (m.flags[b] & 7) == 7; };
+		auto open = [&](int b) {
+			for (int k = 0; k < 4; k++)
+				if (m.cls[m.walls[b * 4 + k]] & 0xC0)
+					return false;
+			return true;
+		};
+		// Les lieux nommés dont la case a été vue.
+		std::vector<const UiMap::Mark *> marks;
+		for (const UiMap::Mark &e : m.legend)
+			if (seen(e.trigger))
+				marks.push_back(&e);
+		// La partie vue de la carte, centrée, à la plus grande échelle (8 à 16 pixels par case).
+		int x0 = 32, y0 = 32, x1 = -1, y1 = -1;
+		auto grow = [&](int b) {
+			const int x = b & 31, y = b >> 5;
+			x0 = std::min(x0, x);
+			x1 = std::max(x1, x);
+			y0 = std::min(y0, y);
+			y1 = std::max(y1, y);
+		};
+		for (int b = 0; b < 1024; b++)
+			if (seen(b))
+				grow(b);
+		for (const UiMap::Mark *e : marks)
+			if (e->mark >= 0 && e->mark < 1024)
+				grow(e->mark);
+		grow(m.block & 1023);
+		const int span = std::max(std::max(x1 - x0 + 1, y1 - y0 + 1), 12);
+		const int cs = std::max(8, std::min(16, kAtlasMap / span));
+		const int ox = (kAtlasW - (x1 - x0 + 1) * cs) / 2 - x0 * cs, oy = kAtlasMapY + (kAtlasMap - (y1 - y0 + 1) * cs) / 2 - y0 * cs;
+		static const int kDx[4] = {0, 1, 0, -1}, kDy[4] = {-1, 0, 1, 0};
+		for (int b = 0; b < 1024; b++)
+			if (seen(b) && open(b))
+				cv.rect(ox + (b & 31) * cs, oy + (b >> 5) * cs, ox + (b & 31) * cs + cs, oy + (b >> 5) * cs + cs, floor);
+		const int t = cs >= 12 ? 2 : 1;
+		for (int b = 0; b < 1024; b++) {
+			if (!seen(b) || !open(b))
+				continue;
+			const int bx = b & 31, by = b >> 5, px = ox + bx * cs, py = oy + by * cs;
+			for (int k = 0; k < 4; k++) {
+				const int nx = bx + kDx[k], ny = by + kDy[k];
+				if (nx < 0 || ny < 0 || nx > 31 || ny > 31)
+					continue;
+				const int nb = ny * 32 + nx, cl = m.cls[m.walls[nb * 4 + ((k + 2) & 3)]];
+				const int sym = cl & 0x1F;
+				// Un mur, ou un passage secret pas encore trouvé (classe 13, comme le jeu).
+				const bool solid = (cl & 0xC0) || (sym == 13 && !(m.flags[nb] & (1 << k)));
+				if (solid)
+					cv.rect(k == 1 ? px + cs - t : px, k == 2 ? py + cs - t : py, k == 3 ? px + t : px + cs, k == 0 ? py + t : py + cs, wall);
+				if (sym != 0x1F && sym != 13) {
+					// Une porte (ou autre chose sur ce côté) : un trait rouge au milieu du côté.
+					const int q = cs / 4;
+					if (k == 0 || k == 2)
+						cv.rect(px + q, k == 0 ? py : py + cs - t - 1, px + cs - q, k == 0 ? py + t + 1 : py + cs, door);
+					else
+						cv.rect(k == 3 ? px : px + cs - t - 1, py + q, k == 3 ? px + t + 1 : px + cs, py + cs - q, door);
+				}
+			}
+		}
+		// Les lieux nommés : un losange de couleur sur la carte, le même devant leur nom.
+		auto diamond = [&](int cx, int cy, int r, Rgb col) {
+			for (int y = -r - 1; y <= r + 1; y++)
+				for (int x = -r - 1; x <= r + 1; x++) {
+					const int dd = abs(x) + abs(y);
+					if (dd <= r + 1)
+						cv.rect(cx + x, cy + y, cx + x + 1, cy + y + 1, dd <= r ? col : wall);
+				}
+		};
+		for (size_t i = 0; i < marks.size() && (int)i < kAtlasLines; i++) {
+			const Rgb col = kMarks[i % 8];
+			const bool marked = marks[i]->mark >= 0 && marks[i]->mark < 1024;
+			const int ly = kAtlasLegendY + (int)i * kAtlasLineH;
+			if (marked) {
+				diamond(ox + (marks[i]->mark & 31) * cs + cs / 2, oy + (marks[i]->mark >> 5) * cs + cs / 2, std::max(2, cs / 3), col);
+				diamond(9, ly + 5, 3, col);
+			}
+			cv.graw(marks[i]->text, 18, ly + 1, 1, kAtlasW - 24, ink, parch);
+		}
+		// Le groupe : une flèche dans sa case, pointée vers où il regarde.
+		const int pb = m.block & 1023, dir = m.direction & 3;
+		const float cx = (float)(ox + (pb & 31) * cs) + cs * 0.5f, cy = (float)(oy + (pb >> 5) * cs) + cs * 0.5f;
+		const float fx = (float)kDx[dir], fy = (float)kDy[dir], sx = -fy, sy = fx;
+		auto side = [](float ax, float ay, float bx, float by, float px, float py) { return (bx - ax) * (py - ay) - (by - ay) * (px - ax); };
+		for (int pass = 0; pass < 2; pass++) {
+			const float g = pass ? 0.0f : 1.2f; // le contour sombre, puis la flèche
+			const float tx = cx + fx * (cs * 0.42f + g), ty = cy + fy * (cs * 0.42f + g);
+			const float lx = cx - fx * (cs * 0.34f + g) + sx * (cs * 0.36f + g), ly = cy - fy * (cs * 0.34f + g) + sy * (cs * 0.36f + g);
+			const float rx = cx - fx * (cs * 0.34f + g) - sx * (cs * 0.36f + g), ry = cy - fy * (cs * 0.34f + g) - sy * (cs * 0.36f + g);
+			for (int y = (int)(cy - cs); y <= (int)(cy + cs); y++)
+				for (int x = (int)(cx - cs); x <= (int)(cx + cs); x++) {
+					const float px = x + 0.5f, py = y + 0.5f;
+					const float e0 = side(tx, ty, lx, ly, px, py), e1 = side(lx, ly, rx, ry, px, py), e2 = side(rx, ry, tx, ty, px, py);
+					if ((e0 >= 0 && e1 >= 0 && e2 >= 0) || (e0 <= 0 && e1 <= 0 && e2 <= 0))
+						cv.rect(x, y, x + 1, y + 1, pass ? arrow : wall);
+				}
+		}
+	}
+	upload(c.tex, cv.px, kAtlasW, kAtlasH, "atlas");
+}
+
+void Ui::Impl::placeAtlas(UiPlacement *placement) {
+	const UiPlacement &p = placement[kPanelParty];
+	const float pw = (comp[kCompParty].w ? (float)comp[kCompParty].w : kSources[kPanelParty].w) * p.scale * 0.5f;
+	const float ph = (comp[kCompParty].h ? (float)comp[kCompParty].h : kSources[kPanelParty].h) * 1.2f * p.scale * 0.5f;
+	UiPlacement &a = placement[kPanelAtlas];
+	a.scale = clampf(p.scale * (0.0012f / 0.0034f), 0.0004f, 0.02f);
+	const float aw = kAtlasW * a.scale * 0.5f, ah = (atlasCollapsed ? kSpellTabH : kAtlasH) * a.scale * 0.5f;
+	const float dist = p.c >= 0.2f ? p.c : 1.0f;
+	a.c = dist;
+	a.a = wrapAngle(p.a - (pw + 0.03f + aw) / dist);
+	a.b = clampf(p.b + (ph - ah) / dist, -1.35f, 1.35f);
 }
 
 // Boutons de la fenêtre du choix de la vue, en pixels de son image (même taille que l'aide).
@@ -931,13 +1113,14 @@ void Ui::Impl::renderMenu() {
 	cv.gcenter(latin1(tr(L, "VR controls", "Réglages VR", "VR-Optionen")), 0, kMenuW, (kMenuRowH - th) / 2 + 2, 2, kWhite);
 	for (int r = 1; r < kMenuRows; r++) {
 		const int i = menuItem(r), y0 = r * kMenuRowH, by0 = y0 + 5, by1 = y0 + kMenuRowH - 5, ty = (by0 + by1 - th) / 2;
-		if (i <= 2) {
-			const std::string n = latin1(names[i - 1]), v = latin1(values[i - 1]);
+		if (i <= 3) {
+			const std::string n = latin1(i == 3 ? "Atlas" : names[i - 1]);
+			const std::string v = latin1(i == 3 ? (atlasOn ? tr(L, "On", "Oui", "An") : tr(L, "Off", "Non", "Aus")) : values[i - 1]);
 			cv.gtext(n, split - 10 - Canvas::textW(n, Canvas::fit(n, split - 24, 2)), ty, Canvas::fit(n, split - 24, 2), kGold);
 			cv.bevel(split, by0, kMenuW - 12, by1, 2, true);
 			cv.gcenter(v, split, kMenuW - 12, ty, Canvas::fit(v, kMenuW - 24 - split, 2), kGold);
 		} else {
-			const std::string l = latin1(i == 3 ? tr(L, "Controller mapping", "Manettes et boutons", "Steuerung und Tasten") : tr(L, "Close", "Fermer", "Schließen"));
+			const std::string l = latin1(i == 4 ? tr(L, "Controller mapping", "Manettes et boutons", "Steuerung und Tasten") : tr(L, "Close", "Fermer", "Schließen"));
 			cv.bevel(12, by0, kMenuW - 12, by1, 2, true);
 			cv.gcenter(l, 12, kMenuW - 12, ty, 2, kGold);
 		}
@@ -1002,7 +1185,7 @@ Ui::~Ui() {
 }
 
 const char *Ui::panelKey(int id) {
-	static const char *names[kUiPanelCount] = {"groupe3", "inventaire", "sorts2", "clavier", "aide"};
+	static const char *names[kUiPanelCount] = {"groupe3", "inventaire", "sorts2", "atlas", "clavier", "aide"};
 	return id >= 0 && id < kUiPanelCount ? names[id] : "";
 }
 
@@ -1059,6 +1242,24 @@ void Ui::setSpellsCollapsed(bool collapsed) {
 	if (collapsed != d->spellsCollapsed) {
 		d->spellsCollapsed = collapsed;
 		d->comp[kCompSpells].key = -1;
+	}
+}
+
+bool Ui::atlasCollapsed() const {
+	return d->atlasCollapsed;
+}
+
+void Ui::setAtlasCollapsed(bool collapsed) {
+	if (collapsed != d->atlasCollapsed) {
+		d->atlasCollapsed = collapsed;
+		d->atlasKey = -1;
+	}
+}
+
+void Ui::setAtlasOption(bool on) {
+	if (on != d->atlasOn) {
+		d->atlasOn = on;
+		d->menuDirty = true;
 	}
 }
 
@@ -1150,6 +1351,7 @@ bool Ui::loadGameFont(const std::string &gameDir) {
 			if (readPakEntry(p, name, data) && g_font.parse(std::move(data))) {
 				d->kbDirty = d->helpDirty = d->menuDirty = d->hintDirty = d->chooserDirty = true;
 				d->comp[kCompSpells].key = -1;
+				d->atlasKey = -1;
 				return true;
 			}
 		}
@@ -1181,7 +1383,7 @@ void Ui::resetLayout(const UiFrameInput &in) {
 	auto srcW = [&](int id) { int c = d->compOf(id); return c >= 0 && d->comp[c].w ? (float)d->comp[c].w : kSources[id].w; };
 	auto srcH = [&](int id) { int c = d->compOf(id); return c >= 0 && d->comp[c].h ? (float)d->comp[c].h : kSources[id].h; };
 	auto halfW = [&](int id, float scale) { return srcW(id) * scale * 0.5f; };
-	auto halfH = [&](int id, float scale) { return srcH(id) * 1.2f * scale * 0.5f; };
+	auto halfH = [&](int id, float scale) { return srcH(id) * pixelAspect(id) * scale * 0.5f; };
 
 	// À gauche : le parchemin des sorts et les messages (pixels doublés dans la fenêtre recomposée).
 	// Le bas de la fenêtre (les messages) est à la hauteur où il serait, livre de sorts ouvert, sous
@@ -1194,6 +1396,8 @@ void Ui::resetLayout(const UiFrameInput &in) {
 	// Dessous : l'inventaire.
 	const float sRow = 0.0026f;
 	set(kPanelInventory, 0.0f, bottom - frame - 0.045f - halfH(kPanelInventory, sRow), sRow);
+	// À droite des personnages : l'atlas.
+	d->placeAtlas(placement);
 
 	// Le clavier vient se poser devant soi, par-dessus le reste.
 	Vec3 v = in.basePos - in.anchorPos;
@@ -1255,6 +1459,13 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 		d->compose(kCompParty, in);
 	if (visible[kPanelSpells])
 		d->compose(kCompSpells, in);
+	// L'atlas : quand le groupe a la carte (et le réglage le montre).
+	visible[kPanelAtlas] = placed && in.split && in.atlasOn && in.map && in.map->available && in.map->flags && in.map->cls && in.map->walls;
+	if (visible[kPanelAtlas]) {
+		if (placement[kPanelAtlas].c < 0.19f) // (une disposition d'avant l'atlas)
+			d->placeAtlas(placement);
+		d->composeAtlas(in);
+	}
 	visible[kPanelKeyboard] = placed && in.keyboardOpen;
 	visible[kPanelHelp] = placed && (in.helpOpen || in.chooserOpen);
 	d->chooserHot = -1;
@@ -1457,6 +1668,7 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 	}
 
 	bool tabHot = false; // le doigt est sur le bandeau du livre de sorts
+	bool atlasHot = false; // … ou sur celui de l'atlas
 	// --- 3. Que vise le doigt ? ---
 	enum { kHitNone, kHitHandle, kHitPanel, kHitScreen, kHitCorner, kHitWrist };
 	int hitKind = kHitNone, hitIndex = -1;
@@ -1665,6 +1877,8 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 				} else if (row == 2) {
 					out.action = kUiActionCycleView;
 				} else if (row == 3) {
+					out.action = kUiActionToggleAtlas;
+				} else if (row == 4) {
 					out.action = kUiActionToggleHelp;
 					d->menuOpen = false;
 				} else {
@@ -1748,6 +1962,21 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 					out.clicked = true;
 					out.layoutChanged = true;
 				}
+			} else if (hitIndex == kPanelAtlas && v * (float)d->comp[kCompAtlas].h < (float)kSpellTabH) {
+				// Le bandeau de l'atlas : ouvrir ou replier la carte. Le haut de la fenêtre ne bouge pas.
+				atlasHot = true;
+				if (in.triggerPressed) {
+					Composite &c = d->comp[kCompAtlas];
+					const int oldH = c.h;
+					d->atlasCollapsed = !d->atlasCollapsed;
+					d->atlasKey = -1;
+					d->composeAtlas(in);
+					UiPlacement &pl = placement[kPanelAtlas];
+					float dh = (float)(c.h - oldH) * pixelAspect(kPanelAtlas) * pl.scale * 0.5f;
+					pl.b -= atan2f(dh, pl.c);
+					out.clicked = true;
+					out.layoutChanged = true;
+				}
 			} else if (d->compOf(hitIndex) >= 0) {
 				// Fenêtre recomposée : retrouver le morceau visé, et l'endroit du jeu qu'il montre.
 				const Composite &c = d->comp[d->compOf(hitIndex)];
@@ -1775,6 +2004,10 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 		}
 	}
 
+	if (atlasHot != d->atlasTabHot) {
+		d->atlasTabHot = atlasHot;
+		d->atlasKey = -1;
+	}
 	if (tabHot != d->spellTabHot) {
 		d->spellTabHot = tabHot;
 		d->comp[kCompSpells].key = -1;

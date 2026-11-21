@@ -19,6 +19,7 @@
 #include "dungeon.h"
 #include "dungeon_data.h"
 #include "libretro.h"
+#include "ui.h"
 
 using namespace lolvr;
 
@@ -248,6 +249,57 @@ int main(int argc, char **argv) {
 				if (getenv("LOLVR_MURS")) // les types de mur de chaque case (N E S O)
 					for (int b = 0; b < 1024; b++)
 						printf("    murs %d (%d,%d) : %d %d %d %d\n", b, b & 31, b >> 5, m.walls[b * 4], m.walls[b * 4 + 1], m.walls[b * 4 + 2], m.walls[b * 4 + 3]);
+			}
+		} else if (op == "atlas") {
+			// atlas NOM [replie] : la fenêtre de l'atlas, comme dans le casque (image NOM.ppm)
+			std::string name, fold;
+			cs >> name >> fold;
+			LevelSnapshot m;
+			if (host.levelSnapshot(m)) {
+				static Ui ui;
+				static bool fontLoaded = false;
+				if (!fontLoaded) {
+					fontLoaded = true;
+					ui.initGl(false);
+					ui.loadGameFont(argv[3]);
+				}
+				ui.setAtlasCollapsed(fold == "replie");
+				UiMap map;
+				map.serial = m.map.serial * 4096u + (uint32_t)m.block * 4 + (uint32_t)m.direction;
+				map.available = m.map.available;
+				map.block = m.block;
+				map.direction = m.direction;
+				map.flags = m.map.flags;
+				map.cls = m.map.cls;
+				map.walls = m.walls;
+				map.title = m.map.title;
+				for (const MapSnapshot::Legend &e : m.map.legend) {
+					UiMap::Mark k;
+					k.trigger = e.trigger;
+					k.mark = e.mark;
+					k.text = e.text;
+					map.legend.push_back(k);
+				}
+				UiFrameInput in;
+				in.split = true;
+				in.atlasOn = true;
+				in.map = &map;
+				in.screenPos = in.basePos;
+				ui.resetLayout(in);
+				const std::string dir = out;
+				setenv("LOLVR_UI_DUMP", dir.c_str(), 1);
+				UiFrameOutput o;
+				SceneState ss;
+				ui.update(in, o, ss);
+				unsetenv("LOLVR_UI_DUMP");
+				char nm[512];
+				snprintf(nm, sizeof(nm), "%s/atlas.ppm", dir.c_str());
+				const std::string dst = out + "/" + name + ".ppm";
+				rename(nm, dst.c_str());
+				int seen = 0;
+				for (int b = 0; b < 1024; b++)
+					seen += (m.map.flags[b] & 7) == 7;
+				printf("  atlas : carte %s, %d cases vues, %d lieux, titre \"%s\"\n", m.map.available ? "oui" : "non", seen, (int)m.map.legend.size(), m.map.title.c_str());
 			}
 		} else if (op == "lang") {
 			int l = 0;

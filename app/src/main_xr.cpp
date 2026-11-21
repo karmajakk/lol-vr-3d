@@ -604,6 +604,12 @@ struct App {
 	bool zoomDown = false, zoomUsed = false;
 	double zoomSince = 0;
 	bool settingsDirty = false;
+	// L'atlas : sa fenêtre (réglage « Atlas » du menu VR), et la carte montrée (refaite quand la carte,
+	// les murs ou la place du groupe changent).
+	bool atlasOn = true;
+	lolvr::UiMap atlasMap;
+	uint32_t atlasMapSerial = 0, atlasWallsSerial = 0;
+	int atlasBlock = -1, atlasDir = -1;
 	int spellsSeen = -1, spellsLevel = 0; // sorts du parchemin vus au dernier coup d'œil, et dans quel niveau
 
 	// Jeu
@@ -1185,6 +1191,12 @@ void loadSettings(App &app, int &environment) {
 		} else if (!strcmp(name, "livresorts")) {
 			if (sscanf(rest, "%d", &iv) == 1)
 				app.ui.setSpellsCollapsed(iv != 0);
+		} else if (!strcmp(name, "atlas")) {
+			if (sscanf(rest, "%d", &iv) == 1)
+				app.atlasOn = iv != 0;
+		} else if (!strcmp(name, "atlasreplie")) {
+			if (sscanf(rest, "%d", &iv) == 1)
+				app.ui.setAtlasCollapsed(iv != 0);
 		} else if (!strcmp(name, "rappelvue")) {
 			if (sscanf(rest, "%d", &iv) == 1)
 				app.viewNotices = iv & 3;
@@ -1220,7 +1232,8 @@ void loadSettings(App &app, int &environment) {
 	}
 	fclose(f);
 	// La disposition n'est reprise que si elle est complète (sinon : disposition d'origine).
-	const int needed = (1 << lolvr::kUiPanelCount) - 1 - (1 << lolvr::kPanelHelp);
+	// (l'atlas, venu plus tard, se place à côté des personnages s'il manque)
+	const int needed = (1 << lolvr::kUiPanelCount) - 1 - (1 << lolvr::kPanelHelp) - (1 << lolvr::kPanelAtlas);
 	if (!(loadedPanels & (1 << lolvr::kPanelHelp)))
 		app.ui.placement[lolvr::kPanelHelp] = lolvr::Ui::defaultHelpPlacement(0.0f);
 	app.layoutLoaded = (loadedPanels & needed) == needed;
@@ -1245,6 +1258,8 @@ void saveSettings(App &app) {
 	fprintf(f, "choixvue %d\n", app.viewChosen ? 1 : 0);
 	fprintf(f, "rappelvue %d\n", app.viewNotices);
 	fprintf(f, "livresorts %d\n", app.ui.spellsCollapsed() ? 1 : 0);
+	fprintf(f, "atlas %d\n", app.atlasOn ? 1 : 0);
+	fprintf(f, "atlasreplie %d\n", app.ui.atlasCollapsed() ? 1 : 0);
 	for (int i = 0; i < kEnvCount; i++)
 		fprintf(f, "visee %d %.4f %.4f\n", app.aimSaved[i] ? 1 : 0, app.aimYaw[i], app.aimPitch[i]);
 	if (app.ui.hasLayout())
@@ -2067,6 +2082,35 @@ void updateUi(App &app, XrTime time, float dt, double now, bool pointer, bool tr
 	}
 	app.ui.setOptions(app.fireOn, app.detached);
 	app.ui.setDungeonOption(app.dungeonMode);
+	app.ui.setAtlasOption(app.atlasOn);
+	{
+		const lolvr::LevelSnapshot &l = app.level;
+		lolvr::UiMap &m = app.atlasMap;
+		if (l.map.serial != app.atlasMapSerial || l.wallsSerial != app.atlasWallsSerial || l.block != app.atlasBlock || l.direction != app.atlasDir) {
+			app.atlasMapSerial = l.map.serial;
+			app.atlasWallsSerial = l.wallsSerial;
+			app.atlasBlock = l.block;
+			app.atlasDir = l.direction;
+			m.serial++;
+			m.available = l.map.available && l.level > 0 && l.map.serial != 0;
+			m.block = l.block;
+			m.direction = l.direction;
+			m.flags = l.map.flags;
+			m.cls = l.map.cls;
+			m.walls = l.walls;
+			m.title = l.map.title;
+			m.legend.clear();
+			for (const lolvr::MapSnapshot::Legend &e : l.map.legend) {
+				lolvr::UiMap::Mark k;
+				k.trigger = e.trigger;
+				k.mark = e.mark;
+				k.text = e.text;
+				m.legend.push_back(k);
+			}
+		}
+		in.atlasOn = app.atlasOn && app.inDungeon;
+		in.map = &app.atlasMap;
+	}
 	app.ui.setVrState(vrModeOf(app), classicViewOf(app));
 	app.ui.setLanguage(app.language);
 	// Menu du poignet : sur la main gauche, quand on la regarde.
@@ -2152,6 +2196,10 @@ void updateUi(App &app, XrTime time, float dt, double now, bool pointer, bool tr
 			pl.scale *= dist / 1.05f;
 			app.ui.placement[lolvr::kPanelHelp] = pl;
 		}
+		break;
+	case lolvr::kUiActionToggleAtlas:
+		app.atlasOn = !app.atlasOn;
+		app.settingsDirty = true;
 		break;
 	case lolvr::kUiActionCloseHelp:
 		app.helpOpen = false;

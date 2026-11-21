@@ -6,7 +6,8 @@ While exploring, the game interface is spread over windows you place wherever yo
 
 - on the left, the spell scroll, with the message line joined under it; the strip at its top ("Spellbook +/-") folds it away, leaving only the message line, and opens it again to change the spell;
 - on the right, the characters one under the other, the atlas column (lamp, purse) to their right, and the rest button under the purse, all in one window (the options button, the floppy, is on your left wrist);
-- below, the inventory.
+- below, the inventory;
+- further right, once the party has the map, the **Atlas**: the map of the level as you explore it, updated at every step (your arrow, the walls, doors in red, named places with a colored diamond and their name underneath). Its strip ("Atlas +/-") folds it to the strip alone; "Atlas" in VR controls hides it altogether.
 
 At first they sit around the screen: the pointer moves from one to the other with no offset, so you can pick up an item on the floor and drop it into the inventory. If you aim just beside a window, the pointer snaps to the nearest one.
 

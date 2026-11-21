@@ -63,6 +63,22 @@ struct LevelSprite {
 	int flightDir = 0;         // sa direction (0 nord .. 3 ouest)
 };
 
+// L'atlas tel que le groupe l'a exploré (patches/0003) : drapeaux de chaque case (bits 0-2 : vue),
+// classe de carte de chaque type de mur (0xC0 plein, 5 bits bas : un symbole, 0x1F aucun), titre
+// et légende (textes dans la page de code du jeu).
+struct MapSnapshot {
+	uint32_t serial = 0;
+	bool available = false; // le groupe a la carte
+	uint8_t flags[1024] = {};
+	uint8_t cls[256] = {};
+	std::string title;
+	struct Legend {
+		int trigger = 0, mark = 0xFFFF, symbol = 0;
+		std::string text;
+	};
+	std::vector<Legend> legend;
+};
+
 // Le niveau en cours, pour le donjon en 3D (patches/0003). Les gros tableaux ne sont recopiés que
 // quand gfxSerial change (changement de niveau), les murs quand wallsSerial change (portes).
 struct LevelSnapshot {
@@ -86,6 +102,7 @@ struct LevelSnapshot {
 	// entre dans leur image sur un mur : 176 x 120 en RVB, une par type de mur (placeTypes).
 	bool scenePicture = false; // une scène montre sa propre image (boutique, personnage), pas le donjon
 	int spellCount = 0;        // les sorts du parchemin
+	MapSnapshot map;           // l'atlas
 	uint32_t sceneRect = 0;    // où la scène se montre : x | y << 9 | l << 16 | h << 25 (0 : la vue)
 	uint32_t placeSerial = 0;
 	std::vector<int> placeTypes;

@@ -6,6 +6,7 @@
 #include <stdint.h>
 
 #include <string>
+#include <vector>
 
 #include "scene.h"
 
@@ -15,6 +16,7 @@ enum UiPanelId {
 	kPanelParty = 0, // à droite : les personnages, l'atlas (lampe, bourse), dessous les options et le repos
 	kPanelInventory, // rangée d'objets
 	kPanelSpells,    // à gauche : parchemin des sorts, et dessous les lignes de messages
+	kPanelAtlas,     // l'atlas : la carte du niveau, à jour à chaque pas (repliable)
 	kPanelKeyboard,  // clavier et options
 	kPanelHelp,      // aide : les manettes et les boutons
 	kUiPanelCount
@@ -30,11 +32,27 @@ struct UiPlacement {
 const float kSplitViewHeight = 0.54f;
 const float kSplitViewLift = 0.16f;
 
-enum UiAction { kUiActionNone = 0, kUiActionToggleFire, kUiActionToggleDetach, kUiActionResetLayout, kUiActionCloseKeyboard, kUiActionToggleHelp, kUiActionCloseHelp, kUiActionToggleLanguage, kUiActionToggleKeyboard, kUiActionToggleDungeon, kUiActionToggleScreenAlways, kUiActionChooseClassic, kUiActionChooseImmersive, kUiActionGameMenu, kUiActionCycleView, kUiActionChooseLanguage };
+enum UiAction { kUiActionNone = 0, kUiActionToggleFire, kUiActionToggleDetach, kUiActionResetLayout, kUiActionCloseKeyboard, kUiActionToggleHelp, kUiActionCloseHelp, kUiActionToggleLanguage, kUiActionToggleKeyboard, kUiActionToggleDungeon, kUiActionToggleScreenAlways, kUiActionChooseClassic, kUiActionChooseImmersive, kUiActionGameMenu, kUiActionCycleView, kUiActionChooseLanguage, kUiActionToggleAtlas };
 
 enum UiLanguage { kLangEnglish = 0, kLangFrench = 1, kLangGerman = 2 };
 
 const unsigned kUiModShift = 1;
+
+// L'atlas du niveau, tel que le groupe l'a exploré (pour la fenêtre de la carte).
+struct UiMap {
+	uint32_t serial = 0;       // change avec la carte, les murs ou la place du groupe
+	bool available = false;    // le groupe a la carte
+	int block = 0, direction = 0;
+	const uint8_t *flags = nullptr; // 1024 cases : bits 0-2 posés = case vue
+	const uint8_t *cls = nullptr;   // 256 types de mur : 0xC0 plein, 5 bits bas un symbole (0x1F aucun)
+	const uint8_t *walls = nullptr; // 1024 x 4 : le mur de chaque côté (N, E, S, O) de chaque case
+	std::string title;              // le nom du niveau (page de code du jeu)
+	struct Mark {
+		int trigger = 0, mark = 0xFFFF;
+		std::string text;
+	};
+	std::vector<Mark> legend;       // les lieux nommés : affichés quand leur case a été vue
+};
 
 struct UiFrameInput {
 	float dt = 0.016f;
@@ -96,6 +114,9 @@ struct UiFrameInput {
 	bool gearHint = false;
 	// Le grand écran est caché (donjon 3D : il n'apparaît que lorsqu'on en a besoin).
 	bool screenHidden = false;
+	// L'atlas : sa fenêtre est montrée (réglage) et la carte (nulle : pas de fenêtre).
+	bool atlasOn = false;
+	const UiMap *map = nullptr;
 	double time = 0.0;
 
 };
@@ -158,6 +179,10 @@ public:
 	// Livre de sorts replié (le bandeau et les messages seulement) ou ouvert.
 	bool spellsCollapsed() const;
 	void setSpellsCollapsed(bool collapsed);
+	// L'atlas : la fenêtre repliée (le bandeau seul) ou ouverte ; le réglage montré dans le menu VR.
+	bool atlasCollapsed() const;
+	void setAtlasCollapsed(bool collapsed);
+	void setAtlasOption(bool on);
 	bool hasLayout() const { return placed; }
 	void setHasLayout(bool v) { placed = v; }
 

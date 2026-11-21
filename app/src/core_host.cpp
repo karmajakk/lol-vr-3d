@@ -111,6 +111,14 @@ struct LolvrLevelData {
 	int32_t scenePicture;
 	uint32_t sceneRect;
 	int32_t spellCount;
+	uint32_t mapSerial;
+	int32_t mapAvailable;
+	uint8_t mapFlags[1024];
+	const uint8_t *mapClass;
+	char mapTitle[40];
+	int32_t mapLegendCount;
+	uint16_t mapLegend[32][3];
+	char mapLegendText[32][40];
 };
 const LolvrLevelData *retro_lolvr_level(void);
 }
@@ -414,6 +422,27 @@ void copyLevel() {
 	l.scenePicture = s->scenePicture != 0;
 	l.sceneRect = s->sceneRect;
 	l.spellCount = s->spellCount;
+	// L'atlas tel que le groupe l'a exploré (fenêtre de la carte)
+	if (l.map.serial != s->mapSerial) {
+		MapSnapshot &m = l.map;
+		m.serial = s->mapSerial;
+		m.available = s->mapAvailable != 0;
+		memcpy(m.flags, s->mapFlags, sizeof(m.flags));
+		if (s->mapClass)
+			memcpy(m.cls, s->mapClass, sizeof(m.cls));
+		else
+			memset(m.cls, 0x1F, sizeof(m.cls));
+		m.title.assign(s->mapTitle, strnlen(s->mapTitle, sizeof(s->mapTitle)));
+		m.legend.clear();
+		for (int i = 0; i < s->mapLegendCount && i < 32; i++) {
+			MapSnapshot::Legend e;
+			e.trigger = s->mapLegend[i][0];
+			e.mark = s->mapLegend[i][1];
+			e.symbol = s->mapLegend[i][2];
+			e.text.assign(s->mapLegendText[i], strnlen(s->mapLegendText[i], 40));
+			m.legend.push_back(e);
+		}
+	}
 	l.magicMenu = s->magicMenu;
 	l.magicLevels = s->magicLevels;
 	// Les images des lieux (176 x 120, RVB), à poser sur leur mur
@@ -746,6 +775,8 @@ bool CoreHost::levelSnapshot(LevelSnapshot &out) const {
 	out.scenePicture = l.scenePicture;
 	out.sceneRect = l.sceneRect;
 	out.spellCount = l.spellCount;
+	if (out.map.serial != l.map.serial)
+		out.map = l.map;
 	out.magicMenu = l.magicMenu;
 	out.magicLevels = l.magicLevels;
 	if (out.placeSerial != l.placeSerial) {

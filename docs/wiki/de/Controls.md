@@ -14,7 +14,7 @@
 | Y | Karte |
 | **X** | **Rechtsklick**, wohin du zielst: Trank trinken, Gegenstand benutzen (wie der Griff) |
 | Menütaste (linker Controller) | ScummVM-Menü: speichern, laden, beenden |
-| **Diskette am linken Handgelenk** | Das Spielmenü (laden, speichern, Sprache …), und darin „VR-Optionen“: VR-Modus, Ansicht, Steuerung und Tasten |
+| **Diskette am linken Handgelenk** | Das Spielmenü (laden, speichern, Sprache …), und darin „VR-Optionen“: VR-Modus, Ansicht, Atlas, Steuerung und Tasten |
 | Rechten Stick klicken | Bildschirm, Raum und Fenster vor dir neu ausrichten. Bei offenen Zauberstufen: nächste Stufe |
 | Linken Stick kurz klicken (L3) | Klassisch und Mixed Reality: nächste Ansicht (Großbild → Fenster → 486er-PC) |
 | Linken Stick gedrückt halten + rechter Stick | Auf/ab: Bildschirmgröße; links/rechts: Abstand |
@@ -27,6 +27,7 @@ Unten in diesem Menü, links von „Resume game“, öffnet **VR-Optionen** die 
 
 - **VR-Modus**: **Immersiv** (du gehst durch den in 3D nachgebauten Dungeon, siehe [Immersiver Modus](Immersive-mode.md)), **Klassisch** (das Spiel in einer mittelalterlichen Bibliothek) oder **Mixed Reality** (das Spiel in deinem echten Zimmer). Wenn du zum ersten Mal Klassisch oder Mixed Reality wählst, erinnert dich ein Hinweis daran, dass L3 die Ansicht wechselt.
 - In Klassisch und Mixed Reality **Ansicht (L3)**: **Großbild** (das ganze Spielbild, wie im Originalspiel), **Fenster** (die Fenster der Oberfläche schweben jedes für sich) oder **486er-PC** (das Spiel auf einem gewölbten 90er-Jahre-Monitor auf einem 486er-PC). Ein kurzer Klick auf den linken Stick macht dasselbe.
+- **Atlas**: **An** oder **Aus**, das Fenster mit der Live-Karte (siehe [Losgelöste Oberfläche](Detached-interface.md)).
 - **Steuerung und Tasten**: ein Feld, das alle Tasten zusammenfasst, über dem Spielbildschirm. Klicke auf das Feld, um es zu schließen.
 - **Schließen**.
 

@@ -14,7 +14,7 @@ echo "built $BIN/scene_test"
 if [ -f "$CORE" ]; then
 	g++ -std=c++17 -O1 -Wall -Wno-missing-field-initializers -Iapp/src $GL_INCLUDES \
 		-I"$LIBRETRO/deps/libretro-common/include" \
-		app/test/e2e_test.cpp app/src/core_host.cpp app/src/dungeon.cpp app/src/dungeon_data.cpp \
+		app/test/e2e_test.cpp app/src/core_host.cpp app/src/dungeon.cpp app/src/dungeon_data.cpp app/src/ui.cpp app/src/room.cpp app/src/props.cpp app/src/mesh.cpp app/src/proctex.cpp \
 		-o "$BIN/e2e_test" "$CORE" $GLLIBS -lpthread -Wl,-rpath,"$LIBRETRO"
 	echo "built $BIN/e2e_test"
 else

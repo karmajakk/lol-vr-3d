@@ -34,7 +34,7 @@ letter), `click U V [S]` and `rclick U V [S]` (fractions of the 320 x 200 pictur
 release, 0.3 s by default), `lang N`, `shot NAME` (picture, game state, and the game's cursor when
 it changes), `dungeon NAME` (the 3D dungeon next to the game picture), `watch S` (objects in
 flight, step by step, for S seconds), `goto LEVEL BLOCK DIR` (move the party there),
-`carte` (print the map: `#` solid, `.` open, `@` the party), `dungeonat NAME BLOCK DIR [B FACE TYPE]`
+`carte` (print the map: `#` solid, `.` open, `@` the party), `atlas NAME [replie]` (the atlas window as the headset draws it, NAME.ppm), `dungeonat NAME BLOCK DIR [B FACE TYPE]`
 (the 3D dungeon seen from any block, optionally with one wall face set to another type),
 `sort N` (the party learns spell N, with the game's animation), `etat SECONDS [NAME]` (every change of the game state: view, scene, text box, block, direction;
 with NAME, a picture at each change).

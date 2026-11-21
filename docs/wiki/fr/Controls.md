@@ -14,7 +14,7 @@
 | Y | Carte |
 | **X** | **Clic droit** là où tu vises : boire une potion, utiliser un objet (comme la poignée) |
 | Bouton menu (manette gauche) | Menu de ScummVM : sauvegarder, charger, quitter |
-| **Disquette au poignet gauche** | Le menu du jeu (charger, sauvegarder, langue…), et dedans « Réglages VR » : mode VR, vue, manettes et boutons |
+| **Disquette au poignet gauche** | Le menu du jeu (charger, sauvegarder, langue…), et dedans « Réglages VR » : mode VR, vue, atlas, manettes et boutons |
 | Clic du joystick droit | Recentrer l'écran, la pièce et les fenêtres devant toi. Niveaux de sort ouverts : niveau suivant |
 | Clic court du joystick gauche (L3) | Classique et réalité mixte : vue suivante (grand écran → fenêtres → PC 486) |
 | Clic du joystick gauche tenu + joystick droit | Haut/bas : taille de l'écran ; gauche/droite : distance |
@@ -27,6 +27,7 @@ En bas de ce menu, à gauche de « Resume game », **Réglages VR** ouvre devant
 
 - **Mode VR** : **Immersif** (tu marches dans le donjon reconstruit en 3D, voir [Mode immersif](Immersive-mode.md)), **Classique** (le jeu dans une bibliothèque médiévale) ou **Réalité mixte** (le jeu dans ta vraie pièce). La première fois que tu choisis Classique ou Réalité mixte, une note te rappelle que L3 change la vue.
 - En Classique et en Réalité mixte, **Vue (L3)** : **Grand écran** (l'image entière du jeu, comme le jeu original), **Fenêtres** (les fenêtres de l'interface flottent chacune de leur côté) ou **PC 486** (le jeu sur un moniteur bombé des années 90 posé sur un PC 486). Un clic court sur le joystick gauche fait la même chose.
+- **Atlas** : **Oui** ou **Non**, la fenêtre de la carte en direct (voir [Interface détachée](Detached-interface.md)).
 - **Manettes et boutons** : un panneau qui résume tous les boutons, par-dessus l'écran du jeu. Clique sur le panneau pour le fermer.
 - **Fermer**.
 

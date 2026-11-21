@@ -3,6 +3,19 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.22.0] — Live atlas window
+
+- New **Atlas** window, to the right of the party once the party has the map: the map of the level
+  as you explore it, updated at every step — your arrow, the walls, doors in red, and the named
+  places of the game's atlas (a colored diamond on the map, the same before its name in the legend
+  underneath). No more opening the atlas to see where you are.
+- Its strip ("Atlas +/-") folds it like the spellbook; it has its own grab bar under it and can be
+  moved and resized like the other windows. A layout saved before this version keeps its windows:
+  the atlas takes its place beside the party.
+- "Atlas" On/Off in VR controls hides or shows it (remembered).
+- Patch 0003 publishes the explored blocks, the map classes of the walls, the level's map title
+  and its legend. Dev: `atlas NAME [replie]` in the bench writes the window as the headset draws it.
+
 ## [0.21.0] — Whole-game check of every fix, wide cutscenes, item cursor in classic view
 
 Every fix since 0.1 was checked again on levels 3 to 24 (doors closed, half open and open; empty

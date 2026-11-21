@@ -14,7 +14,7 @@
 | Y | Map |
 | **X** | **Right click** where you aim: drink a potion, use an item (same as the grip) |
 | Menu button (left controller) | ScummVM menu: save, load, quit |
-| **Floppy on the left wrist** | The game menu (load, save, language...), and in it "VR controls": VR mode, view, controller mapping |
+| **Floppy on the left wrist** | The game menu (load, save, language...), and in it "VR controls": VR mode, view, atlas, controller mapping |
 | Right stick click | Recenter the screen, the room and the windows in front of you. With the spell levels open: next level |
 | Short left stick click (L3) | Classic and mixed reality: next view (big screen → windows → 486 PC) |
 | Left stick click held + right stick | Up/down: screen size; left/right: distance |
@@ -27,6 +27,7 @@ At the bottom of that menu, left of "Resume game", **VR controls** opens the hea
 
 - **VR mode**: **Immersive** (you walk in the dungeon rebuilt in 3D, see [Immersive mode](Immersive-mode.md)), **Classic** (the game in a medieval library) or **Mixed reality** (the game in your real room). The first time you pick Classic or Mixed reality, a note reminds you that L3 changes the view.
 - In Classic and Mixed reality, **View (L3)**: **Big screen** (the whole game image, like the original game), **Windows** (the interface windows float on their own) or **486 PC** (the game on a curved 90s monitor standing on a 486 PC). A short click of the left stick does the same.
+- **Atlas**: **On** or **Off**, the live map window (see [Detached interface](Detached-interface.md)).
 - **Controller mapping**: shows a panel summing up every button, over the game screen. Click the panel to close it.
 - **Close**.
 
