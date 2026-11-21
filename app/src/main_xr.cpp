@@ -607,6 +607,7 @@ struct App {
 	// L'atlas : sa fenêtre (réglage « Atlas » du menu VR), et la carte montrée (refaite quand la carte,
 	// les murs ou la place du groupe changent).
 	bool atlasOn = true;
+	bool fnWasDown[lolvr::kFnCount] = {false}; // les fonctions des boutons à l'image précédente
 	lolvr::UiMap atlasMap;
 	uint32_t atlasMapSerial = 0, atlasWallsSerial = 0;
 	int atlasBlock = -1, atlasDir = -1;
@@ -1151,6 +1152,7 @@ void loadSettings(App &app, int &environment) {
 		return;
 	char line[256];
 	int screenIndex = 0, aimIndex = 0, loadedPanels = 0;
+	std::string activeProfile;
 	// La disposition (écran, fenêtres) n'est reprise que si elle a été enregistrée avec la disposition
 	// d'origine actuelle (« disposition 2 » : écran plus petit et plus proche, pour le donjon en 3D).
 	bool layoutCurrent = false;
@@ -1191,6 +1193,23 @@ void loadSettings(App &app, int &environment) {
 		} else if (!strcmp(name, "livresorts")) {
 			if (sscanf(rest, "%d", &iv) == 1)
 				app.ui.setSpellsCollapsed(iv != 0);
+		} else if (!strcmp(name, "profil")) {
+			// profil a b x y poignée L3 R3 nom : un profil de manettes du joueur
+			int v[lolvr::kSlotCount] = {0};
+			int used2 = 0;
+			if (sscanf(rest, "%d %d %d %d %d %d %d %n", &v[0], &v[1], &v[2], &v[3], &v[4], &v[5], &v[6], &used2) == 7) {
+				std::string nm(rest + used2);
+				while (!nm.empty() && (nm.back() == '\n' || nm.back() == '\r' || nm.back() == ' '))
+					nm.pop_back();
+				uint8_t fns[lolvr::kSlotCount];
+				for (int i = 0; i < lolvr::kSlotCount; i++)
+					fns[i] = (uint8_t)(v[i] >= 0 && v[i] < lolvr::kFnCount ? v[i] : 0);
+				app.ui.addProfile(nm, fns);
+			}
+		} else if (!strcmp(name, "profilactif")) {
+			activeProfile = rest;
+			while (!activeProfile.empty() && (activeProfile.back() == '\n' || activeProfile.back() == '\r' || activeProfile.back() == ' '))
+				activeProfile.pop_back();
 		} else if (!strcmp(name, "atlas")) {
 			if (sscanf(rest, "%d", &iv) == 1)
 				app.atlasOn = iv != 0;
@@ -1231,6 +1250,7 @@ void loadSettings(App &app, int &environment) {
 		}
 	}
 	fclose(f);
+	app.ui.selectProfile(activeProfile);
 	// La disposition n'est reprise que si elle est complète (sinon : disposition d'origine).
 	// (l'atlas, venu plus tard, se place à côté des personnages s'il manque)
 	const int needed = (1 << lolvr::kUiPanelCount) - 1 - (1 << lolvr::kPanelHelp) - (1 << lolvr::kPanelAtlas);
@@ -1259,6 +1279,7 @@ void saveSettings(App &app) {
 	fprintf(f, "rappelvue %d\n", app.viewNotices);
 	fprintf(f, "livresorts %d\n", app.ui.spellsCollapsed() ? 1 : 0);
 	fprintf(f, "atlas %d\n", app.atlasOn ? 1 : 0);
+	fputs(app.ui.profilesText().c_str(), f);
 	fprintf(f, "atlasreplie %d\n", app.ui.atlasCollapsed() ? 1 : 0);
 	for (int i = 0; i < kEnvCount; i++)
 		fprintf(f, "visee %d %.4f %.4f\n", app.aimSaved[i] ? 1 : 0, app.aimYaw[i], app.aimPitch[i]);
@@ -2198,6 +2219,10 @@ void updateUi(App &app, XrTime time, float dt, double now, bool pointer, bool tr
 			app.ui.placement[lolvr::kPanelHelp] = pl;
 		}
 		break;
+	case lolvr::kUiActionOpenKeyboard:
+		app.keyboardOpen = true;
+		app.keyboardAuto = false;
+		break;
 	case lolvr::kUiActionToggleAtlas:
 		app.atlasOn = !app.atlasOn;
 		app.settingsDirty = true;
@@ -2316,9 +2341,25 @@ void updateInput(App &app, XrTime time, float dt, double now) {
 	sync.activeActionSets = &active;
 	xrSyncActions(app.session, &sync);
 
-	// Clic du joystick droit : recentrer l'écran (et la pièce) devant soi.
-	// (menu de magie ouvert : R3 change de niveau de sort, voir les boutons)
-	const bool r3Raw = getBool(app, app.stickClickAction, kRight);
+	// Les boutons changeables : ce que fait chacun selon le profil de manettes (Réglages VR,
+	// Manettes et boutons). fnDown[f] : un bouton qui fait f est enfoncé.
+	bool fnDown[lolvr::kFnCount] = {false};
+	{
+		const uint8_t *map = app.ui.buttonMap();
+		const bool slot[lolvr::kSlotCount] = {getBool(app, app.aAction, -1), getBool(app, app.bAction, -1), getBool(app, app.xAction, -1),
+		                                      getBool(app, app.yAction, -1), app.squeezeDown[app.activeHand],
+		                                      getBool(app, app.stickClickAction, kLeft), getBool(app, app.stickClickAction, kRight)};
+		for (int i = 0; i < lolvr::kSlotCount; i++)
+			if (slot[i] && map[i] < lolvr::kFnCount)
+				fnDown[map[i]] = true;
+	}
+	bool fnPressed[lolvr::kFnCount];
+	for (int i = 0; i < lolvr::kFnCount; i++) {
+		fnPressed[i] = fnDown[i] && !app.fnWasDown[i];
+		app.fnWasDown[i] = fnDown[i];
+	}
+	// Recentrer : l'écran (et la pièce) devant soi (menu de magie ouvert : niveau de sort suivant).
+	const bool r3Raw = fnDown[lolvr::kFnRecenter];
 	bool recenter = r3Raw && app.level.magicMenu < 0;
 	if (app.headValid && recenter && !app.recenterDown) {
 		updateFloor(app, time);
@@ -2410,9 +2451,10 @@ void updateInput(App &app, XrTime time, float dt, double now) {
 	} else {
 		if (ui.pointerValid)
 			CoreHost::get().setPointer(ui.gu, ui.gv);
-		// Clic droit : la poignée de la main qui vise, ou le bouton X (boire une potion, utiliser un objet).
-		bool xRight = getBool(app, app.xAction, -1) && ui.pointerValid;
-		CoreHost::get().setMouseButtons(app.triggerDown[hand] && toGame, (app.squeezeDown[hand] && toGame) || xRight);
+		// Clic droit (boire une potion, utiliser un objet) : les boutons du profil qui le font
+		// (dans « Classique », X et la poignée de la main qui vise).
+		bool xRight = fnDown[lolvr::kFnRightClick] && ui.pointerValid && !ui.dragging;
+		CoreHost::get().setMouseButtons(app.triggerDown[hand] && toGame, xRight);
 		if (xRight && !app.keyboardButtonDown) {
 			app.clickPulse = 1.0f;
 			pulse(app, hand, 0.28f, 0.018f);
@@ -2426,7 +2468,7 @@ void updateInput(App &app, XrTime time, float dt, double now) {
 	float w = screenWidth(app);
 
 	// Joysticks : gauche = avancer/reculer/pas de côté, droit = tourner.
-	bool zoomMode = getBool(app, app.stickClickAction, kLeft);
+	bool zoomMode = fnDown[lolvr::kFnView];
 	bool stickBusy = zoomMode || ui.dragging; // le joystick droit règle l'écran ou un panneau
 	// Une seule direction à la fois : celle où le joystick penche le plus. La direction tenue garde
 	// l'avantage, pour qu'un pas un peu en biais ne change pas de direction en route.
@@ -2525,7 +2567,7 @@ void updateInput(App &app, XrTime time, float dt, double now) {
 	// Boutons
 	// A et B : dans le donjon, attaque et magie du personnage choisi (joystick droit haut/bas pour
 	// en changer) ; partout ailleurs (menus, cinématiques, carte, fiche), Entrée et Échap.
-	bool aDown = getBool(app, app.aAction, -1), bDown = getBool(app, app.bAction, -1);
+	bool aDown = fnDown[lolvr::kFnAttack], bDown = fnDown[lolvr::kFnMagic];
 	bool combat = app.inDungeon && app.characters > 0;
 	if (combat) {
 		if (aDown && !app.attackDown) {
@@ -2552,7 +2594,7 @@ void updateInput(App &app, XrTime time, float dt, double now) {
 			pulse(app, kRight, 0.25f, 0.03f);
 		}
 		// R3, menu ouvert : niveau suivant parmi ceux que le personnage peut lancer
-		const bool r3 = getBool(app, app.stickClickAction, kRight);
+		const bool r3 = fnDown[lolvr::kFnRecenter];
 		if (r3 && !app.r3Down && menu >= 0) {
 			const int n = app.level.magicLevels > 0 ? app.level.magicLevels : 1;
 			app.spellLevel = (app.spellLevel + 1) % n;
@@ -2560,8 +2602,8 @@ void updateInput(App &app, XrTime time, float dt, double now) {
 		}
 		app.r3Down = r3;
 		bool flick = !stickBusy && fabsf(right.y) > 0.75f && fabsf(right.x) < 0.40f;
-		if (flick && !app.charFlick) {
-			int step = right.y > 0 ? 1 : app.characters - 1;
+		if ((flick && !app.charFlick) || fnPressed[lolvr::kFnNextChar]) {
+			int step = !flick || right.y > 0 ? 1 : app.characters - 1;
 			app.selectedChar = (app.selectedChar + step) % app.characters;
 			pulse(app, kRight, 0.30f, 0.02f);
 		}
@@ -2571,9 +2613,17 @@ void updateInput(App &app, XrTime time, float dt, double now) {
 	}
 	app.attackDown = aDown;
 	app.magicDown = bDown;
-	setKey(app.kEnter, aDown && !combat, RETROK_RETURN);
-	setKey(app.kEsc, bDown && !combat, RETROK_ESCAPE);
-	setKey(app.kMap, getBool(app, app.yAction, -1), RETROK_m);
+	setKey(app.kEnter, (aDown && !combat) || fnDown[lolvr::kFnEnter], RETROK_RETURN);
+	setKey(app.kEsc, (bDown && !combat) || fnDown[lolvr::kFnEscape], RETROK_ESCAPE);
+	setKey(app.kMap, fnDown[lolvr::kFnMap], RETROK_m);
+	if (fnPressed[lolvr::kFnAtlas]) {
+		app.ui.setAtlasCollapsed(!app.ui.atlasCollapsed());
+		app.settingsDirty = true;
+	}
+	if (fnPressed[lolvr::kFnKeyboard]) {
+		app.keyboardOpen = !app.keyboardOpen;
+		app.keyboardAuto = false;
+	}
 	// X = clic droit (voir plus haut) ; le clavier s'ouvre depuis le menu du poignet. Bouton menu = menu ScummVM.
 	CoreHost::get().setSpecialButtons(false, getBool(app, app.menuAction, -1));
 	releaseTypedKeys(app, now, false);

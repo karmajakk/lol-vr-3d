@@ -66,6 +66,8 @@ jobs:
           fi
           echo "" >> notes.md
           echo "Installation: download \`lol-vr-3d.apk\` below and install it with SideQuest, over the previous version (saves are kept)." >> notes.md
+          echo "" >> notes.md
+          echo "Unofficial, non-commercial fan project, not affiliated with or endorsed by Electronic Arts, Westwood Studios or Virgin Interactive. No game files are included: you need your own legally obtained copy of Lands of Lore (CD or GOG)." >> notes.md
           gh release create "v${VERSION}" build/lol-vr-3d.apk --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" --title "Lands of Lore VR 3D ${VERSION}" --notes-file notes.md --latest
 
@@ -81,5 +83,7 @@ jobs:
             [ -s sync.md ] || continue
             echo "" >> sync.md
             echo "Installation: download \`lol-vr-3d.apk\` below and install it with SideQuest, over the previous version (saves are kept)." >> sync.md
+            echo "" >> sync.md
+            echo "Unofficial, non-commercial fan project, not affiliated with or endorsed by Electronic Arts, Westwood Studios or Virgin Interactive. No game files are included: you need your own legally obtained copy of Lands of Lore (CD or GOG)." >> sync.md
             gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --title "Lands of Lore VR 3D ${V}" --notes-file sync.md > /dev/null
           done

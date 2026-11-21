@@ -32,7 +32,26 @@ struct UiPlacement {
 const float kSplitViewHeight = 0.54f;
 const float kSplitViewLift = 0.16f;
 
-enum UiAction { kUiActionNone = 0, kUiActionToggleFire, kUiActionToggleDetach, kUiActionResetLayout, kUiActionCloseKeyboard, kUiActionToggleHelp, kUiActionCloseHelp, kUiActionToggleLanguage, kUiActionToggleKeyboard, kUiActionToggleDungeon, kUiActionToggleScreenAlways, kUiActionChooseClassic, kUiActionChooseImmersive, kUiActionGameMenu, kUiActionCycleView, kUiActionChooseLanguage, kUiActionToggleAtlas };
+enum UiAction { kUiActionNone = 0, kUiActionToggleFire, kUiActionToggleDetach, kUiActionResetLayout, kUiActionCloseKeyboard, kUiActionToggleHelp, kUiActionCloseHelp, kUiActionToggleLanguage, kUiActionToggleKeyboard, kUiActionToggleDungeon, kUiActionToggleScreenAlways, kUiActionChooseClassic, kUiActionChooseImmersive, kUiActionGameMenu, kUiActionCycleView, kUiActionChooseLanguage, kUiActionToggleAtlas, kUiActionOpenKeyboard };
+
+// Les boutons qu'on peut changer dans un profil de manettes, et ce que chacun peut faire. La gâchette,
+// les joysticks (marcher, tourner), le bouton menu et la disquette restent fixes.
+enum UiButtonSlot { kSlotA = 0, kSlotB, kSlotX, kSlotY, kSlotGrip, kSlotL3, kSlotR3, kSlotCount };
+enum UiButtonFn {
+	kFnNone = 0,
+	kFnAttack,     // attaquer (personnage encadré) ; hors combat : Entrée
+	kFnMagic,      // magie du personnage encadré ; hors combat : Échap
+	kFnRightClick, // clic droit (boire, utiliser)
+	kFnMap,        // la carte du jeu
+	kFnRecenter,   // recentrer ; menu de magie ouvert : niveau de sort suivant
+	kFnView,       // vue suivante ; maintenu : taille et distance de l'écran
+	kFnEnter,
+	kFnEscape,
+	kFnAtlas,      // replier ou ouvrir la fenêtre de l'atlas
+	kFnNextChar,   // personnage suivant
+	kFnKeyboard,   // ouvrir ou fermer le clavier
+	kFnCount
+};
 
 enum UiLanguage { kLangEnglish = 0, kLangFrench = 1, kLangGerman = 2 };
 
@@ -184,6 +203,13 @@ public:
 	bool atlasCollapsed() const;
 	void setAtlasCollapsed(bool collapsed);
 	void setAtlasOption(bool on);
+	// Profils de manettes : « Classique » (toujours là, intouchable) et ceux du joueur. buttonMap :
+	// ce que fait chaque bouton (UiButtonSlot -> UiButtonFn) en ce moment, changements en cours dans
+	// la fenêtre de modification compris.
+	const uint8_t *buttonMap() const;
+	void addProfile(const std::string &name, const uint8_t *fns);
+	void selectProfile(const std::string &name);
+	std::string profilesText() const; // lignes « profil … » et « profilactif … » des réglages
 	bool hasLayout() const { return placed; }
 	void setHasLayout(bool v) { placed = v; }
 

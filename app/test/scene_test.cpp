@@ -532,11 +532,42 @@ int main(int argc, char **argv) {
 			ui.update(in, o, tmp);
 			SceneState::Panel help = tmp.panels[3];
 			check(help.visible && help.texture != 0, "aide : le panneau est affiché");
-			aimAt(help.center);
-			in.triggerDown = in.triggerPressed = true;
+			// Un point de l'aide (pixels de son image 640 x 520)
+			auto helpAt = [&](float x, float y) {
+				return help.center + help.right * ((x / 640.0f * 2.0f - 1.0f) * help.halfW) + help.up * ((1.0f - y / 520.0f * 2.0f) * help.halfH);
+			};
+			auto clickAt = [&](Vec3 target) {
+				aimAt(target);
+				in.triggerDown = in.triggerPressed = true;
+				ui.update(in, o, tmp);
+				UiFrameOutput first = o;
+				in.triggerDown = in.triggerPressed = false;
+				ui.update(in, o, tmp);
+				return first;
+			};
+			check(clickAt(helpAt(320, 200)).action == kUiActionNone, "aide : un clic sur le texte ne la ferme pas");
+			// Modifier : la fenêtre des boutons
+			clickAt(helpAt(200, 486));
 			ui.update(in, o, tmp);
-			check(o.action == kUiActionCloseHelp && !o.buttonsToGame, "aide : un clic la ferme");
-			in.triggerDown = in.triggerPressed = false;
+			check(tmp.panels[3].texture != help.texture, "aide : Modifier ouvre la fenêtre des boutons");
+			const uint8_t before = ui.buttonMap()[kSlotY];
+			clickAt(helpAt(500, 100 + 3 * 40 + 20)); // la ligne de Y : la fonction suivante
+			check(ui.buttonMap()[kSlotY] == (before + 1) % kFnCount, "boutons : un clic change l'action de Y (aussitôt)");
+			UiFrameOutput sn = clickAt(helpAt(240, 458)); // Nouveau profil
+			check(sn.action == kUiActionOpenKeyboard, "boutons : Nouveau profil ouvre le clavier");
+			in.keyboardOpen = true;
+			ui.update(in, o, tmp);
+			press(0.5f, 2.5f); // q
+			UiFrameOutput enk = press(9.5f, 5.5f); // Entrée
+			check(enk.action == kUiActionCloseKeyboard && enk.keyCount == 0 && enk.layoutChanged, "boutons : le nom tapé, Entrée enregistre le profil");
+			in.keyboardOpen = false;
+			ui.update(in, o, tmp);
+			const std::string saved = ui.profilesText();
+			check(saved.find("profil ") != std::string::npos && saved.find(" q\n") != std::string::npos && saved.find("profilactif q") != std::string::npos, "boutons : le profil « q » est enregistré et choisi");
+			clickAt(helpAt(394, 458)); // Supprimer
+			check(ui.profilesText() == "profilactif \n" && ui.buttonMap()[kSlotY] == before, "boutons : Supprimer, retour à Classique");
+			clickAt(helpAt(550, 458)); // Retour
+			check(clickAt(helpAt(430, 486)).action == kUiActionCloseHelp, "aide : Fermer");
 			in.helpOpen = false;
 			// Premier lancement : la fenêtre du choix de la vue, deux boutons.
 			in.chooserOpen = true;
@@ -544,7 +575,7 @@ int main(int argc, char **argv) {
 			SceneState::Panel ch = tmp.panels[3];
 			check(ch.visible && ch.texture != 0 && ch.texture != help.texture, "choix de la vue : la fenêtre est affichée");
 			auto pressAt = [&](float px, float py) {
-				aimAt(ch.center + ch.right * ((px / 640.0f * 2.0f - 1.0f) * ch.halfW) + ch.up * ((1.0f - py / 520.0f * 2.0f) * ch.halfH));
+				aimAt(ch.center + ch.right * ((px / 640.0f * 2.0f - 1.0f) * ch.halfW) + ch.up * ((1.0f - py / 624.0f * 2.0f) * ch.halfH));
 				in.triggerDown = in.triggerPressed = true;
 				ui.update(in, o, tmp);
 				UiFrameOutput r = o;
@@ -604,8 +635,8 @@ int main(int argc, char **argv) {
 			SceneState::Panel m = tmp.panels[menu];
 			check(shown4 >= shown + 1 && m.center.z < in.headPos.z - 0.4f && fabsf(m.center.x - in.headPos.x) < 0.05f, "réglages VR : la fenêtre s'ouvre devant le joueur");
 			int rows = 6; // mode immersif : titre, mode VR, atlas, manettes, crédits, fermer
-			check(fabsf(m.halfH / m.halfW - (6.0f * 44.0f + 26.0f) / 360.0f) < 0.01f, "réglages VR : mode immersif, pas de ligne « écran du jeu »");
-			auto row = [&](int r) { return m.center + m.up * ((1.0f - 2.0f * (r + 0.5f) * 44.0f / (44.0f * rows + 26.0f)) * m.halfH); };
+			check(fabsf(m.halfH / m.halfW - (6.0f * 44.0f + 38.0f) / 360.0f) < 0.01f, "réglages VR : mode immersif, pas de ligne « écran du jeu »");
+			auto row = [&](int r) { return m.center + m.up * ((1.0f - 2.0f * (r + 0.5f) * 44.0f / (44.0f * rows + 38.0f)) * m.halfH); };
 			in.tip = in.headPos + Vec3{0.15f, -0.15f, 0.0f};
 			auto click = [&](int r) {
 				aimAt(row(r));
@@ -627,7 +658,7 @@ int main(int argc, char **argv) {
 			for (int i = 0; i < SceneState::kMaxPanels; i++)
 				if (tmp.panels[i].visible && tmp.panels[i].texW == 360) m = tmp.panels[i];
 			rows = 7;
-			check(fabsf(m.halfH / m.halfW - (7.0f * 44.0f + 26.0f) / 360.0f) < 0.01f, "réglages VR : vue classique, sept lignes");
+			check(fabsf(m.halfH / m.halfW - (7.0f * 44.0f + 38.0f) / 360.0f) < 0.01f, "réglages VR : vue classique, sept lignes");
 			check(click(2).action == kUiActionCycleView, "réglages VR : deuxième ligne, la vue (classique, réalité mixte)");
 			check(click(3).action == kUiActionToggleAtlas, "réglages VR : troisième ligne, l'atlas");
 			ui.openMenu();

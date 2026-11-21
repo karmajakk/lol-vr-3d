@@ -29,3 +29,5 @@ At first launch, a window asks which one you want; you can switch at any time fr
 - [Latest version](https://github.com/karmajakk/lol-vr-3d/releases/latest)
 
 The project is in development (0.x versions). It is mostly checked on a PC, and its behavior in the headset evolves with test feedback. The classic view was first developed on its own in the `lol-vr` project (versions 0.1.0 to 0.12.0, history kept here; its changelog is in [docs/lol-vr-CHANGELOG.md](../lol-vr-CHANGELOG.md)).
+
+*Unofficial, non-commercial fan project, not affiliated with or endorsed by Electronic Arts, Westwood Studios or Virgin Interactive. No game files are included: you need your own legally obtained copy (CD or GOG).*

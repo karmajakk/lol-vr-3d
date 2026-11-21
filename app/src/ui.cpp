@@ -36,9 +36,9 @@ struct Source {
 // Clavier : grille de 11 colonnes sur 6 rangées.
 const int kCellW = 46, kCellH = 40, kCols = 11, kRows = 6;
 // Menu du poignet : engrenage et petit menu
-const int kGearSize = 64, kHintW = 440, kHintH = 84, kMenuW = 360, kMenuRowH = 44, kMenuMaxRows = 7, kMenuFootH = 26;
+const int kGearSize = 64, kHintW = 440, kHintH = 84, kMenuW = 360, kMenuRowH = 44, kMenuMaxRows = 7, kMenuFootH = 38;
 // Panneau d'aide
-const int kHelpW = 640, kHelpH = 520, kChooserH = 590; // (le choix du premier lancement : un peu plus haut, pour les crédits)
+const int kHelpW = 640, kHelpH = 520, kChooserH = 624; // (le choix du premier lancement : un peu plus haut, pour les crédits)
 const int kInfoH = 0; // (plus de lignes d'information sous les touches)
 const int kKbW = kCellW * kCols, kKbH = kCellH * kRows + kInfoH;
 
@@ -331,6 +331,27 @@ struct Ui::Impl {
 	bool hintPlaced = false;
 	Vec3 hintPos = {0, 0, 0};
 	void renderHelp();
+	// Profils de manettes
+	struct Profile {
+		std::string name; // vide : « Classique »
+		uint8_t fn[kSlotCount];
+	};
+	std::vector<Profile> profiles;
+	int activeProfile = 0;
+	uint8_t draft[kSlotCount] = {0};
+	bool draftChanged() const { return memcmp(draft, profiles[activeProfile].fn, kSlotCount) != 0; }
+	void selectProfileIndex(int i) {
+		activeProfile = i;
+		memcpy(draft, profiles[i].fn, kSlotCount);
+		helpDirty = editDirty = true;
+	}
+	int helpMode = 0; // 0 l'aide, 1 la fenêtre de modification
+	bool helpWasOpen = false, naming = false, namingKbSeen = false;
+	std::string nameText;
+	int helpHot = -1, editHot = -1;
+	GLuint editTex = 0;
+	bool editDirty = true;
+	void renderEditor();
 	void renderChooser();
 	void renderGear();
 	void renderMenu();
@@ -737,6 +758,13 @@ static void drawFlag(Canvas &cv, int lang, int x0, int y0, int w, int h) {
 
 // Crédits et prérequis : sur quoi le mod repose, et merci.
 static const char *creditsTitle(int lang) { return tr(lang, "Credits & Requirements", "Crédits et prérequis", "Credits & Voraussetzungen"); }
+// Mentions légales : projet de fan, sans lien avec les ayants droit, fichiers du jeu à fournir.
+static const char *legalTitle(int lang) { return tr(lang, "Legal Notice", "Mentions légales", "Rechtlicher Hinweis"); }
+static const char *requirementsText(int lang) {
+	return tr(lang, "Unofficial, non-commercial fan project. Not affiliated with or endorsed by Electronic Arts, Westwood Studios, or Virgin Interactive. Requires legally obtained original game files (e.g., GOG release) to play.",
+	          "Projet de fan non officiel et non commercial. Non affilié à ou approuvé par Electronic Arts, Westwood Studios ou Virgin Interactive. Nécessite les fichiers originaux du jeu obtenus légalement (ex. version GOG).",
+	          "Inoffizielles, nicht kommerzielles Fanprojekt. Nicht mit Electronic Arts, Westwood Studios oder Virgin Interactive verbunden oder von ihnen unterstützt. Erfordert legal erworbene Originalspieldateien (z. B. die GOG-Version).");
+}
 static const char *creditsText(int lang) {
 	return tr(lang, "This VR mod runs on ScummVM and was made possible thanks to the hard work of KForestland (lands-of-lore-1-re).",
 	          "Ce mod VR fonctionne avec ScummVM et a été rendu possible grâce au travail acharné de KForestland (lands-of-lore-1-re).",
@@ -795,160 +823,208 @@ void Ui::Impl::renderChooser() {
 		cv.gcenter(l, 0, kHelpW, y, 2, kPale);
 		y += 20;
 	}
+	y += 4;
+	const std::string legal = latin1(legalTitle(language)) + " : " + latin1(requirementsText(language));
+	for (const std::string &l : Canvas::wrap(legal, kHelpW - 48, 1)) {
+		cv.gcenter(l, 0, kHelpW, y, 1, kGold);
+		y += 12;
+	}
 	upload(chooserTex, cv.px, kHelpW, kChooserH, "choix");
 	chooserDirty = false;
 }
 
+// --- Profils de manettes --------------------------------------------------------------------------
+
+const uint8_t kClassicMap[kSlotCount] = {kFnAttack, kFnMagic, kFnRightClick, kFnMap, kFnRightClick, kFnView, kFnRecenter};
+
+static const char *slotName(int lang, int s) {
+	switch (s) {
+	case kSlotA: return "A";
+	case kSlotB: return "B";
+	case kSlotX: return "X";
+	case kSlotY: return "Y";
+	case kSlotGrip: return tr(lang, "Grip (aiming hand)", "Poignée (main qui vise)", "Griff (zielende Hand)");
+	case kSlotL3: return tr(lang, "Left stick click", "Clic joystick gauche", "Linker Stick-Klick");
+	default: return tr(lang, "Right stick click", "Clic joystick droit", "Rechter Stick-Klick");
+	}
+}
+
+static const char *fnName(int lang, int f) {
+	switch (f) {
+	case kFnAttack: return tr(lang, "Attack (menus: Enter)", "Attaquer (menus : Entrée)", "Angriff (Menüs: Eingabe)");
+	case kFnMagic: return tr(lang, "Magic (menus: Escape)", "Magie (menus : Échap)", "Magie (Menüs: Esc)");
+	case kFnRightClick: return tr(lang, "Right click (drink, use)", "Clic droit (boire, utiliser)", "Rechtsklick (trinken, benutzen)");
+	case kFnMap: return tr(lang, "Map", "Carte", "Karte");
+	case kFnRecenter: return tr(lang, "Recenter (spell level)", "Recentrer (niveau de sort)", "Zentrieren (Zauberstufe)");
+	case kFnView: return tr(lang, "View; hold: screen size", "Vue ; maintenu : taille écran", "Ansicht; halten: Bildgröße");
+	case kFnEnter: return tr(lang, "Enter", "Entrée", "Eingabe");
+	case kFnEscape: return tr(lang, "Escape (skip)", "Échap (passer)", "Esc (überspringen)");
+	case kFnAtlas: return tr(lang, "Atlas window", "Fenêtre de l'atlas", "Atlas-Fenster");
+	case kFnNextChar: return tr(lang, "Next character", "Personnage suivant", "Nächste Figur");
+	case kFnKeyboard: return tr(lang, "Keyboard", "Clavier", "Tastatur");
+	default: return tr(lang, "Nothing", "Rien", "Nichts");
+	}
+}
+
+// Le nom d'un profil, en Latin-1 (« Classique » dans la langue de l'application).
+static std::string profileLabel(int lang, const std::string &name) {
+	return name.empty() ? latin1(tr(lang, "Classic", "Classique", "Klassisch")) : name;
+}
+
+// Boutons du bas de l'aide, et de la fenêtre de modification (pixels de leur image).
+const int kHelpBtnY0 = 466, kHelpBtnY1 = 506;
+const int kHelpBtnX[2][2] = {{110, 310}, {330, 530}};
+const int kEditProfY0 = 50, kEditProfY1 = 88, kEditRowY0 = 100, kEditRowH = 40, kEditValX0 = 300, kEditValX1 = 618;
+const int kEditArrowX[2][2] = {{232, 272}, {578, 618}};
+const int kEditBtnY0 = 438, kEditBtnY1 = 478;
+const int kEditBtnX[4][2] = {{12, 158}, {168, 314}, {324, 470}, {480, 628}};
+
+// La zone visée dans la fenêtre de modification : 0 et 1 profil précédent ou suivant, 10 + bouton
+// (20 + bouton : à gauche, la fonction précédente), 30 + n les boutons du bas ; -1 rien.
+static int editorZone(int px, int py) {
+	if (py >= kEditProfY0 && py < kEditProfY1)
+		for (int k = 0; k < 2; k++)
+			if (px >= kEditArrowX[k][0] && px < kEditArrowX[k][1])
+				return k;
+	for (int s = 0; s < kSlotCount; s++) {
+		const int y0 = kEditRowY0 + s * kEditRowH;
+		if (py >= y0 + 3 && py < y0 + kEditRowH - 3 && px >= kEditValX0 && px < kEditValX1)
+			return (px < kEditValX0 + 44 ? 20 : 10) + s;
+	}
+	if (py >= kEditBtnY0 && py < kEditBtnY1)
+		for (int k = 0; k < 4; k++)
+			if (px >= kEditBtnX[k][0] && px < kEditBtnX[k][1])
+				return 30 + k;
+	return -1;
+}
+
 void Ui::Impl::renderHelp() {
-	static const char *const english[] = {
-		"#CONTROLLER MAPPING",
+	const int L = language;
+	auto line = [](const char *a, const char *b) { return std::string(a) + " .. " + b; };
+	std::vector<std::string> lines = {
+		std::string("#") + tr(L, "CONTROLLER MAPPING", "LES MANETTES ET LES BOUTONS", "STEUERUNG UND TASTEN"),
 		"",
-		"#Everywhere",
-		"Aim + trigger ............ left click",
-		"Aim + grip, or X ......... right click (drink, use)",
-		"Left stick ............... walk where you look",
-		"Right stick (sideways) ... turn",
-		"Y ........................ map",
-		"Menu button (left) ....... save, load, quit",
-		"Floppy on the left wrist .. game menu, VR controls",
+		std::string("#") + tr(L, "Always", "Toujours", "Immer"),
+		line(tr(L, "Aim + trigger", "Viser + gâchette", "Zielen + Abzug"), tr(L, "left click", "clic gauche", "Linksklick")),
+		line(tr(L, "Left stick", "Joystick gauche", "Linker Stick"), tr(L, "walk where you look", "marcher là où l'on regarde", "dorthin gehen, wohin du schaust")),
+		line(tr(L, "Right stick (sideways)", "Joystick droit (côtés)", "Rechter Stick (seitlich)"), tr(L, "turn", "tourner", "drehen")),
+		line(tr(L, "Right stick (up/down)", "Joystick droit (haut/bas)", "Rechter Stick (hoch/runter)"), tr(L, "change character", "changer de personnage", "Figur wechseln")),
+		line(tr(L, "Menu button (left)", "Bouton menu (gauche)", "Menütaste (links)"), tr(L, "save, load, quit", "sauver, charger, quitter", "speichern, laden, beenden")),
+		line(tr(L, "Floppy on the left wrist", "Disquette (main gauche)", "Diskette (linke Hand)"), tr(L, "game menu, VR controls", "menu du jeu, réglages VR", "Spielmenü, VR-Optionen")),
+		line(tr(L, "Brass bar + hold trigger", "Barrette + gâchette tenue", "Messingleiste + Abzug halten"), tr(L, "move a window", "déplacer une fenêtre", "Fenster verschieben")),
+		line(tr(L, "Corner + hold trigger", "Coin + gâchette tenue", "Ecke + Abzug halten"), tr(L, "resize", "agrandir, réduire", "Größe ändern")),
 		"",
-		"#Combat, in the dungeon",
-		"A ........................ attack with the framed character",
-		"B ........................ open their magic, aim at a spell",
-		"Right stick (up/down) .... change character",
-		"Drink a potion: aim at it and press X",
-		"",
-		"#Menus and cutscenes",
-		"A : Enter       B : Escape (skip)",
-		"",
-		"#Windows and screen",
-		"Brass bar + hold trigger ........ move",
-		"Corner + hold trigger ..... resize",
-		"Right stick click ........ recenter everything",
-		"Left stick click ......... view: big, windows, 486 PC",
-		"",
-		"Click this panel to close it.",
-		nullptr,
+		std::string("#") + tr(L, "Buttons", "Boutons", "Tasten") + " : " + "\x01",
 	};
-	static const char *const french[] = {
-		"#LES MANETTES ET LES BOUTONS",
-		"",
-		"#Partout",
-		"Viser + gâchette ......... clic gauche",
-		"Viser + poignée, ou X .... clic droit (boire, utiliser)",
-		"Joystick gauche .......... marcher là où l'on regarde",
-		"Joystick droit (côtés) ... tourner",
-		"Y ........................ carte",
-		"Bouton menu (gauche) ..... sauvegarder, charger, quitter",
-		"Disquette (main gauche) .. menu du jeu, réglages VR",
-		"",
-		"#Combat, dans le donjon",
-		"A ........................ attaquer (personnage encadré)",
-		"B ........................ sa magie, puis viser un sort",
-		"Joystick droit (haut/bas)  changer de personnage",
-		"Boire une potion : la viser et appuyer sur X",
-		"",
-		"#Menus et cinématiques",
-		"A : Entrée      B : Échap (passer)",
-		"",
-		"#Fenêtres et écran",
-		"Barrette + gâchette tenue ... déplacer",
-		"Coin + gâchette tenue ....... agrandir, réduire",
-		"Clic du joystick droit ... tout recentrer devant soi",
-		"Clic du joystick gauche .. vue : écran, fenêtres, PC 486",
-		"",
-		"Cliquer ce panneau pour le fermer.",
-		nullptr,
-	};
-	static const char *const german[] = {
-		"#CONTROLLER UND TASTEN",
-		"",
-		"#Überall",
-		"Zielen + Abzug ........... Linksklick",
-		"Zielen + Griff, oder X ... Rechtsklick (trinken, benutzen)",
-		"Linker Stick ............. gehen, wohin man schaut",
-		"Rechter Stick (Seiten) ... drehen",
-		"Y ........................ Karte",
-		"Menütaste (links) ........ speichern, laden, beenden",
-		"Diskette (linke Hand) .... Spielmenü, VR-Optionen",
-		"",
-		"#Kampf, im Dungeon",
-		"A ........................ angreifen (gerahmte Figur)",
-		"B ........................ ihre Magie, dann Zauber zielen",
-		"Rechter Stick (auf/ab) ... Figur wechseln",
-		"Trank trinken: ihn zielen und X drücken",
-		"",
-		"#Menüs und Zwischensequenzen",
-		"A : Eingabe     B : Esc (überspringen)",
-		"",
-		"#Fenster und Bildschirm",
-		"Messingleiste + Abzug .... verschieben",
-		"Ecke + Abzug gehalten .... vergrößern, verkleinern",
-		"Rechter Stick klicken .... alles vor dir zentrieren",
-		"Linker Stick klicken ..... Ansicht: Bild, Fenster, 486er",
-		"",
-		"Dieses Feld anklicken, um es zu schließen.",
-		nullptr,
-	};
-	const char *const *lines = language == kLangFrench ? french : language == kLangGerman ? german : english;
+	for (int sl = 0; sl < kSlotCount; sl++)
+		lines.push_back(line(slotName(L, sl), fnName(L, draft[sl])));
 	Canvas cv{kHelpW, kHelpH, std::vector<uint8_t>((size_t)kHelpW * kHelpH * 4)};
 	cv.window();
-	// « bouton .... action » (ou deux espaces) : deux colonnes, l'écriture du jeu n'ayant pas des
-	// lettres de même largeur pour aligner les points.
+	// « bouton .. action » : deux colonnes, l'écriture du jeu n'ayant pas des lettres de même
+	// largeur pour aligner les points.
 	auto split = [](const std::string &s, std::string &l, std::string &r) {
 		size_t p = s.find(" ..");
-		size_t q = p != std::string::npos ? s.find_first_not_of(". ", p) : std::string::npos;
-		if (p == std::string::npos) {
-			p = s.find("  ");
-			q = p != std::string::npos ? s.find_first_not_of(' ', p) : std::string::npos;
-		}
-		if (p == std::string::npos || q == std::string::npos)
+		if (p == std::string::npos)
 			return false;
 		l = s.substr(0, p);
-		r = s.substr(q);
+		r = s.substr(p + 4);
 		return true;
 	};
 	const int x0 = 22, xMax = kHelpW - 12;
-	int col = x0, y = 34; // (le contenu fait ~450 pixels de haut : au milieu)
-	for (int i = 0; lines[i]; i++) {
-		const char *line = lines[i];
-		bool title = line[0] == '#';
-		std::string text = latin1(title ? line + 1 : line), l, r;
+	int col = x0, y = 20;
+	for (size_t i = 0; i < lines.size(); i++) {
+		const bool title = !lines[i].empty() && lines[i][0] == '#';
+		std::string text = latin1((title ? lines[i].substr(1) : lines[i]).c_str()), l, r;
+		const size_t mark = text.find('\x01');
+		if (mark != std::string::npos)
+			text = text.substr(0, mark) + profileLabel(L, profiles[activeProfile].name) + (draftChanged() ? " *" : "");
 		if (text.empty()) {
 			y += 6;
 			continue;
 		}
 		if (title) {
-			// Titre blanc, souligné d'un filet gravé (sombre puis clair)
 			cv.gtext(text, 14, y, 2, kWhite);
 			cv.rect(10, y + 18, kHelpW - 10, y + 19, kDark);
 			cv.rect(10, y + 19, kHelpW - 10, y + 20, kLight);
 			y += 23;
-			// La colonne des actions de cette partie : après le plus long nom de bouton.
 			col = x0;
-			for (int j = i + 1; lines[j] && lines[j][0] != '#'; j++) {
-				std::string t = latin1(lines[j]), a, b;
+			for (size_t j = i + 1; j < lines.size() && (lines[j].empty() || lines[j][0] != '#'); j++) {
+				std::string t = latin1(lines[j].c_str()), a, b;
 				if (split(t, a, b) && x0 + Canvas::textW(a, 2) + 24 > col)
 					col = x0 + Canvas::textW(a, 2) + 24;
 			}
 		} else if (split(text, l, r)) {
 			cv.gtext(l, x0, y, 2, kGold);
-			// L'action dans sa colonne ; trop longue, collée au bord droit.
-			int rw = Canvas::textW(r, 2), rx = col + rw > xMax ? xMax - rw : col;
-			int sc = 2;
-			if (rx < x0 + Canvas::textW(l, 2) + 8) {
-				rx = col;
-				sc = Canvas::fit(r, xMax - col, 2);
-			}
-			cv.gtext(r, rx, y, sc, kPale);
+			const int sc = Canvas::fit(r, xMax - col, 2);
+			cv.gtext(r, col, y, sc, kPale);
 			y += 18;
 		} else {
 			cv.gtext(text, x0, y, Canvas::fit(text, xMax - x0, 2), kGold);
 			y += 18;
 		}
 	}
+	// En bas : modifier les boutons, fermer.
+	const char *labels[2] = {tr(L, "Customize", "Modifier", "Anpassen"), tr(L, "Close", "Fermer", "Schließen")};
+	for (int k = 0; k < 2; k++) {
+		cv.bevel(kHelpBtnX[k][0], kHelpBtnY0, kHelpBtnX[k][1], kHelpBtnY1, 2, true);
+		cv.gcenter(latin1(labels[k]), kHelpBtnX[k][0], kHelpBtnX[k][1], (kHelpBtnY0 + kHelpBtnY1 - Canvas::textH(2)) / 2, 2, kGold);
+	}
 	upload(helpTex, cv.px, kHelpW, kHelpH, "aide");
 	helpDirty = false;
+}
+
+// La fenêtre de modification : le profil (flèches pour en changer), chaque bouton et ce qu'il fait
+// (un clic : la fonction suivante ; sur la flèche de gauche : la précédente), puis Enregistrer,
+// Nouveau profil, Supprimer, Retour. « Classique » ne s'enregistre ni ne se supprime.
+void Ui::Impl::renderEditor() {
+	const int L = language;
+	Canvas cv{kHelpW, kHelpH, std::vector<uint8_t>((size_t)kHelpW * kHelpH * 4)};
+	cv.window();
+	cv.gcenter(latin1(tr(L, "Customize the buttons", "Modifier les boutons", "Tasten anpassen")), 0, kHelpW, 12, 2, kWhite);
+	cv.rect(10, 36, kHelpW - 10, 37, kDark);
+	cv.rect(10, 37, kHelpW - 10, 38, kLight);
+	const int th = Canvas::textH(2);
+	// Le profil
+	cv.gtext(latin1(tr(L, "Profile", "Profil", "Profil")), 22, (kEditProfY0 + kEditProfY1 - th) / 2, 2, kGold);
+	for (int k = 0; k < 2; k++) {
+		cv.bevel(kEditArrowX[k][0], kEditProfY0, kEditArrowX[k][1], kEditProfY1, 2, true);
+		cv.gcenter(k ? ">" : "<", kEditArrowX[k][0], kEditArrowX[k][1], (kEditProfY0 + kEditProfY1 - th) / 2, 2, kGold);
+	}
+	cv.bevel(kEditArrowX[0][1] + 6, kEditProfY0, kEditArrowX[1][0] - 6, kEditProfY1, 2, false);
+	const std::string pname = profileLabel(L, profiles[activeProfile].name) + (draftChanged() ? " *" : "");
+	cv.gcenter(pname, kEditArrowX[0][1] + 6, kEditArrowX[1][0] - 6, (kEditProfY0 + kEditProfY1 - th) / 2, Canvas::fit(pname, kEditArrowX[1][0] - kEditArrowX[0][1] - 24, 2), kBlue);
+	// Les boutons
+	for (int sl = 0; sl < kSlotCount; sl++) {
+		const int y0 = kEditRowY0 + sl * kEditRowH, by0 = y0 + 3, by1 = y0 + kEditRowH - 3, ty = (by0 + by1 - th) / 2;
+		const std::string n = latin1(slotName(L, sl)), v = latin1(fnName(L, draft[sl]));
+		cv.gtext(n, 22, ty, Canvas::fit(n, kEditValX0 - 34, 2), kGold);
+		cv.bevel(kEditValX0, by0, kEditValX1, by1, 2, true);
+		cv.gtext("<", kEditValX0 + 14, ty, 2, kLight);
+		cv.gtext(">", kEditValX1 - 26, ty, 2, kLight);
+		cv.gcenter(v, kEditValX0 + 40, kEditValX1 - 30, ty, Canvas::fit(v, kEditValX1 - kEditValX0 - 76, 2), kPale);
+	}
+	// Le nom du nouveau profil, tapé au clavier
+	const int ny = kEditRowY0 + kSlotCount * kEditRowH + 4;
+	if (naming) {
+		const std::string t = latin1(tr(L, "Name: ", "Nom : ", "Name: ")) + nameText + "_";
+		cv.gtext(t, 22, ny, 2, kWhite);
+	} else if (draftChanged()) {
+		cv.gtext(latin1(tr(L, "* not saved: the buttons already work this way.", "* pas enregistré : les boutons marchent déjà ainsi.", "* nicht gespeichert: die Tasten gehen schon so.")), 22, ny, 1, kPale);
+	}
+	// Les boutons du bas
+	const char *labels[4] = {tr(L, "Save", "Enregistrer", "Speichern"), tr(L, "Save as new", "Nouveau profil", "Neues Profil"),
+	                         tr(L, "Delete", "Supprimer", "Löschen"), tr(L, "Back", "Retour", "Zurück")};
+	for (int k = 0; k < 4; k++) {
+		const bool off = (k == 0 && (activeProfile == 0 || !draftChanged())) || (k == 2 && activeProfile == 0);
+		cv.bevel(kEditBtnX[k][0], kEditBtnY0, kEditBtnX[k][1], kEditBtnY1, 2, true);
+		const std::string l = latin1(labels[k]);
+		cv.gcenter(l, kEditBtnX[k][0], kEditBtnX[k][1], (kEditBtnY0 + kEditBtnY1 - th) / 2, Canvas::fit(l, kEditBtnX[k][1] - kEditBtnX[k][0] - 12, 2), off ? kDark : kGold);
+	}
+	const char *hint = naming ? tr(L, "Type the name on the keyboard: Enter saves, Esc cancels.", "Tape le nom au clavier : Entrée enregistre, Échap annule.", "Tippe den Namen: Eingabe speichert, Esc bricht ab.")
+	                          : tr(L, "Click a button's action to change it. Classic stays as it is.", "Clique sur l'action d'un bouton pour la changer. Classique ne change pas.", "Klicke auf eine Aktion, um sie zu ändern. Klassisch bleibt, wie es ist.");
+	cv.gcenter(latin1(hint), 0, kHelpW, kEditBtnY1 + 14, 1, kPale);
+	upload(editTex, cv.px, kHelpW, kHelpH, "boutons");
+	editDirty = false;
 }
 
 // Un engrenage de laiton sur fond sombre.
@@ -1026,6 +1102,8 @@ void Ui::Impl::renderMenu() {
 		cv.rect(12, kMenuH - kMenuFootH + 3, kMenuW - 12, kMenuH - kMenuFootH + 4, kLight);
 		const std::string t = latin1(tr(L, "Made possible by ScummVM & KForestland", "Ce mod est possible grâce à ScummVM et KForestland", "Möglich gemacht durch ScummVM & KForestland"));
 		cv.gcenter(t, 0, kMenuW, kMenuH - kMenuFootH + 9, 1, kPale);
+		const std::string u = latin1(tr(L, "Unofficial fan project, not affiliated with EA, Westwood or Virgin", "Projet de fan non officiel, non affilié à EA, Westwood ou Virgin", "Inoffizielles Fanprojekt, nicht mit EA, Westwood oder Virgin verbunden"));
+		cv.gcenter(u, 0, kMenuW, kMenuH - kMenuFootH + 22, 1, kPale);
 	}
 	upload(menuTex, cv.px, kMenuW, kMenuH, "menu");
 	menuDirty = false;
@@ -1033,10 +1111,11 @@ void Ui::Impl::renderMenu() {
 
 // Invitation du premier lancement : un engrenage et deux lignes.
 // Le rappel de la vue classique : L3 passe du grand écran aux fenêtres et au PC 486.
-const int kNoticeW = 480, kNoticeH = 200;
+const int kNoticeW = 480, kNoticeH = 200, kCreditsH = 350; // (crédits et prérequis : plus haut)
 
 void Ui::Impl::renderNotice() {
-	Canvas cv{kNoticeW, kNoticeH, std::vector<uint8_t>((size_t)kNoticeW * kNoticeH * 4)};
+	const int nh = noticeKind == 1 ? kCreditsH : kNoticeH;
+	Canvas cv{kNoticeW, nh, std::vector<uint8_t>((size_t)kNoticeW * nh * 4)};
 	cv.window();
 	if (noticeKind == 1) {
 		// Crédits et prérequis
@@ -1048,9 +1127,16 @@ void Ui::Impl::renderNotice() {
 			cv.gcenter(l, 0, kNoticeW, y, 2, kGold);
 			y += 20;
 		}
-		cv.bevel(kNoticeW / 2 - 50, kNoticeH - 42, kNoticeW / 2 + 50, kNoticeH - 12, 2, true);
-		cv.gcenter("OK", kNoticeW / 2 - 50, kNoticeW / 2 + 50, kNoticeH - 36, 2, kGold);
-		upload(noticeTex, cv.px, kNoticeW, kNoticeH, "credits");
+		y += 8;
+		cv.gcenter(latin1(legalTitle(language)), 0, kNoticeW, y, 2, kWhite);
+		y += 22;
+		for (const std::string &l : Canvas::wrap(latin1(requirementsText(language)), kNoticeW - 40, 2)) {
+			cv.gcenter(l, 0, kNoticeW, y, 2, kPale);
+			y += 20;
+		}
+		cv.bevel(kNoticeW / 2 - 50, nh - 42, kNoticeW / 2 + 50, nh - 12, 2, true);
+		cv.gcenter("OK", kNoticeW / 2 - 50, kNoticeW / 2 + 50, nh - 36, 2, kGold);
+		upload(noticeTex, cv.px, kNoticeW, nh, "credits");
 		noticeDirty = false;
 		return;
 	}
@@ -1066,9 +1152,9 @@ void Ui::Impl::renderNotice() {
 		y += 20;
 	}
 	cv.gcenter(latin1(tr(language, "Also in the game menu, VR controls.", "Aussi dans le menu du jeu, Réglages VR.", "Auch im Spielmenü, VR-Optionen.")), 0, kNoticeW, y + 6, 2, kPale);
-	cv.bevel(kNoticeW / 2 - 50, kNoticeH - 42, kNoticeW / 2 + 50, kNoticeH - 12, 2, true);
-	cv.gcenter("OK", kNoticeW / 2 - 50, kNoticeW / 2 + 50, kNoticeH - 36, 2, kGold);
-	upload(noticeTex, cv.px, kNoticeW, kNoticeH, "rappel");
+	cv.bevel(kNoticeW / 2 - 50, nh - 42, kNoticeW / 2 + 50, nh - 12, 2, true);
+	cv.gcenter("OK", kNoticeW / 2 - 50, kNoticeW / 2 + 50, nh - 36, 2, kGold);
+	upload(noticeTex, cv.px, kNoticeW, nh, "rappel");
 	noticeDirty = false;
 }
 
@@ -1096,6 +1182,50 @@ void Ui::Impl::renderHint() {
 
 Ui::Ui() : d(new Impl()) {
 	d->buildKeys();
+	Impl::Profile classic;
+	memcpy(classic.fn, kClassicMap, kSlotCount);
+	d->profiles.push_back(classic);
+	d->selectProfileIndex(0);
+}
+
+const uint8_t *Ui::buttonMap() const {
+	return d->draft;
+}
+
+void Ui::addProfile(const std::string &name, const uint8_t *fns) {
+	if (name.empty())
+		return;
+	Impl::Profile p;
+	p.name = name.substr(0, 18);
+	for (int i = 0; i < kSlotCount; i++)
+		p.fn[i] = fns[i] < kFnCount ? fns[i] : (uint8_t)kFnNone;
+	for (size_t i = 1; i < d->profiles.size(); i++)
+		if (d->profiles[i].name == p.name) {
+			d->profiles[i] = p;
+			return;
+		}
+	d->profiles.push_back(p);
+}
+
+void Ui::selectProfile(const std::string &name) {
+	for (size_t i = 0; i < d->profiles.size(); i++)
+		if (d->profiles[i].name == name) {
+			d->selectProfileIndex((int)i);
+			return;
+		}
+	d->selectProfileIndex(0);
+}
+
+std::string Ui::profilesText() const {
+	std::string out;
+	char buf[128];
+	for (size_t i = 1; i < d->profiles.size(); i++) {
+		const Impl::Profile &p = d->profiles[i];
+		snprintf(buf, sizeof(buf), "profil %d %d %d %d %d %d %d %s\n", p.fn[0], p.fn[1], p.fn[2], p.fn[3], p.fn[4], p.fn[5], p.fn[6], p.name.c_str());
+		out += buf;
+	}
+	out += "profilactif " + d->profiles[d->activeProfile].name + "\n";
+	return out;
 }
 
 Ui::~Ui() {
@@ -1117,6 +1247,7 @@ void Ui::setLanguage(int language) {
 		d->language = language;
 		d->kbDirty = true;
 		d->helpDirty = true;
+		d->editDirty = true;
 		d->menuDirty = true;
 		d->hintDirty = true;
 		d->chooserDirty = true;
@@ -1270,7 +1401,7 @@ bool Ui::loadGameFont(const std::string &gameDir) {
 		for (const std::string &p : paks) {
 			std::vector<uint8_t> data;
 			if (readPakEntry(p, name, data) && g_font.parse(std::move(data))) {
-				d->kbDirty = d->helpDirty = d->menuDirty = d->hintDirty = d->chooserDirty = true;
+				d->kbDirty = d->helpDirty = d->menuDirty = d->hintDirty = d->chooserDirty = d->editDirty = true;
 				d->comp[kCompSpells].key = -1;
 				d->atlasKey = -1;
 				return true;
@@ -1354,8 +1485,30 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 		scene.handles[i].visible = false;
 	if (d->kbDirty)
 		d->renderKeyboard();
+	// L'aide fermée : retour à l'aide, nom abandonné, changements non enregistrés oubliés.
+	if (d->helpWasOpen && !in.helpOpen) {
+		d->helpMode = 0;
+		if (d->naming) {
+			d->naming = false;
+			out.action = kUiActionCloseKeyboard;
+		}
+		if (d->draftChanged())
+			d->selectProfileIndex(d->activeProfile);
+	}
+	d->helpWasOpen = in.helpOpen;
+	// Le nom en cours : le clavier refermé l'abandonne.
+	if (d->naming) {
+		if (in.keyboardOpen)
+			d->namingKbSeen = true;
+		else if (d->namingKbSeen) {
+			d->naming = false;
+			d->editDirty = true;
+		}
+	}
 	if (d->helpDirty || !d->helpTex)
 		d->renderHelp();
+	if (d->helpMode == 1 && (d->editDirty || !d->editTex))
+		d->renderEditor();
 	if (!d->gearTex)
 		d->renderGear();
 	if (in.keyboardOpen != d->menuKeyboard) {
@@ -1390,6 +1543,7 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 	visible[kPanelKeyboard] = placed && in.keyboardOpen;
 	visible[kPanelHelp] = placed && (in.helpOpen || in.chooserOpen);
 	d->chooserHot = -1;
+	d->helpHot = d->editHot = -1;
 	auto isPanel = [](int target) { return target >= 0 && target < kUiPanelCount; };
 
 	Vec3 screenR = rotate(in.screenRot, {1, 0, 0}), screenU = rotate(in.screenRot, {0, 1, 0}), screenN = rotate(in.screenRot, {0, 0, 1});
@@ -1545,7 +1699,7 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 	noticeQ.r = d->noticeRight;
 	noticeQ.u = d->noticeUp;
 	noticeQ.hw = kNoticeW * kNoticeScale * 0.5f;
-	noticeQ.hh = kNoticeH * kNoticeScale * 0.5f;
+	noticeQ.hh = (d->noticeKind == 1 ? kCreditsH : kNoticeH) * kNoticeScale * 0.5f;
 	if (d->menuOpen) {
 		menuQ.c = d->menuPos;
 		menuQ.r = d->menuRight;
@@ -1842,10 +1996,65 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 				out.action = d->chooserHot == 0 ? kUiActionChooseClassic : kUiActionChooseImmersive;
 				out.clicked = true;
 			}
-		} else if (hitIndex == kPanelHelp) {
-			if (in.triggerPressed) {
-				out.action = kUiActionCloseHelp;
+		} else if (hitIndex == kPanelHelp && d->helpMode == 0) {
+			// L'aide : Modifier (la fenêtre des boutons), Fermer.
+			const int px = (int)(u * (float)kHelpW), py = (int)(v * (float)kHelpH);
+			for (int k = 0; k < 2; k++)
+				if (px >= kHelpBtnX[k][0] && px < kHelpBtnX[k][1] && py >= kHelpBtnY0 && py < kHelpBtnY1)
+					d->helpHot = k;
+			if (in.triggerPressed && d->helpHot >= 0) {
 				out.clicked = true;
+				if (d->helpHot == 0) {
+					d->helpMode = 1;
+					d->editDirty = true;
+				} else {
+					out.action = kUiActionCloseHelp;
+				}
+			}
+		} else if (hitIndex == kPanelHelp) {
+			const int zone = editorZone((int)(u * (float)kHelpW), (int)(v * (float)kHelpH));
+			d->editHot = zone;
+			if (in.triggerPressed && zone >= 0) {
+				out.clicked = true;
+				const int n = (int)d->profiles.size();
+				auto endNaming = [&]() {
+					if (d->naming) {
+						d->naming = false;
+						out.action = kUiActionCloseKeyboard;
+					}
+				};
+				if (zone <= 1) {
+					endNaming();
+					d->selectProfileIndex((d->activeProfile + (zone ? 1 : n - 1)) % n);
+					out.layoutChanged = true; // (le profil choisi est retenu)
+				} else if (zone >= 10 && zone < 30) {
+					const int sl = zone % 10;
+					d->draft[sl] = (uint8_t)((d->draft[sl] + (zone >= 20 ? kFnCount - 1 : 1)) % kFnCount);
+					d->helpDirty = d->editDirty = true;
+				} else if (zone == 30) {
+					if (d->activeProfile > 0 && d->draftChanged()) {
+						memcpy(d->profiles[d->activeProfile].fn, d->draft, kSlotCount);
+						d->helpDirty = d->editDirty = true;
+						out.layoutChanged = true;
+					}
+				} else if (zone == 31) {
+					d->naming = true;
+					d->namingKbSeen = false;
+					d->nameText.clear();
+					d->editDirty = true;
+					out.action = kUiActionOpenKeyboard;
+				} else if (zone == 32) {
+					if (d->activeProfile > 0) {
+						endNaming();
+						d->profiles.erase(d->profiles.begin() + d->activeProfile);
+						d->selectProfileIndex(0);
+						out.layoutChanged = true;
+					}
+				} else {
+					endNaming();
+					d->helpMode = 0;
+					d->helpDirty = true;
+				}
 			}
 		} else if (hitIndex == kPanelKeyboard) {
 			int col = (int)(u * (float)kCols), row = (int)(v * (float)kKbH / (float)kCellH);
@@ -1864,6 +2073,36 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 					d->kbDirty = true;
 				} else if (key.action != kUiActionNone) {
 					out.action = key.action;
+				} else if (d->naming && key.key) {
+					// Le nom d'un nouveau profil de manettes
+					const unsigned c = key.key;
+					if (c == 13 || c == 27) {
+						if (c == 13) {
+							std::string nm = d->nameText;
+							while (!nm.empty() && nm.back() == ' ')
+								nm.pop_back();
+							if (nm.empty())
+								nm = "Profil " + std::to_string(d->profiles.size());
+							uint8_t fns[kSlotCount];
+							memcpy(fns, d->draft, kSlotCount);
+							addProfile(nm, fns);
+							selectProfile(nm.substr(0, 18));
+							out.layoutChanged = true;
+						}
+						d->naming = false;
+						out.action = kUiActionCloseKeyboard;
+					} else if (c == 8) {
+						if (!d->nameText.empty())
+							d->nameText.pop_back();
+					} else if (c >= 32 && c < 127 && d->nameText.size() < 18) {
+						const bool letter = c >= 'a' && c <= 'z';
+						d->nameText += (char)(letter && d->shift ? c - 32 : c);
+						if (d->shift) {
+							d->shift = false;
+							d->kbDirty = true;
+						}
+					}
+					d->editDirty = true;
 				} else if (key.key && out.keyCount < 4) {
 					bool letter = key.key >= 'a' && key.key <= 'z';
 					out.keys[out.keyCount] = key.key;
@@ -1974,9 +2213,31 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 					p.hot[3] = (float)(lg ? kLangY1 : kChooseY1) / (float)kChooserH;
 				}
 			} else if (i == kPanelHelp) {
-				p.texture = d->helpTex;
+				p.texture = d->helpMode == 1 && d->editTex ? d->editTex : d->helpTex;
 				p.texW = kHelpW;
 				p.texH = kHelpH;
+				// Le bouton visé, encadré
+				int x0 = 0, y0 = 0, x1 = 0, y1 = 0;
+				if (d->helpMode == 0 && d->helpHot >= 0) {
+					x0 = kHelpBtnX[d->helpHot][0]; x1 = kHelpBtnX[d->helpHot][1]; y0 = kHelpBtnY0; y1 = kHelpBtnY1;
+				} else if (d->helpMode == 1 && d->editHot >= 0) {
+					const int z = d->editHot;
+					if (z <= 1) {
+						x0 = kEditArrowX[z][0]; x1 = kEditArrowX[z][1]; y0 = kEditProfY0; y1 = kEditProfY1;
+					} else if (z < 30) {
+						x0 = z >= 20 ? kEditValX0 : kEditValX0 + 44; x1 = z >= 20 ? kEditValX0 + 44 : kEditValX1;
+						y0 = kEditRowY0 + (z % 10) * kEditRowH + 3; y1 = y0 + kEditRowH - 6;
+					} else {
+						x0 = kEditBtnX[z - 30][0]; x1 = kEditBtnX[z - 30][1]; y0 = kEditBtnY0; y1 = kEditBtnY1;
+					}
+				}
+				if (x1 > x0) {
+					p.hotOutline = true;
+					p.hot[0] = (float)x0 / kHelpW;
+					p.hot[1] = (float)y0 / kHelpH;
+					p.hot[2] = (float)x1 / kHelpW;
+					p.hot[3] = (float)y1 / kHelpH;
+				}
 			} else if (i == kPanelKeyboard) {
 				p.texture = d->kbTex;
 				p.texW = kKbW;
@@ -2078,7 +2339,7 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 		p.border = 0.004f;
 		p.texture = w == 0 ? d->gearTex : w == 1 ? d->menuTex : d->noticeTex;
 		p.texW = w == 0 ? kGearSize : w == 1 ? kMenuW : kNoticeW;
-		p.texH = w == 0 ? kGearSize : w == 1 ? d->menuH() : kNoticeH;
+		p.texH = w == 0 ? kGearSize : w == 1 ? d->menuH() : (d->noticeKind == 1 ? kCreditsH : kNoticeH);
 		if (w == 1 && d->menuHot >= 1) {
 			p.hot[0] = 0.0f;
 			p.hot[1] = (float)(d->menuHot * kMenuRowH) / (float)d->menuH();

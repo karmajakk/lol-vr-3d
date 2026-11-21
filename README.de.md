@@ -111,6 +111,17 @@ Version wird veröffentlicht, wenn die Datei `VERSION` eine Nummer ohne veröffe
 enthält. Zum Testen auf einem Linux-PC ohne Headset siehe [scripts/dev](scripts/dev/README.md)
 (auf Englisch).
 
+## Haftungsausschluss
+
+Lands of Lore VR ist eine kostenlose, quelloffene, nicht kommerzielle Fan-Modifikation. Dieses
+Projekt ist nicht mit Electronic Arts (EA), Westwood Studios oder Virgin Interactive verbunden und
+wird von ihnen weder autorisiert, gepflegt, gesponsert noch unterstützt. Alle Marken und
+Urheberrechte gehören ihren jeweiligen Inhabern.
+
+Dieses Repository und seine Veröffentlichungen enthalten keine urheberrechtlich geschützten
+Spieldateien. Um diese Mod zu nutzen, brauchst du deine eigene, legal erworbene Kopie von
+*Lands of Lore: The Throne of Chaos* (zum Beispiel die Version von GOG.com).
+
 ## Lizenz
 
 GPL-3.0, wie ScummVM (siehe `COPYING`).

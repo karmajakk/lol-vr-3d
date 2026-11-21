@@ -29,3 +29,5 @@ Au premier lancement, une fenêtre te demande laquelle tu veux ; tu peux changer
 - [Dernière version](https://github.com/karmajakk/lol-vr-3d/releases/latest)
 
 Le projet est en développement (versions 0.x). Il est surtout vérifié sur PC, et son comportement dans le casque évolue avec les retours de test. La vue classique a d'abord été développée à part dans le projet `lol-vr` (versions 0.1.0 à 0.12.0, historique conservé ici ; son journal est dans [docs/lol-vr-CHANGELOG.md](../../lol-vr-CHANGELOG.md)).
+
+*Projet de fan non officiel et non commercial, non affilié à ou approuvé par Electronic Arts, Westwood Studios ou Virgin Interactive. Aucun fichier du jeu n'est inclus : il te faut ta propre copie obtenue légalement (CD ou GOG).*

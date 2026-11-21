@@ -108,6 +108,17 @@ Chaque envoi est compilé par GitHub Actions (`.github/workflows/build.yml`, `sc
 version est publiée quand le fichier `VERSION` contient un numéro sans version publiée. Pour
 tester sur un PC Linux sans le casque, voir [scripts/dev](scripts/dev/README.md) (en anglais).
 
+## Avertissement
+
+Lands of Lore VR est une modification de fan gratuite, libre et non commerciale. Ce projet n'est
+ni affilié à, ni autorisé, maintenu, parrainé ou approuvé par Electronic Arts (EA), Westwood
+Studios ou Virgin Interactive. Toutes les marques et tous les droits d'auteur appartiennent à leurs
+propriétaires respectifs.
+
+Aucun fichier du jeu protégé par le droit d'auteur n'est inclus dans ce dépôt ni dans ses versions
+publiées. Pour utiliser ce mod, tu dois fournir ta propre copie, obtenue légalement, de
+*Lands of Lore: The Throne of Chaos* (par exemple la version vendue sur GOG.com).
+
 ## Licence
 
 GPL-3.0, comme ScummVM (voir `COPYING`).

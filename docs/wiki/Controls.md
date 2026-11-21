@@ -28,7 +28,11 @@ At the bottom of that menu, left of "Resume game", **VR controls** opens the hea
 - **VR mode**: **Immersive** (you walk in the dungeon rebuilt in 3D, see [Immersive mode](Immersive-mode.md)), **Classic** (the game in a medieval library) or **Mixed reality** (the game in your real room). The first time you pick Classic or Mixed reality, a note reminds you that L3 changes the view.
 - In Classic and Mixed reality, **View (L3)**: **Big screen** (the whole game image, like the original game), **Windows** (the interface windows float on their own) or **486 PC** (the game on a curved 90s monitor standing on a 486 PC). A short click of the left stick does the same.
 - **Atlas**: **On** or **Off**, the live map window (see [Detached interface](Detached-interface.md)).
-- **Controller mapping**: shows a panel summing up every button, over the game screen. Click the panel to close it.
+- **Controller mapping**: a panel summing up every button for the profile in use. **Customize** opens the button editor:
+  - **Profile** `<` `>`: choose a profile (it is used at once). **Classic**, the default, is always there and cannot be changed or deleted.
+  - A, B, X, Y, the grip and the two stick clicks: click an action to switch to the next one (the left arrow goes back): attack, magic, right click, map, recenter, view, Enter, Escape, atlas window, next character, keyboard or nothing. The buttons work that way right away.
+  - **Save** (your own profiles), **Save as new** (type a name on the keyboard, Enter saves), **Delete**, **Back**. Changes not saved are dropped when the panel closes.
+  - The trigger, the sticks (walk, turn, change character), the menu button and the floppy always stay the same.
 - **Credits & Requirements**: a short note on what the mod runs on and who made it possible (also on the first-launch window).
 - **Close**.
 

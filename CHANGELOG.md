@@ -3,6 +3,19 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.25.0] — Controller profiles, legal notice
+
+- **Controller profiles**: "Controller mapping" (VR controls) now shows the buttons of the profile
+  in use, and **Customize** opens a button editor. A, B, X, Y, the grip and both stick clicks can
+  each do any of: attack, magic, right click, map, recenter, view, Enter, Escape, atlas window,
+  next character, keyboard, or nothing. Save a profile under a name (typed on the keyboard), pick it
+  again later, or delete it. **Classic** (the default) is always there and cannot be changed or
+  deleted. The trigger, the sticks, the menu button and the floppy stay fixed.
+- **Legal notice**: under "Credits & Requirements", on the first-launch window, at the bottom of
+  VR controls, in the READMEs, the wiki and the release notes: an unofficial, non-commercial fan
+  project, not affiliated with or endorsed by Electronic Arts, Westwood Studios or Virgin
+  Interactive; no game files are included, a legally obtained copy is needed.
+
 ## [0.24.0] — Credits & Requirements
 
 - "VR controls" ends with "Made possible by ScummVM & KForestland", and has a new

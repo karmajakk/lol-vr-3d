@@ -28,7 +28,11 @@ En bas de ce menu, à gauche de « Resume game », **Réglages VR** ouvre devant
 - **Mode VR** : **Immersif** (tu marches dans le donjon reconstruit en 3D, voir [Mode immersif](Immersive-mode.md)), **Classique** (le jeu dans une bibliothèque médiévale) ou **Réalité mixte** (le jeu dans ta vraie pièce). La première fois que tu choisis Classique ou Réalité mixte, une note te rappelle que L3 change la vue.
 - En Classique et en Réalité mixte, **Vue (L3)** : **Grand écran** (l'image entière du jeu, comme le jeu original), **Fenêtres** (les fenêtres de l'interface flottent chacune de leur côté) ou **PC 486** (le jeu sur un moniteur bombé des années 90 posé sur un PC 486). Un clic court sur le joystick gauche fait la même chose.
 - **Atlas** : **Oui** ou **Non**, la fenêtre de la carte en direct (voir [Interface détachée](Detached-interface.md)).
-- **Manettes et boutons** : un panneau qui résume tous les boutons, par-dessus l'écran du jeu. Clique sur le panneau pour le fermer.
+- **Manettes et boutons** : un panneau qui résume tous les boutons du profil utilisé. **Modifier** ouvre la fenêtre des boutons :
+  - **Profil** `<` `>` : choisis un profil (il sert aussitôt). **Classique**, celui par défaut, est toujours là et ne peut être ni changé ni supprimé.
+  - A, B, X, Y, la poignée et les deux clics des joysticks : clique sur une action pour passer à la suivante (la flèche de gauche revient en arrière) : attaquer, magie, clic droit, carte, recentrer, vue, Entrée, Échap, fenêtre de l'atlas, personnage suivant, clavier ou rien. Les boutons marchent ainsi tout de suite.
+  - **Enregistrer** (tes profils), **Nouveau profil** (tape un nom au clavier, Entrée enregistre), **Supprimer**, **Retour**. Ce qui n'est pas enregistré est oublié quand le panneau se ferme.
+  - La gâchette, les joysticks (marcher, tourner, changer de personnage), le bouton menu et la disquette ne changent jamais.
 - **Crédits et prérequis** : un petit mot sur ce qui fait tourner le mod et sur qui l'a rendu possible (aussi dans la fenêtre du premier lancement).
 - **Fermer**.
 

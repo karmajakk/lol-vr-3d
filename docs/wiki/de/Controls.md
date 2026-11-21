@@ -28,7 +28,11 @@ Unten in diesem Menü, links von „Resume game“, öffnet **VR-Optionen** die 
 - **VR-Modus**: **Immersiv** (du gehst durch den in 3D nachgebauten Dungeon, siehe [Immersiver Modus](Immersive-mode.md)), **Klassisch** (das Spiel in einer mittelalterlichen Bibliothek) oder **Mixed Reality** (das Spiel in deinem echten Zimmer). Wenn du zum ersten Mal Klassisch oder Mixed Reality wählst, erinnert dich ein Hinweis daran, dass L3 die Ansicht wechselt.
 - In Klassisch und Mixed Reality **Ansicht (L3)**: **Großbild** (das ganze Spielbild, wie im Originalspiel), **Fenster** (die Fenster der Oberfläche schweben jedes für sich) oder **486er-PC** (das Spiel auf einem gewölbten 90er-Jahre-Monitor auf einem 486er-PC). Ein kurzer Klick auf den linken Stick macht dasselbe.
 - **Atlas**: **An** oder **Aus**, das Fenster mit der Live-Karte (siehe [Losgelöste Oberfläche](Detached-interface.md)).
-- **Steuerung und Tasten**: ein Feld, das alle Tasten zusammenfasst, über dem Spielbildschirm. Klicke auf das Feld, um es zu schließen.
+- **Steuerung und Tasten**: ein Feld mit allen Tasten des aktiven Profils. **Anpassen** öffnet den Tasten-Editor:
+  - **Profil** `<` `>`: wähle ein Profil (es gilt sofort). **Klassisch**, die Vorgabe, ist immer da und lässt sich weder ändern noch löschen.
+  - A, B, X, Y, der Griff und die beiden Stick-Klicks: klicke auf eine Aktion, um zur nächsten zu wechseln (der linke Pfeil geht zurück): Angriff, Magie, Rechtsklick, Karte, Zentrieren, Ansicht, Eingabe, Esc, Atlas-Fenster, nächste Figur, Tastatur oder nichts. Die Tasten gehen sofort so.
+  - **Speichern** (eigene Profile), **Neues Profil** (Namen tippen, Eingabe speichert), **Löschen**, **Zurück**. Nicht Gespeichertes wird beim Schließen verworfen.
+  - Abzug, Sticks (gehen, drehen, Figur wechseln), Menütaste und Diskette bleiben immer gleich.
 - **Credits & Voraussetzungen**: ein kurzer Hinweis, worauf die Mod läuft und wer sie möglich gemacht hat (auch im Fenster beim ersten Start).
 - **Schließen**.
 

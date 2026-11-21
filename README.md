@@ -110,6 +110,16 @@ To the [ScummVM](https://www.scummvm.org/) team, whose engine runs the game, and
 game's formats this mod relies on. Thanks for their hard work. (Also in "VR controls", under
 "Credits & Requirements", and on the first-launch window.)
 
+## Disclaimer
+
+Lands of Lore VR is a free, open-source, non-commercial fan modification. This project is not
+affiliated with, authorized, maintained, sponsored, or endorsed by Electronic Arts (EA), Westwood
+Studios, or Virgin Interactive. All trademarks and copyrights belong to their respective owners.
+
+No copyrighted game assets are included in this repository or its releases. To use this mod, you
+must supply your own legally acquired copy of *Lands of Lore: The Throne of Chaos* (such as the
+version available on GOG.com).
+
 ## License
 
 GPL-3.0, like ScummVM (see `COPYING`).
