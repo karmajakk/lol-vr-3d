@@ -561,6 +561,7 @@ struct App {
 	bool holdOver = false;    // le groupe a quitté un bloc d'entrée : la vue reste devant l'image du lieu pendant sa scène
 	bool holdOverScene = false;
 	double holdOverUntil = 0.0;
+	int holdOverBlock = -1;
 	int openBlock = -1;       // bloc d'entrée où l'on se tient (montré ouvert), -1 sinon
 	int builtOpen = -1;
 	float lightLevel = 1.0f;  // clarté du jeu (pénombre, lampe), adoucie
@@ -2193,7 +2194,7 @@ void updateUi(App &app, XrTime time, float dt, double now, bool pointer, bool tr
 	in.headDir = rotate(app.headRot, {0, 0, -1});
 	in.helpOpen = app.helpOpen;
 	in.compassBlank = app.split && app.charSheet;
-	in.textBoxActive = (app.bandShown && app.level.textRect != 0) || app.cutscene;
+	in.textBoxActive = (app.bandShown && app.level.textRect != 0) || app.cutscene || (app.dungeonMode && app.level.sceneBusy && !app.charSheet);
 	if (!app.frame.rgba.empty()) {
 		in.gameRgba = app.frame.rgba.data();
 		in.gameW = app.frame.width;
@@ -3095,7 +3096,8 @@ void updateDungeon(App &app, float dt) {
 		if (app.prevHold && !hold && !gfxChanged && app.shownLevel == l.level && app.visBlock >= 0) {
 			app.holdOver = true;
 			app.holdOverScene = false;
-			app.holdOverUntil = app.clock + 1.4;
+			app.holdOverUntil = app.clock + 1.0;
+			app.holdOverBlock = l.block;
 		}
 		app.prevHold = hold;
 		if (app.holdOver) {
@@ -3103,7 +3105,7 @@ void updateDungeon(App &app, float dt) {
 				app.holdOverScene = true;
 				app.holdOverUntil = app.clock + 120.0;
 			}
-			if (gfxChanged || app.shownLevel != l.level || hold || (app.holdOverScene && !pictureScene) || app.clock > app.holdOverUntil)
+			if (gfxChanged || app.shownLevel != l.level || hold || (!app.holdOverScene && l.block != app.holdOverBlock) || (app.holdOverScene && !pictureScene) || app.clock > app.holdOverUntil)
 				app.holdOver = false;
 		}
 	}

@@ -3,6 +3,11 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.27.1] — Fixes
+
+- Leaving a place no longer freezes the view for two seconds: the view follows at the next step.
+- The characters' portraits stay visible during scenes and conversations.
+
 ## [0.27.0] — New inventory
 
 - **Inventory** (3D dungeon): the 48 slots of the game are now a fixed **quick bar of 8 slots**; the
