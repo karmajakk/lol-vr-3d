@@ -3,6 +3,15 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.26.0] — Atlas icon, scenes
+
+- **Atlas**: the game's atlas icon opens the movable atlas window; "Close" on the page closes it.
+  The brown tab and the "Atlas" VR setting are gone.
+- Thieves and guards turn toward the party before the scene starts.
+- Thug's Hideout exit is one flat picture; the Southland inn screen shows the door and EXIT again;
+  the place's backdrop stays during inn/Marina scenes; the inventory stays visible during text boxes.
+- Items on the floor can be picked by clicking them directly; alcove keys sit closer to the wall.
+
 ## [0.25.0] — Controller profiles, legal notice
 
 - **Controller profiles**: "Controller mapping" (VR controls) now shows the buttons of the profile

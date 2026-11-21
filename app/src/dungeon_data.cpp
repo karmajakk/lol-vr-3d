@@ -198,6 +198,7 @@ void decodeDungeonTextures(const DungeonGfx &g, DungeonTextures &out) {
 		memset(out.planeColFoot[i], 0, kDunTexSize);
 		out.picBox[i][0] = out.picBox[i][1] = out.picBox[i][2] = out.picBox[i][3] = 0;
 		out.footFit[i] = false;
+		out.scenery[i] = false;
 		out.hidden[i] = invisibleWall(g, (uint8_t)i);
 		out.doorTopV[i] = out.doorFootV[i] = out.doorLift[i] = 0.0f;
 		out.faceDepth[i] = 1.0f;
@@ -328,6 +329,27 @@ void decodeDungeonTextures(const DungeonGfx &g, DungeonTextures &out) {
 			for (int i = 0; i < n; i++)
 				if (al[i])
 					img[i] = rgb(px[i]);
+			// Un « objet » qui est un grand décor (la sortie d'une grotte, vue de l'intérieur) : une seule
+			// image, agrandie à tout le mur, dressée au fond de la case (voir le maillage) ; deux images
+			// croisées au milieu de la case la coupaient en deux.
+			if (out.kind[t] == kWallObject && !g.vmpMap[t]) {
+				int x0 = kDunTexSize, y0 = kDunWallRows, x1 = -1, y1 = -1;
+				for (int y = 0; y < kDunWallRows; y++)
+					for (int x = 0; x < kDunTexSize; x++)
+						if (al[y * kDunTexSize + x]) {
+							x0 = x < x0 ? x : x0; x1 = x > x1 ? x : x1;
+							y0 = y < y0 ? y : y0; y1 = y > y1 ? y : y1;
+						}
+				const int bw = x1 - x0 + 1, bh = y1 - y0 + 1;
+				if (x1 >= 0 && bw >= 56 && bh >= 44 && y0 < 40) {
+					out.scenery[t] = true;
+					for (int y = 0; y < kDunWallRows; y++)
+						for (int x = 0; x < kDunTexSize; x++) {
+							const int si = (y0 + y * bh / kDunWallRows) * kDunTexSize + x0 + x * bw / kDunTexSize;
+							img[y * kDunTexSize + x] = al[si] ? rgb(px[si]) : Rgba{0, 0, 0, 0};
+						}
+				}
+			}
 			// Une image (une maison au bout d'un chemin, l'entrée d'une autre région) : le jeu la montre
 			// au loin, petite au milieu du mur ; ici, de près, elle couvre tout le mur.
 			if (picture && out.kind[t] == kWallFace) {
@@ -656,6 +678,20 @@ void buildDungeonMesh(const uint8_t *walls, const DungeonGfx &g, const DungeonTe
 				continue;
 			// Un objet au milieu de la case : deux images croisées, visibles des deux côtés.
 			if (tex.kind[t] == kWallObject) {
+				if (!objectDone && tex.typeLayer[t] >= 0 && tex.scenery[t]) {
+					// Un décor entier : au fond de la case, face à l'unique ouverture (sinon, comme un objet).
+					int open = -1, nOpen = 0;
+					for (int k2 = 0; k2 < 4; k2++)
+						if (!isSolidBlock(walls, (b + dx[k2] + dz[k2] * 32) & 1023, g)) {
+							open = k2;
+							nOpen++;
+						}
+					if (nOpen == 1) {
+						objectDone = true;
+						upright(cx - dx[open] * (S * 0.5f - 0.01f), cz - dz[open] * (S * 0.5f - 0.01f), (float)dx[open], (float)dz[open], (float)tex.typeLayer[t], faceShade[open], 1.0f, false);
+						continue;
+					}
+				}
 				if (!objectDone && tex.typeLayer[t] >= 0) {
 					objectDone = true;
 					uint8_t tn = w[0] && tex.kind[w[0]] == kWallObject ? w[0] : t;

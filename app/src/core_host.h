@@ -104,7 +104,7 @@ struct LevelSnapshot {
 	bool scenePicture = false; // une scène montre sa propre image (boutique, personnage), pas le donjon
 	int spellCount = 0;        // les sorts du parchemin
 	MapSnapshot map;           // l'atlas
-	uint32_t sceneRect = 0;    // où la scène se montre : x | y << 9 | l << 16 | h << 25 (0 : la vue)
+	uint32_t sceneRect = 0;    // où la scène se montre : x | y << 9 | l << 16 | (h / 2) << 25 (0 : la vue)
 	uint32_t placeSerial = 0;
 	std::vector<int> placeTypes;
 	std::vector<uint8_t> placeRgb;

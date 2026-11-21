@@ -72,8 +72,8 @@ struct Composite {
 	uint32_t serial = 0;
 	int key = -1;          // nombre de personnages, fenêtre éteinte... : refaire si cela change
 };
-const int kCompParty = 0, kCompSpells = 1, kCompAtlas = 2;
-const int kCompTexW[3] = {104, 240, kAtlasW}, kCompTexH[3] = {200, 288, kAtlasH};
+const int kCompParty = 0, kCompSpells = 1, kCompAtlas = 2, kCompInv = 3;
+const int kCompTexW[4] = {104, 240, kAtlasW, 240}, kCompTexH[4] = {200, 288, kAtlasH, 24};
 const int kSpellTabH = 18; // bandeau du haut de la fenêtre de gauche : ouvrir ou replier le livre de sorts
 
 // Les pixels du jeu sont 1,2 fois plus hauts que larges ; ceux du clavier sont carrés.
@@ -377,7 +377,7 @@ struct Ui::Impl {
 	int menuItem(int row) const { return menuRows() == 5 && row >= 2 ? row + 1 : row; }
 	// Colonne du groupe recomposée
 	int chooserHot = -1; // bouton visé dans la fenêtre du choix de la vue
-	Composite comp[3];
+	Composite comp[4];
 	bool atlasCollapsed = false, atlasTabHot = false, atlasOn = true;
 	uint32_t atlasSerial = 0;
 	int atlasKey = -1;
@@ -387,7 +387,7 @@ struct Ui::Impl {
 	bool spellsCollapsed = true; // livre de sorts replié : seuls le bandeau et les messages restent
 	bool spellTabHot = false;
 	void compose(int which, const UiFrameInput &in);
-	int compOf(int panel) const { return panel == kPanelParty ? kCompParty : panel == kPanelSpells ? kCompSpells : panel == kPanelAtlas ? kCompAtlas : -1; }
+	int compOf(int panel) const { return panel == kPanelParty ? kCompParty : panel == kPanelSpells ? kCompSpells : panel == kPanelAtlas ? kCompAtlas : panel == kPanelInventory ? kCompInv : -1; }
 	// L'atlas à droite de la fenêtre des personnages, haut contre haut.
 	void placeAtlas(UiPlacement *placement);
 	int drag = -1;
@@ -532,7 +532,7 @@ void Ui::Impl::compose(int which, const UiFrameInput &in) {
 	Composite &c = comp[which];
 	const int n = in.characters < 0 ? 0 : in.characters > 4 ? 4 : in.characters;
 	const bool blank = in.compassBlank;
-	const int key = (which == kCompParty ? n * 2 + (blank ? 1 : 0) : (spellsCollapsed ? 1 : 0) + language * 2 + (spellTabHot ? 4 : 0)) + (in.textBoxActive ? 64 : 0);
+	const int key = (which == kCompInv ? 1 : which == kCompParty ? n * 2 + (blank ? 1 : 0) : (spellsCollapsed ? 1 : 0) + language * 2 + (spellTabHot ? 4 : 0)) + (in.textBoxActive ? 64 : 0);
 	if (c.tex && in.gameSerial == c.serial && key == c.key)
 		return;
 	// Pendant une boîte de texte, les morceaux viennent de l'image d'avant ; sinon on la garde à jour.
@@ -563,7 +563,12 @@ void Ui::Impl::compose(int which, const UiFrameInput &in) {
 	c.texH = kCompTexH[which];
 	c.pieces.clear();
 	int band = -1; // début du bandeau des boutons (colonne de droite)
-	if (which == kCompParty) {
+	if (which == kCompInv) {
+		// La ligne d'objets du bas : pendant une grande boîte de texte, le jeu la recouvre ; on garde celle d'avant.
+		c.pieces.push_back({0, 0, 237, 22, 83, 178, 237, 22});
+		c.w = 237;
+		c.h = 22;
+	} else if (which == kCompParty) {
 		for (int i = 0; i < n; i++)
 			c.pieces.push_back({0, i * 36, 66, 34, in.portraitX[i], 143, 66, 34});
 		c.pieces.push_back({68, 0, 32, 122, 288, 0, 32, 122});
@@ -631,7 +636,7 @@ void Ui::Impl::compose(int which, const UiFrameInput &in) {
 		for (int y = 0; y < kSpellTabH; y++)
 			memcpy(&c.px[(size_t)y * c.texW * 4], &cv.px[(size_t)y * c.w * 4], (size_t)c.w * 4);
 	}
-	upload(c.tex, c.px, c.texW, c.texH, which == kCompParty ? "groupe" : "sorts");
+	upload(c.tex, c.px, c.texW, c.texH, which == kCompParty ? "groupe" : which == kCompInv ? "inventaire" : "sorts");
 }
 
 // L'atlas : la page de l'atlas telle que le jeu la dessine (le moteur la refait à chaque pas),
@@ -1537,6 +1542,8 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 		visible[i] = placed && in.split;
 	if (visible[kPanelParty])
 		d->compose(kCompParty, in);
+	if (visible[kPanelInventory])
+		d->compose(kCompInv, in);
 	if (visible[kPanelSpells])
 		d->compose(kCompSpells, in);
 	// L'atlas : quand le groupe a la carte (et le réglage le montre).
@@ -2148,7 +2155,8 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 			} else if (d->compOf(hitIndex) >= 0) {
 				// Fenêtre recomposée : retrouver le morceau visé, et l'endroit du jeu qu'il montre.
 				const Composite &c = d->comp[d->compOf(hitIndex)];
-				float cx = u * (float)c.w, cy = v * (float)c.h;
+				// (au bord exact d'une fenêtre : dans son dernier pixel)
+				float cx = clampf(u * (float)c.w, 0.0f, (float)c.w - 0.001f), cy = clampf(v * (float)c.h, 0.0f, (float)c.h - 0.001f);
 				for (const Piece &pc : c.pieces) {
 					if (!pc.contains(cx, cy))
 						continue;

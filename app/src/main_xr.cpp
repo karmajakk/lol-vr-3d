@@ -557,6 +557,10 @@ struct App {
 	bool aimOnUi = false;     // le doigt vise une fenêtre ou l'écran
 	int visBlock = -1;        // case où se tient la vue 3D (elle ne suit pas le groupe dans une porte de boutique)
 	bool holdScene = false;   // une scène s'est jouée pendant que le groupe était dans un bloc d'entrée
+	bool prevHold = false;    // le groupe était dans un bloc d'entrée à l'image d'avant
+	bool holdOver = false;    // le groupe a quitté un bloc d'entrée : la vue reste devant l'image du lieu pendant sa scène
+	bool holdOverScene = false;
+	double holdOverUntil = 0.0;
 	int openBlock = -1;       // bloc d'entrée où l'on se tient (montré ouvert), -1 sinon
 	int builtOpen = -1;
 	float lightLevel = 1.0f;  // clarté du jeu (pénombre, lampe), adoucie
@@ -1780,7 +1784,7 @@ void updateLayout(App &app, double now) {
 		// l'écran s'élargit à toute la scène, ses personnages et son bouton de sortie.
 		const uint32_t sr = app.level.sceneRect;
 		if (app.dungeonMode && app.level.scenePicture && sr && !app.charSheet) {
-			const float rx = (float)(sr & 511), rw = (float)((sr >> 16) & 511), rh = (float)((sr >> 25) & 127);
+			const float rx = (float)(sr & 511), rw = (float)((sr >> 16) & 511), rh = (float)((sr >> 25) & 127) * 2.0f;
 			if (rw > kViewW + 1.0f && rx + rw <= 320.0f && rh >= 60.0f) {
 				cx = rx;
 				cw = rw;
@@ -2985,8 +2989,8 @@ void updateDungeon(App &app, float dt) {
 				// Le point du mur où l'œil, au centre de la case voisine, voit le pied de l'objet ; un
 				// peu en avant du mur.
 				float r = faceD / itemD;
-				d.x = vx + (d.x - vx) * r + nx * 0.04f;
-				d.z = vz + (d.z - vz) * r + nz * 0.04f;
+				d.x = vx + (d.x - vx) * r + nx * 0.012f;
+				d.z = vz + (d.z - vz) * r + nz * 0.012f;
 				d.base = eyeY * (1.0f - r);
 				// Posé en hauteur dans le mur (une alcôve) : le jeu le dessine plus haut, de 6 pixels par
 				// cran (pixels du mur vu de face : sa hauteur fait 96 pixels).
@@ -3072,7 +3076,29 @@ void updateDungeon(App &app, float dt) {
 	// Un bloc plein qu'on traverse (ses murs portent le drapeau 0x80 : un faux mur, l'entrée d'une
 	// maison à Yvel) : le jeu y fait entrer le groupe et dessine ce qui l'entoure ; ici aussi.
 	const bool fake = !hold && lolvr::isSolidBlock(l.walls, l.block, g);
-	if (gfxChanged || app.shownLevel != l.level || app.visBlock < 0 || !hold || leftScene) {
+	// De la porte d'un lieu (le bloc de l'image) à l'intérieur (l'auberge, la marina) : le groupe fait un
+	// pas hors du bloc de l'image et le jeu y joue sa scène. La vue reste devant l'image du lieu, comme
+	// avant ; autrement on voit, derrière la scène, le mur de forêt de la case où le groupe est entré.
+	{
+		const bool pictureScene = l.sceneBusy && l.scenePicture;
+		if (app.prevHold && !hold && !gfxChanged && app.shownLevel == l.level && app.visBlock >= 0) {
+			app.holdOver = true;
+			app.holdOverScene = false;
+			app.holdOverUntil = app.clock + 1.4;
+		}
+		app.prevHold = hold;
+		if (app.holdOver) {
+			if (pictureScene) {
+				app.holdOverScene = true;
+				app.holdOverUntil = app.clock + 120.0;
+			}
+			if (gfxChanged || app.shownLevel != l.level || hold || (app.holdOverScene && !pictureScene) || app.clock > app.holdOverUntil)
+				app.holdOver = false;
+		}
+	}
+	if (app.holdOver) {
+		// (la vue ne bouge pas)
+	} else if (gfxChanged || app.shownLevel != l.level || app.visBlock < 0 || !hold || leftScene) {
 		app.visBlock = l.block;
 		// Arrivée sur une entrée (le bloc de l'image, à la sortie du château, du manoir, de la hutte de
 		// Buck) : comme le jeu, on se tient dans ce bloc, ouvert (ses murs ne se voient que de dehors).

@@ -191,7 +191,7 @@ int main(int argc, char **argv) {
 				host.gameState(gs);
 				host.levelSnapshot(w);
 				char line[256];
-				snprintf(line, sizeof line, "niveau %d mode %d scène %d image %d texte %08x case %d dir %d", gs.level, gs.controlMode, w.sceneBusy, (int)w.scenePicture, w.textRect, w.block, w.direction);
+				snprintf(line, sizeof line, "niveau %d mode %d scène %d image %d texte %08x rect %08x case %d dir %d", gs.level, gs.controlMode, w.sceneBusy, (int)w.scenePicture, w.textRect, w.sceneRect, w.block, w.direction);
 				if (last != line) {
 					last = line;
 					printf("  %5d ms : %s\n", i * 10, line);
@@ -275,6 +275,7 @@ int main(int argc, char **argv) {
 				map.title = m.map.title;
 				map.rgb = m.map.rgb.size() >= 320 * 200 * 3 ? m.map.rgb.data() : nullptr;
 				for (const MapSnapshot::Legend &e : m.map.legend) {
+					printf("    lieu : %s (trigger %d, case %d)\n", e.text.c_str(), e.trigger, e.mark);
 					UiMap::Mark k;
 					k.trigger = e.trigger;
 					k.mark = e.mark;

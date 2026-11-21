@@ -81,7 +81,7 @@ index 1016080..bfba10b 100644
  		// the global subtitles settings, we're using this hack to enable subtitles
  		// for fan translations
 diff --git a/engines/kyra/engine/lol.cpp b/engines/kyra/engine/lol.cpp
-index c4f86a3..eb3a2f6 100644
+index c4f86a3..5f66d37 100644
 --- a/engines/kyra/engine/lol.cpp
 +++ b/engines/kyra/engine/lol.cpp
 @@ -21,6 +21,8 @@
@@ -270,7 +270,7 @@ index c4f86a3..eb3a2f6 100644
  	updateSequenceBackgroundAnimations();
  
  	if (_updateCharNum != -1 && _system->getMillis() > _updatePortraitNext)
-@@ -1621,6 +1754,7 @@ void LoLEngine::setupScreenDims() {
+@@ -1621,9 +1754,11 @@ void LoLEngine::setupScreenDims() {
  		_screen->modifyScreenDim(4, 11, 124, 28, 9);
  		_screen->modifyScreenDim(5, 85, 123, 233, 18);
  	}
@@ -278,7 +278,11 @@ index c4f86a3..eb3a2f6 100644
  }
  
  void LoLEngine::initSceneWindowDialogue(int controlMode) {
-@@ -1633,6 +1767,8 @@ void LoLEngine::initSceneWindowDialogue(int controlMode) {
++	lolvrTurnPause(); // lol-vr-3d
+ 	resetPortraitsAndDisableSysTimer();
+ 	gui_prepareForSequence(112, 0, 176, 120, controlMode);
+ 
+@@ -1633,6 +1768,8 @@ void LoLEngine::initSceneWindowDialogue(int controlMode) {
  	_txt->expandField();
  	setupScreenDims();
  	gui_disableControls(controlMode);
@@ -287,17 +291,17 @@ index c4f86a3..eb3a2f6 100644
  }
  
  void LoLEngine::toggleSelectedCharacterFrame(bool mode) {
-@@ -1649,6 +1785,9 @@ void LoLEngine::toggleSelectedCharacterFrame(bool mode) {
+@@ -1649,6 +1786,9 @@ void LoLEngine::toggleSelectedCharacterFrame(bool mode) {
  }
  
  void LoLEngine::gui_prepareForSequence(int x, int y, int w, int h, int buttonFlags) {
 +	lolvrTurnPause(); // lol-vr-3d
 +	lolvrScenePicture(); // lol-vr-3d
-+	g_lolvrLevel.sceneRect = (uint32)x | ((uint32)y << 9) | ((uint32)w << 16) | ((uint32)h << 25); // lol-vr-3d
++	g_lolvrLevel.sceneRect = (uint32)x | ((uint32)y << 9) | ((uint32)w << 16) | ((uint32)(h >> 1) << 25); // lol-vr-3d
  	setSequenceButtons(x, y, w, h, buttonFlags);
  
  	_seqWindowX1 = x;
-@@ -1690,6 +1829,10 @@ void LoLEngine::gui_specialSceneRestoreControls(int restoreLamp) {
+@@ -1690,6 +1830,10 @@ void LoLEngine::gui_specialSceneRestoreControls(int restoreLamp) {
  }
  
  void LoLEngine::restoreAfterSceneWindowDialogue(int redraw) {
@@ -308,7 +312,7 @@ index c4f86a3..eb3a2f6 100644
  	gui_enableControls();
  	_txt->setupField(false);
  	_updateFlags &= 0xFFDF;
-@@ -1711,9 +1854,12 @@ void LoLEngine::restoreAfterSceneWindowDialogue(int redraw) {
+@@ -1711,9 +1855,12 @@ void LoLEngine::restoreAfterSceneWindowDialogue(int redraw) {
  
  	_needSceneRestore = 0;
  	enableSysTimer(2);
@@ -321,7 +325,7 @@ index c4f86a3..eb3a2f6 100644
  	if (controlMode) {
  		_timer->disable(11);
  		_fadeText = false;
-@@ -1734,6 +1880,7 @@ void LoLEngine::initDialogueSequence(int controlMode, int pageNum) {
+@@ -1734,6 +1881,7 @@ void LoLEngine::initDialogueSequence(int controlMode, int pageNum) {
  		_txt->clearDim(4);
  
  		_updateFlags |= 2;
@@ -329,7 +333,7 @@ index c4f86a3..eb3a2f6 100644
  		_currentControlMode = controlMode;
  		calcCharPortraitXpos();
  
-@@ -1758,11 +1905,16 @@ void LoLEngine::initDialogueSequence(int controlMode, int pageNum) {
+@@ -1758,11 +1906,16 @@ void LoLEngine::initDialogueSequence(int controlMode, int pageNum) {
  
  	_currentControlMode = controlMode;
  	_dialogueField = true;
@@ -346,7 +350,7 @@ index c4f86a3..eb3a2f6 100644
  
  	stopPortraitSpeechAnim();
  	_currentControlMode = controlMode;
-@@ -1780,6 +1932,8 @@ void LoLEngine::restoreAfterDialogueSequence(int controlMode) {
+@@ -1780,6 +1933,8 @@ void LoLEngine::restoreAfterDialogueSequence(int controlMode) {
  	}
  
  	_dialogueField = false;
@@ -355,7 +359,7 @@ index c4f86a3..eb3a2f6 100644
  }
  
  void LoLEngine::resetPortraitsAndDisableSysTimer() {
-@@ -1922,6 +2076,21 @@ void LoLEngine::loadTalkFile(int index) {
+@@ -1922,6 +2077,21 @@ void LoLEngine::loadTalkFile(int index) {
  	_res->loadPakFile(Common::Path(Common::String::format("%02d.TLK", index)));
  }
  
@@ -377,7 +381,7 @@ index c4f86a3..eb3a2f6 100644
  int LoLEngine::characterSays(int track, int charId, bool redraw) {
  	if (charId == 1) {
  		charId = _selectedCharacter;
-@@ -2020,6 +2189,7 @@ int LoLEngine::playCharacterScriptChat(int charId, int mode, int restorePortrait
+@@ -2020,6 +2190,7 @@ int LoLEngine::playCharacterScriptChat(int charId, int mode, int restorePortrait
  	_fadeText = false;
  	if (!skipAnim && charId < 3)
  		updatePortraitSpeechAnim();
@@ -385,7 +389,7 @@ index c4f86a3..eb3a2f6 100644
  
  	return 1;
  }
-@@ -2123,8 +2293,12 @@ int LoLEngine::castSpell(int charNum, int spellType, int spellLevel) {
+@@ -2123,8 +2294,12 @@ int LoLEngine::castSpell(int charNum, int spellType, int spellLevel) {
  
  	if (charNum < 0) {
  		_activeSpell.charNum = (charNum * -1) - 1;
@@ -400,7 +404,7 @@ index c4f86a3..eb3a2f6 100644
  	} else {
  		if (_activeSpell.p->mpRequired[spellLevel] > _characters[charNum].magicPointsCur)
  			return 0;
-@@ -2136,13 +2310,421 @@ int LoLEngine::castSpell(int charNum, int spellType, int spellLevel) {
+@@ -2136,13 +2311,447 @@ int LoLEngine::castSpell(int charNum, int spellType, int spellLevel) {
  		setCharacterMagicOrHitPoints(charNum, 0, -_activeSpell.p->hpRequired[spellLevel], 1);
  		gui_drawCharPortraitWithStats(charNum);
  
@@ -742,14 +746,40 @@ index c4f86a3..eb3a2f6 100644
 +	_mapOverlay = oldOverlay;
 +}
 +
++// lol-vr-3d: the monsters near the party turn to face it, as they do when a scene (the thieves' demand)
++// starts: the game only draws them as they were, walking across. Returns true if any turned.
++bool LoLEngine::lolvrFaceMonsters() {
++	bool turned = false;
++	const int px = _currentBlock & 31, py = _currentBlock >> 5;
++	for (int i = 0; i < 30; i++) {
++		LoLMonster *m = &_monsters[i];
++		if (!m->properties || m->mode > 13 || m->hitPoints <= 0)
++			continue;
++		const int mx = m->block & 31, my = m->block >> 5;
++		if (ABS(mx - px) > 3 || ABS(my - py) > 3)
++			continue;
++		const int dir = calcMonsterDirection(m->x, m->y, _partyPosX, _partyPosY);
++		if (m->direction == dir && m->facing == (dir >> 1))
++			continue;
++		m->direction = dir;
++		m->facing = dir >> 1;
++		m->destDirection = dir;
++		turned = true;
++	}
++	return turned;
++}
++
 +void LoLEngine::lolvrTurnPause() {
 +	// (the party's place as the scene starts, even when no script moved it: a step onto the block)
 +	g_lolvrLevel.block = _currentBlock;
 +	g_lolvrLevel.direction = _currentDirection;
-+	if (!_lolvrTurnPending)
++	const bool turned = lolvrFaceMonsters();
++	if (turned && g_lolvrLevel.gfxSerial && g_lolvrLevel.wallCaptureSerial == g_lolvrLevel.gfxSerial)
++		lolvrCaptureSprites(); // the monsters as they look now, facing the party
++	if (!_lolvrTurnPending && !turned)
 +		return;
 +	_lolvrTurnPending = false;
-+	delay(700, true);
++	delay(turned ? 900 : 700, true);
 +}
 +
 +void LoLEngine::lolvrExportLight() {
@@ -822,7 +852,7 @@ index c4f86a3..eb3a2f6 100644
  int LoLEngine::castSpark(ActiveSpell *a) {
  	processMagicSpark(a->charNum, a->level);
  	return 1;
-@@ -3206,6 +3788,10 @@ void LoLEngine::addSpellToScroll(int spell, int charNum) {
+@@ -3206,6 +3815,10 @@ void LoLEngine::addSpellToScroll(int spell, int charNum) {
  		}
  	}
  
@@ -833,7 +863,7 @@ index c4f86a3..eb3a2f6 100644
  	if (spell > 1)
  		transferSpellToScollAnimation(charNum, spell, slot - 1);
  
-@@ -3521,6 +4107,8 @@ int LoLEngine::calcInflictableDamage(int16 attacker, int16 target, int hitType)
+@@ -3521,6 +4134,8 @@ int LoLEngine::calcInflictableDamage(int16 attacker, int16 target, int hitType)
  int LoLEngine::inflictDamage(uint16 target, int damage, uint16 attacker, int skill, int flags) {
  	LoLMonster *m = 0;
  	LoLCharacter *c = 0;
@@ -842,7 +872,7 @@ index c4f86a3..eb3a2f6 100644
  
  	if (target & 0x8000) {
  		m = &_monsters[target & 0x7FFF];
-@@ -4130,7 +4718,6 @@ uint16 LoLEngine::getNearestPartyMemberFromPos(int x, int y) {
+@@ -4130,7 +4745,6 @@ uint16 LoLEngine::getNearestPartyMemberFromPos(int x, int y) {
  // magic atlas
  
  void LoLEngine::displayAutomap() {
@@ -850,7 +880,7 @@ index c4f86a3..eb3a2f6 100644
  	snd_playSoundEffect(105, -1);
  	gui_toggleButtonDisplayMode(_flags.isTalkie ? 78 : 76, 1);
  
-@@ -4174,6 +4761,9 @@ void LoLEngine::displayAutomap() {
+@@ -4174,6 +4788,9 @@ void LoLEngine::displayAutomap() {
  
  	_screen->copyPage(2, 0);
  	_screen->updateScreen();
@@ -861,7 +891,7 @@ index c4f86a3..eb3a2f6 100644
  	uint32 delayTimer = _system->getMillis() + 8 * _tickLength;
  
 diff --git a/engines/kyra/engine/lol.h b/engines/kyra/engine/lol.h
-index a9028a2..71c5847 100644
+index a9028a2..4dd0718 100644
 --- a/engines/kyra/engine/lol.h
 +++ b/engines/kyra/engine/lol.h
 @@ -50,6 +50,133 @@ struct LolvrGameState {
@@ -998,7 +1028,7 @@ index a9028a2..71c5847 100644
  }
  
  namespace Audio {
-@@ -335,6 +462,44 @@ private:
+@@ -335,6 +462,45 @@ private:
  
  	// main loop
  	void runLoop();
@@ -1037,6 +1067,7 @@ index a9028a2..71c5847 100644
 +	bool lolvrExportPlace(int type, const char *name);
 +	void lolvrPartyMoved();           // lol-vr-3d: called wherever the party's block or direction changes
 +	void lolvrTurnPause();            // lol-vr-3d: before a scene starts, the time to turn
++	bool lolvrFaceMonsters();         // lol-vr-3d: monsters near the party turn to face it
 +	void lolvrScenePicture() { g_lolvrLevel.scenePicture = 1; } // lol-vr-3d: the scene window shows a picture
 +private:
 +	bool lolvrDrawSprite(uint16 id, uint8 &ceiling); // lol-vr-3d
@@ -1044,7 +1075,7 @@ index a9028a2..71c5847 100644
  
  	// mouse
 diff --git a/engines/kyra/engine/scene_lol.cpp b/engines/kyra/engine/scene_lol.cpp
-index 210b482..efcc034 100644
+index 210b482..b88f0cd 100644
 --- a/engines/kyra/engine/scene_lol.cpp
 +++ b/engines/kyra/engine/scene_lol.cpp
 @@ -76,6 +76,17 @@ void LoLEngine::loadLevel(int index) {
@@ -1099,7 +1130,7 @@ index 210b482..efcc034 100644
  		setSpecialSceneButtons(0, 0, 320, 130, controlMode);
 +		// lol-vr-3d: a scene over the whole width (the poisoning of King Richard, Baccata's cage)
 +		g_lolvrLevel.scenePicture = 1;
-+		g_lolvrLevel.sceneRect = 0u | (0u << 9) | (320u << 16) | (130u << 25);
++		g_lolvrLevel.sceneRect = 0u | (0u << 9) | (320u << 16) | (65u << 25);
  
  	} else {
  		if (suspendGui)

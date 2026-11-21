@@ -77,6 +77,7 @@ struct DungeonTextures {
 	// Une ouverture jusqu'au sol dans un mur (une sortie, une porte de boutique) : chaque colonne
 	// posée au sol par son pied (planeColFoot).
 	bool footFit[256];
+	bool scenery[256];         // un objet qui est en fait un décor entier (la sortie d'une grotte) : dressé au fond de la case
 	// Un mur que le jeu ne dessine pas (invisible et franchissable) : ni maillage ni clic.
 	bool hidden[256];
 	// La porte dans son dessin (fraction de la texture, en hauteur) : son haut et son pied ; et une
