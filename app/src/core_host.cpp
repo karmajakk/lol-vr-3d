@@ -108,6 +108,7 @@ struct LolvrLevelData {
 	int32_t placeCount;
 	int32_t placeType[16];
 	const uint8_t *placeRgb;
+	int32_t scenePicture;
 };
 const LolvrLevelData *retro_lolvr_level(void);
 }
@@ -408,6 +409,7 @@ void copyLevel() {
 	l.textRect = (uint32_t)s->textBox;
 	// L'objet tenu par le pointeur, et l'image du curseur du jeu (en couleurs, le fond transparent)
 	l.itemInHand = s->itemInHand;
+	l.scenePicture = s->scenePicture != 0;
 	l.magicMenu = s->magicMenu;
 	l.magicLevels = s->magicLevels;
 	// Les images des lieux (176 x 120, RVB), à poser sur leur mur
@@ -737,6 +739,7 @@ bool CoreHost::levelSnapshot(LevelSnapshot &out) const {
 	out.textBox = l.textBox;
 	out.textRect = l.textRect;
 	out.itemInHand = l.itemInHand;
+	out.scenePicture = l.scenePicture;
 	out.magicMenu = l.magicMenu;
 	out.magicLevels = l.magicLevels;
 	if (out.placeSerial != l.placeSerial) {

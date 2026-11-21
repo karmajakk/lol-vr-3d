@@ -557,6 +557,8 @@ struct App {
 	bool aimOnUi = false;     // le doigt vise une fenêtre ou l'écran
 	int visBlock = -1;        // case où se tient la vue 3D (elle ne suit pas le groupe dans une porte de boutique)
 	bool holdScene = false;   // une scène s'est jouée pendant que le groupe était dans un bloc d'entrée
+	int openBlock = -1;       // bloc d'entrée où l'on se tient (montré ouvert), -1 sinon
+	int builtOpen = -1;
 	float lightLevel = 1.0f;  // clarté du jeu (pénombre, lampe), adoucie
 	double imagesCheckedAt = -100.0;
 	bool imageLoaded[kImageSlots] = {false, false, false, false, false, false};
@@ -2059,8 +2061,17 @@ bool dungeonPick(App &app, Vec3 tip, Vec3 dir, float &gu, float &gv, Vec3 &hitW,
 				continue;
 			bestT = tt;
 			hit = hh;
-			px = 136.0f + (dt.planeU0[backT] + u * (dt.planeU1[backT] - dt.planeU0[backT])) * 128.0f;
-			py = 8.0f + (dt.planeTop[backT] + (1.0f - hh.y / H) * (dt.planeFoot[backT] - dt.planeTop[backT])) * 128.0f;
+			const float uu = dt.planeU0[backT] + u * (dt.planeU1[backT] - dt.planeU0[backT]);
+			// comme le maillage : le pied dessiné de chaque colonne est au sol
+			float vf = dt.planeFoot[backT];
+			const int col = (int)fminf(fmaxf(uu * 128.0f, 0.0f), 127.0f);
+			if (dt.planeColFoot[backT][col]) {
+				const float f = (float)dt.planeColFoot[backT][col] / 128.0f;
+				if (f > dt.planeTop[backT] + 0.2f && f < vf)
+					vf = f;
+			}
+			px = 136.0f + uu * 128.0f;
+			py = 8.0f + (dt.planeTop[backT] + (1.0f - hh.y / H) * (vf - dt.planeTop[backT])) * 128.0f;
 			finalF = f;
 			face = k;
 			finalR = r;
@@ -2077,6 +2088,11 @@ bool dungeonPick(App &app, Vec3 tip, Vec3 dir, float &gu, float &gv, Vec3 &hitW,
 			// L'image du mur (128 x 96, horizon au milieu) est agrandie de wfr autour de mi-hauteur.
 			float u = 0.5f + dot(hh - facePt, r) / (S * wfr);
 			float row = 48.0f - (hh.y - H * 0.5f) / (H * 0.5f * wfr) * 48.0f;
+			if (app.dunTex.footFit[backT] && wfr == 1.0f && app.dunTex.doorLayer[backT] < 0) {
+				// comme le maillage : la colonne descend jusqu'à son pied dessiné
+				const uint8_t f = app.dunTex.planeColFoot[backT][(int)fminf(fmaxf(u * 128.0f, 0.0f), 127.0f)];
+				row = (1.0f - hh.y / H) * (f ? (float)f : 96.0f);
+			}
 			if (u < 0.0f || u > 1.0f || row < 0.0f || row > 96.0f || hh.y < 0.0f || hh.y > H)
 				continue;
 			bestT = tt;
@@ -2901,10 +2917,16 @@ void updateDungeon(App &app, float dt) {
 		app.builtGfx = l.gfxSerial;
 		LOGI("donjon 3D : niveau %d, %d textures, %d lieux", l.level, app.dunTex.layers, (int)l.placeTypes.size());
 	}
-	if (texChanged || l.wallsSerial != app.builtWalls || (l.direction & 3) != app.builtDir) {
+	if (texChanged || l.wallsSerial != app.builtWalls || (l.direction & 3) != app.builtDir || app.openBlock != app.builtOpen) {
 		app.builtDir = l.direction & 3;
+		app.builtOpen = app.openBlock;
 		std::vector<lolvr::DungeonVertex> verts;
-		lolvr::buildDungeonMesh(l.walls, g, app.dunTex, verts, app.builtDir);
+		// Le bloc d'entrée où se tient le groupe : sans ses murs, comme le jeu le dessine de l'intérieur.
+		uint8_t walls[4096];
+		memcpy(walls, l.walls, sizeof(walls));
+		if (app.openBlock >= 0)
+			memset(walls + app.openBlock * 4, 0, 4);
+		lolvr::buildDungeonMesh(walls, g, app.dunTex, verts, app.builtDir);
 		app.dungeon.setMesh(verts);
 		app.builtWalls = l.wallsSerial;
 	}
@@ -3062,21 +3084,12 @@ void updateDungeon(App &app, float dt) {
 	}
 	if (gfxChanged || app.shownLevel != l.level || app.visBlock < 0 || !hold || leftScene) {
 		app.visBlock = l.block;
-		// Arrivée dans une nouvelle région sur l'entrée elle-même (le bloc de l'image, à la sortie du
-		// château par exemple) : on se tient devant, dans le passage, plutôt que dans le mur.
-		if (hold) {
-			static const int hdx[4] = {0, 1, 0, -1}, hdz[4] = {-1, 0, 1, 0};
-			for (int i = 0; i < 4; i++) {
-				// devant d'abord ; après une scène, puis derrière (une boutique dont on ressort à reculons)
-				static const int arrive[4] = {0, 1, 3, 2}, back[4] = {0, 2, 1, 3};
-				const int k = (l.direction + (leftScene ? back[i] : arrive[i])) & 3;
-				const int nb = (l.block + hdx[k] + hdz[k] * 32) & 1023;
-				if (!lolvr::isSolidBlock(l.walls, nb, g) && !lolvr::isHoldBlock(l.walls, nb, g)) {
-					app.visBlock = nb;
-					break;
-				}
-			}
-		}
+		// Arrivée sur une entrée (le bloc de l'image, à la sortie du château, du manoir, de la hutte de
+		// Buck) : comme le jeu, on se tient dans ce bloc, ouvert (ses murs ne se voient que de dehors).
+		// On en repart comme d'une case ordinaire, et les clics visent les murs autour.
+		app.openBlock = hold ? l.block : -1;
+	} else if (!hold || app.openBlock != l.block) {
+		app.openBlock = -1;
 	}
 	float tx, tz;
 	lolvr::blockCenter(app.visBlock, tx, tz);
@@ -3156,7 +3169,8 @@ void updateDungeon(App &app, float dt) {
 		for (int k = 0; k < 4 && !inWall; k++) {
 			float sx = lx + ((k & 1) ? m : -m), sz = lz + ((k & 2) ? m : -m);
 			int bx = (int)floorf(sx / S), bz = (int)floorf(sz / S);
-			inWall = lolvr::isSolidBlock(l.walls, (bz * 32 + bx) & 1023, g); // au bord, la case suivante
+			const int wb = (bz * 32 + bx) & 1023; // au bord, la case suivante
+			inWall = wb != app.openBlock && lolvr::isSolidBlock(l.walls, wb, g);
 		}
 		app.wallDim += ((inWall ? 1.0f : 0.0f) - app.wallDim) * clampf(dt * 8.0f, 0.0f, 1.0f);
 		light *= 1.0f - 0.92f * app.wallDim;
@@ -3176,11 +3190,13 @@ void updateScreenShown(App &app, double now) {
 	// La carte, une fiche, un menu : l'écran disparaît dès qu'ils se ferment. Une scène (boutique,
 	// rencontre) : un court instant de grâce, le temps qu'une scène suivante enchaîne.
 	bool need = !app.dungeonVisible || !app.splitWanted || app.charSheet || app.automapOpen;
-	if (app.level.sceneBusy)
+	// Une scène qui montre sa propre image (une boutique, un personnage, une cinématique). Une
+	// remarque ou un monstre qui parle (les chandeliers, le gros orc) laisse le donjon dans la fenêtre
+	// du jeu : seule la boîte de texte apparaît, le donjon en 3D le montre déjà.
+	const bool scene = app.level.scenePicture && (app.level.sceneBusy || app.cutscene);
+	if (scene)
 		app.screenNeededAt = now;
-	if (app.cutscene)
-		app.screenNeededAt = now;
-	bool show = need || app.level.sceneBusy || app.cutscene || now - app.screenNeededAt < 0.1;
+	bool show = need || scene || now - app.screenNeededAt < 0.1;
 	if (show && !app.screenShown && app.dungeonVisible && app.headValid && app.screenPlaced) {
 		// Il revient là où le joueur regarde, à sa distance et à sa hauteur habituelles.
 		Vec3 f = rotate(app.headRot, {0, 0, -1});

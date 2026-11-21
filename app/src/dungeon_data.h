@@ -72,6 +72,9 @@ struct DungeonTextures {
 	// Une image agrandie à tout le mur : où elle était dans le dessin du jeu (x, y, largeur, hauteur ;
 	// largeur 0 = pas agrandie). Un clic sur le mur se ramène là, où le jeu l'attend.
 	int16_t picBox[256][4];
+	// Une ouverture jusqu'au sol dans un mur (une sortie, une porte de boutique) : chaque colonne
+	// posée au sol par son pied (planeColFoot).
+	bool footFit[256];
 	// La porte dans son dessin (fraction de la texture, en hauteur) : son haut et son pied ; et une
 	// porte qui s'ouvre ou se ferme : la part de sa hauteur dont elle est levée (0 fermée, 1 ouverte).
 	float doorTopV[256], doorFootV[256], doorLift[256];

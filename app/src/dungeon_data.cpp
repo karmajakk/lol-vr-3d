@@ -169,6 +169,7 @@ void decodeDungeonTextures(const DungeonGfx &g, DungeonTextures &out) {
 		out.planeDepth[i] = 0.0f;
 		memset(out.planeColFoot[i], 0, kDunTexSize);
 		out.picBox[i][0] = out.picBox[i][1] = out.picBox[i][2] = out.picBox[i][3] = 0;
+		out.footFit[i] = false;
 		out.doorTopV[i] = out.doorFootV[i] = out.doorLift[i] = 0.0f;
 		out.faceDepth[i] = 1.0f;
 		out.kind[i] = kWallFace;
@@ -344,6 +345,10 @@ void decodeDungeonTextures(const DungeonGfx &g, DungeonTextures &out) {
 				}
 				for (int x = 0; x < kDunTexSize; x++) {
 					const bool opening = !wallBg.empty() && faceFoot >= kDunWallRows - 4 && lastRow[x] >= 0 && lastRow[x] < kDunWallRows - 8;
+					// Le bas de l'ouverture (un chemin peint, une porte de boutique) sera posé au sol.
+					out.planeColFoot[t][x] = lastRow[x] >= 0 ? (uint8_t)(lastRow[x] + 1) : 0;
+					if (opening)
+						out.footFit[t] = true;
 					Rgba last = {0, 0, 0, 255};
 					for (int y = 0; y < kDunWallRows; y++) {
 						Rgba &cc = img[y * kDunTexSize + x];
@@ -678,29 +683,50 @@ void buildDungeonMesh(const uint8_t *walls, const DungeonGfx &g, const DungeonTe
 				// la largeur et toute la hauteur de la case ; les côtés du renfoncement sont les vrais
 				// murs des cases voisines (la case de la porte est un passage).
 				const float r = tex.planeDepth[t], rx = nz, rz = -nx;
+				// Par bandes de colonnes de même pied : le pied dessiné de chaque colonne (un pilier, le bas
+				// de la porte, le bas d'un chemin peint) est posé au sol. Le jeu dessine le sol dessous ; ici,
+				// sans cela, la porte flotte et l'on voit le sol de l'autre côté sous elle.
+				const int c0 = (int)lroundf(tex.planeU0[t] * kDunTexSize), c1 = (int)lroundf(tex.planeU1[t] * kDunTexSize);
+				auto colFoot = [&](int c) {
+					const float vf = tex.planeFoot[t];
+					if (c < 0 || c >= kDunTexSize || !tex.planeColFoot[t][c])
+						return vf;
+					const float f = (float)tex.planeColFoot[t][c] / kDunTexSize;
+					return f > tex.planeTop[t] + 0.2f && f < vf ? f : vf;
+				};
 				for (int pass = 0; pass < 2; pass++) {
 					const float lyr = pass ? (float)tex.doorLayer[t] : layer;
 					const float off = pass ? 0.004f : 0.0f; // la porte un rien devant le cadre
 					const float px = fx - nx * ((r - 1.0f) * S * 0.5f - off), pz = fz - nz * ((r - 1.0f) * S * 0.5f - off);
 					// Une porte qui s'ouvre glisse vers le haut, son haut caché sous le linteau : on en
 					// montre le bas, plus haut d'autant.
-					// Le plan va de vt (en haut, à H) à vf (au sol) ; la porte occupe [dt, df] de son image.
-					const float vt = tex.planeTop[t], vf = tex.planeFoot[t];
-					auto yOf = [&](float v) { return H * (vf - v) / (vf - vt); };
-					float dt = vt, df = vf, lift = 0.0f;
-					if (pass) {
-						dt = tex.doorTopV[t] > vt ? tex.doorTopV[t] : vt;
-						df = tex.doorFootV[t] < vf ? tex.doorFootV[t] : vf;
-						lift = tex.doorLift[t] * (df - dt);
+					const float vt = tex.planeTop[t];
+					for (int x = c0; x < c1;) {
+						const float vf = colFoot(x);
+						int e = x + 1;
+						while (e < c1 && fabsf(colFoot(e) - vf) * kDunTexSize <= 1.5f)
+							e++;
+						// Le plan va de vt (en haut, à H) à vf (au sol) ; la porte occupe [dt, df] de son image.
+						auto yOf = [&](float v) { return H * (vf - v) / (vf - vt); };
+						float dt = vt, df = vf, lift = 0.0f;
+						if (pass) {
+							dt = tex.doorTopV[t] > vt ? tex.doorTopV[t] : vt;
+							df = tex.doorFootV[t] < vf ? tex.doorFootV[t] : vf;
+							lift = tex.doorLift[t] * (df - dt);
+						}
+						const float ua = (float)x / kDunTexSize, ub = (float)e / kDunTexSize;
+						const float sa = (ua - tex.planeU0[t]) / (tex.planeU1[t] - tex.planeU0[t]) - 0.5f;
+						const float sb = (ub - tex.planeU0[t]) / (tex.planeU1[t] - tex.planeU0[t]) - 0.5f;
+						x = e;
+						if (lift >= (df - dt) - 0.002f || df <= dt)
+							continue;
+						const float y0 = yOf(df - lift), y1 = yOf(dt);
+						float bl[5] = {px + rx * S * sa, y0, pz + rz * S * sa, ua, df};
+						float br[5] = {px + rx * S * sb, y0, pz + rz * S * sb, ub, df};
+						float tr[5] = {px + rx * S * sb, y1, pz + rz * S * sb, ub, dt + lift};
+						float tl[5] = {px + rx * S * sa, y1, pz + rz * S * sa, ua, dt + lift};
+						quad(bl, br, tr, tl, lyr, faceShade[k]);
 					}
-					if (lift >= (df - dt) - 0.002f)
-						continue;
-					const float y0 = yOf(df - lift), y1 = yOf(dt);
-					float bl[5] = {px - rx * S * 0.5f, y0, pz - rz * S * 0.5f, tex.planeU0[t], df};
-					float br[5] = {px + rx * S * 0.5f, y0, pz + rz * S * 0.5f, tex.planeU1[t], df};
-					float tr[5] = {px + rx * S * 0.5f, y1, pz + rz * S * 0.5f, tex.planeU1[t], dt + lift};
-					float tl[5] = {px - rx * S * 0.5f, y1, pz - rz * S * 0.5f, tex.planeU0[t], dt + lift};
-					quad(bl, br, tr, tl, lyr, faceShade[k]);
 				}
 				// Les côtés du renfoncement, de la face au plan : le jeu les dessine en biais dans le cadre,
 				// à gauche et à droite des piliers (montants, rocher, boutons d'ouverture). Le dessin étant
@@ -755,6 +781,27 @@ void buildDungeonMesh(const uint8_t *walls, const DungeonGfx &g, const DungeonTe
 				continue;
 			}
 			float fr = tex.faceDepth[t];
+			if (tex.footFit[t] && fr == 1.0f && tex.doorLayer[t] < 0) {
+				// Une ouverture jusqu'au sol (une sortie, une porte de boutique) : chaque colonne du dessin
+				// descend jusqu'au sol, son pied posé dessus, par bandes de même pied.
+				const float rx = nz, rz = -nx;
+				auto foot = [&](int c) { return tex.planeColFoot[t][c] ? (float)tex.planeColFoot[t][c] / kDunTexSize : vBottom; };
+				for (int x = 0; x < kDunTexSize;) {
+					const float vf = foot(x);
+					int e = x + 1;
+					while (e < kDunTexSize && fabsf(foot(e) - vf) * kDunTexSize <= 1.5f)
+						e++;
+					const float ua = (float)x / kDunTexSize, ub = (float)e / kDunTexSize;
+					const float sa = ua - 0.5f, sb = ub - 0.5f;
+					x = e;
+					float bl[5] = {fx + rx * S * sa, 0.0f, fz + rz * S * sa, ua, vf};
+					float br[5] = {fx + rx * S * sb, 0.0f, fz + rz * S * sb, ub, vf};
+					float tr[5] = {fx + rx * S * sb, H, fz + rz * S * sb, ub, 0.0f};
+					float tl[5] = {fx + rx * S * sa, H, fz + rz * S * sa, ua, 0.0f};
+					quad(bl, br, tr, tl, layer, faceShade[k]);
+				}
+				continue;
+			}
 			upright(fx - nx * (fr - 1.0f) * S * 0.5f, fz - nz * (fr - 1.0f) * S * 0.5f, nx, nz, layer, faceShade[k], fr, false);
 			// La porte se dresse plus loin dans la case, à la profondeur où le jeu la dessine.
 			if (tex.doorLayer[t] >= 0) {

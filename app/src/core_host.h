@@ -84,6 +84,7 @@ struct LevelSnapshot {
 	int magicLevels = 0;       // niveaux qu'il peut lancer maintenant (à partir du niveau 1)
 	// Les images des lieux (une hutte, un château, une marina) que le jeu montre en grand quand on
 	// entre dans leur image sur un mur : 176 x 120 en RVB, une par type de mur (placeTypes).
+	bool scenePicture = false; // une scène montre sa propre image (boutique, personnage), pas le donjon
 	uint32_t placeSerial = 0;
 	std::vector<int> placeTypes;
 	std::vector<uint8_t> placeRgb;

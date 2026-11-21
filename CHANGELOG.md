@@ -3,6 +3,24 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.20.0] — Doors on the floor, standing in the doorway, places in full from the start
+
+- Doors set back in their frame (Roland's manor): the door now stands on the floor. Each column of
+  the frame and of the door is laid down to the floor by its own foot; before, the door stopped
+  above the threshold and you could see the floor of the next room under it.
+- Ways out painted in a wall (the exit of Roland's manor) and the shop doors of the castle: the
+  bottom of the painted path or door touches the floor, instead of a strip of floor rising behind it.
+- Leaving the manor, Buck's hut or the castle: you now stand where the game puts you, in the
+  doorway itself, shown open as the game draws it. Walking on works at once, and clicks on the
+  walls around (a bush, a hole in a tree) reach the game: before, the view stood one block away
+  from the party, so the first steps seemed stuck and those clicks went to the wrong walls.
+- Pictures of places in full from the start: the keep and the marina (level 2), Buck's hut, the
+  Grey Eagle inn, Roland's manor and the second marina (Southland forest), and the king's palace,
+  the hut, the fletcher and the smithy of the swamp. Others still show in full after a first visit.
+- Remarks and monsters that talk (the sconces, the big orc): only the text box appears; the game's
+  screen stays hidden, since its window only showed the dungeon the 3D view already shows. Scenes
+  with their own picture (a shop, a person, a cutscene) still show it (patch 0003).
+
 ## [0.19.0] — Places in full size, leaving Buck's hut, the manor's exit, clicks on pictures
 
 - Pictures of places on the walls (the marina, Gladstone keep, Buck's hut, ...): the 3D dungeon now

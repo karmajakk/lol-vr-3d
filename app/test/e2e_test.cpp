@@ -177,7 +177,7 @@ int main(int argc, char **argv) {
 				host.gameState(gs);
 				host.levelSnapshot(w);
 				char line[256];
-				snprintf(line, sizeof line, "niveau %d mode %d scène %d texte %08x case %d dir %d", gs.level, gs.controlMode, w.sceneBusy, w.textRect, w.block, w.direction);
+				snprintf(line, sizeof line, "niveau %d mode %d scène %d image %d texte %08x case %d dir %d", gs.level, gs.controlMode, w.sceneBusy, (int)w.scenePicture, w.textRect, w.block, w.direction);
 				if (last != line) {
 					last = line;
 					printf("  %5d ms : %s\n", i * 10, line);
@@ -282,7 +282,6 @@ int main(int argc, char **argv) {
 					ovBlock = -1;
 			}
 			static int builtOverride = -2;
-			const int overrideKey = ovBlock < 0 ? -1 : (ovBlock * 4 + ovFace) * 256 + ovType;
 			if (!host.levelSnapshot(lvl)) {
 				printf("ÉCHEC pas de niveau publié par le moteur\n");
 				failures++;
@@ -335,7 +334,7 @@ int main(int argc, char **argv) {
 						used = lvl.walls[i] == t;
 					if (!strcmp(dt, "tous") ? !used : strcmp(dt, "portes") ? t != (atoi(dt) & 255) : tex.doorLayer[t] < 0)
 						continue;
-					printf("    type %d : genre %d couche %d porte %d profondeur face %.2f porte %.2f plan %.2f levée %.2f\n", t, tex.kind[t], tex.typeLayer[t], tex.doorLayer[t], tex.faceDepth[t], tex.doorDepth[t], tex.planeDepth[t], tex.doorLift[t]);
+					printf("    type %d : genre %d couche %d porte %d profondeur face %.2f porte %.2f plan %.2f levée %.2f%s\n", t, tex.kind[t], tex.typeLayer[t], tex.doorLayer[t], tex.faceDepth[t], tex.doorDepth[t], tex.planeDepth[t], tex.doorLift[t], tex.footFit[t] ? " ouverture au sol" : "");
 					{
 						int shown = 0;
 						for (int bb = 0; bb < 1024 && shown < 3; bb++)
@@ -390,6 +389,10 @@ int main(int argc, char **argv) {
 				builtWalls = 0;
 			}
 			const int meshDir = atBlock >= 0 ? atDir : lvl.direction;
+			// comme l'app à l'arrivée sur une entrée (sortie du manoir, de la hutte) : le groupe s'y tient,
+			// le bloc montré ouvert
+			const int openBlock = atBlock < 0 && isHoldBlock(lvl.walls, lvl.block, g) ? lvl.block : -1;
+			const int overrideKey = (ovBlock < 0 ? -1 : (ovBlock * 4 + ovFace) * 256 + ovType) * 2048 + openBlock;
 			if (lvl.wallsSerial != builtWalls || meshDir != builtDir || overrideKey != builtOverride) {
 				builtDir = meshDir;
 				builtOverride = overrideKey;
@@ -410,6 +413,8 @@ int main(int argc, char **argv) {
 					if (lvl.walls[nb * 4 + ((ovFace + 2) & 3)] == lvl.walls[(ovBlock & 1023) * 4 + (ovFace & 3)])
 						wallsCopy[nb * 4 + ((ovFace + 2) & 3)] = (uint8_t)ovType;
 				}
+				if (openBlock >= 0)
+					memset(wallsCopy + openBlock * 4, 0, 4);
 				buildDungeonMesh(wallsCopy, g, tex, verts, meshDir);
 				dun.setMesh(verts);
 				builtWalls = lvl.wallsSerial;
@@ -512,25 +517,15 @@ int main(int argc, char **argv) {
 					fclose(fp);
 				}
 			}
-			if (atBlock < 0 && isHoldBlock(lvl.walls, lvl.block, g)) {
-				printf("  le groupe est dans une porte ou une entrée : la vue reste devant\n");
-				atBlock = -2;
-			}
-			if (atBlock == -1 && isSolidBlock(lvl.walls, lvl.block, g)) {
+			if (openBlock >= 0)
+				printf("  le groupe est dans une entrée : le bloc est montré ouvert\n");
+			if (atBlock == -1 && openBlock < 0 && isSolidBlock(lvl.walls, lvl.block, g)) {
 				printf("ÉCHEC le groupe est dans un bloc plein\n");
 				failures++;
 			}
 			float px, pz;
 			static const int bdx[4] = {0, 1, 0, -1}, bdz[4] = {-32, 0, 32, 0};
 			int vb = atBlock >= 0 ? atBlock : lvl.block, vd = atBlock >= 0 ? atDir : lvl.direction;
-			if (atBlock == -2) // comme l'app à l'arrivée sur une entrée : la case devant, sinon à droite, à gauche, derrière
-				for (int i : {0, 1, 3, 2}) {
-					const int k = (lvl.direction + i) & 3, nb = (lvl.block + bdx[k] + bdz[k]) & 1023;
-					if (!isSolidBlock(lvl.walls, nb, g) && !isHoldBlock(lvl.walls, nb, g)) {
-						vb = nb;
-						break;
-					}
-				}
 			blockCenter(vb, px, pz);
 			Mat4 model = dungeonModel({0, 0, 0}, 0.0f, px, pz, (float)vd * 1.5707963f);
 			Vec3 eye{0, 1.35f, 0};
