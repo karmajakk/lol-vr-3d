@@ -7,7 +7,7 @@ Beim Erkunden ist die Oberfläche des Spiels auf Fenster verteilt, die du hinste
 - links die Zauberrolle, mit der Nachrichtenzeile darunter; der Streifen oben („Zauberbuch +/-“) klappt sie ein, sodass nur die Nachrichtenzeile bleibt, und öffnet sie wieder, um den Zauber zu wechseln;
 - rechts die Figuren untereinander, rechts daneben die Atlas-Spalte (Laterne, Geldbeutel) und unter dem Geldbeutel der Rast-Knopf, alles in einem Fenster (der Optionsknopf, die Diskette, ist an deinem linken Handgelenk);
 - unten das Inventar;
-- weiter rechts, sobald die Gruppe die Karte hat, der **Atlas**: die Karte der Ebene, wie du sie erkundest, bei jedem Schritt aktualisiert (dein Pfeil, die Wände, Türen in Rot, benannte Orte mit einer farbigen Raute und ihrem Namen darunter). Sein Streifen („Atlas +/-“) klappt ihn bis auf den Streifen ein; „Atlas“ in den VR-Optionen blendet ihn ganz aus.
+- weiter rechts, sobald die Gruppe die Karte hat, der **Atlas**: die Atlasseite des Spiels selbst (gleiches Pergament, gleiche Symbole, gleiche Schrift, gleiche Legende), bei jedem Schritt aktualisiert, während du erkundest. Sein Streifen („Atlas +/-“) klappt ihn bis auf den Streifen ein; „Atlas“ in den VR-Optionen blendet ihn ganz aus.
 
 Am Anfang stehen sie um den Bildschirm: Der Zeiger wechselt ohne Versatz von einem zum anderen, sodass du einen Gegenstand vom Boden aufheben und ins Inventar legen kannst. Zielst du knapp neben ein Fenster, springt der Zeiger zum nächsten.
 

@@ -604,8 +604,8 @@ int main(int argc, char **argv) {
 			SceneState::Panel m = tmp.panels[menu];
 			check(shown4 >= shown + 1 && m.center.z < in.headPos.z - 0.4f && fabsf(m.center.x - in.headPos.x) < 0.05f, "réglages VR : la fenêtre s'ouvre devant le joueur");
 			int rows = 5; // mode immersif : titre, mode VR, atlas, manettes, fermer
-			check(fabsf(m.halfH / m.halfW - 5.0f * 44.0f / 360.0f) < 0.01f, "réglages VR : mode immersif, pas de ligne « écran du jeu »");
-			auto row = [&](int r) { return m.center + m.up * ((1.0f - 2.0f * (r + 0.5f) / (float)rows) * m.halfH); };
+			check(fabsf(m.halfH / m.halfW - (5.0f * 44.0f + 46.0f) / 360.0f) < 0.01f, "réglages VR : mode immersif, pas de ligne « écran du jeu »");
+			auto row = [&](int r) { return m.center + m.up * ((1.0f - 2.0f * (r + 0.5f) * 44.0f / (44.0f * rows + 46.0f)) * m.halfH); };
 			in.tip = in.headPos + Vec3{0.15f, -0.15f, 0.0f};
 			auto click = [&](int r) {
 				aimAt(row(r));
@@ -627,7 +627,7 @@ int main(int argc, char **argv) {
 			for (int i = 0; i < SceneState::kMaxPanels; i++)
 				if (tmp.panels[i].visible && tmp.panels[i].texW == 360) m = tmp.panels[i];
 			rows = 6;
-			check(fabsf(m.halfH / m.halfW - 6.0f * 44.0f / 360.0f) < 0.01f, "réglages VR : vue classique, six lignes");
+			check(fabsf(m.halfH / m.halfW - (6.0f * 44.0f + 46.0f) / 360.0f) < 0.01f, "réglages VR : vue classique, six lignes");
 			check(click(2).action == kUiActionCycleView, "réglages VR : deuxième ligne, la vue (classique, réalité mixte)");
 			check(click(3).action == kUiActionToggleAtlas, "réglages VR : troisième ligne, l'atlas");
 			ui.openMenu();

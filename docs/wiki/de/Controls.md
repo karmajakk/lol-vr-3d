@@ -31,6 +31,8 @@ Unten in diesem Menü, links von „Resume game“, öffnet **VR-Optionen** die 
 - **Steuerung und Tasten**: ein Feld, das alle Tasten zusammenfasst, über dem Spielbildschirm. Klicke auf das Feld, um es zu schließen.
 - **Schließen**.
 
+Unter den Knöpfen ein Dank an das ScummVM-Team und an KForestland ([lands-of-lore-1-re](https://github.com/KForestland/lands-of-lore-1-re)).
+
 Die App spricht die Sprache, die in den Optionen des Spiels gewählt ist („Language is“ unter Game controls): Englisch, Französisch oder Deutsch.
 
 Die Tastatur öffnet sich von selbst, wenn das Spiel nach dem Namen eines Spielstands fragt, und schließt sich, wenn gespeichert ist.

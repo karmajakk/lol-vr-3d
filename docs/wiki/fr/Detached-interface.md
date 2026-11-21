@@ -7,7 +7,7 @@ Pendant l'exploration, l'interface du jeu est répartie dans des fenêtres que t
 - à gauche, le parchemin des sorts, avec la ligne de messages collée dessous ; le bandeau en haut (« Livre de sorts +/- ») le replie, ne laissant que la ligne de messages, et le rouvre pour changer de sort ;
 - à droite, les personnages l'un sous l'autre, la colonne de l'atlas (lanterne, bourse) à leur droite et le bouton du repos sous la bourse, dans une seule fenêtre (le bouton des options, la disquette, est sur ton poignet gauche) ;
 - en bas, l'inventaire ;
-- plus à droite, dès que le groupe a la carte, l'**Atlas** : la carte du niveau telle que tu l'explores, à jour à chaque pas (ta flèche, les murs, les portes en rouge, les lieux nommés avec un losange de couleur et leur nom dessous). Son bandeau (« Atlas +/- ») la replie jusqu'au bandeau seul ; « Atlas » dans Réglages VR la masque tout à fait.
+- plus à droite, dès que le groupe a la carte, l'**Atlas** : la page de l'atlas du jeu elle-même (même parchemin, mêmes symboles, même police, même légende), à jour à chaque pas à mesure que tu explores. Son bandeau (« Atlas +/- ») la replie jusqu'au bandeau seul ; « Atlas » dans Réglages VR la masque tout à fait.
 
 Au départ, elles sont autour de l'écran : le pointeur passe de l'une à l'autre sans décalage, pour ramasser un objet au sol et le déposer dans l'inventaire. Si tu vises juste à côté d'une fenêtre, le pointeur se colle à la plus proche.
 

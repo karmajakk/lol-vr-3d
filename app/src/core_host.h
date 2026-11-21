@@ -77,6 +77,7 @@ struct MapSnapshot {
 		std::string text;
 	};
 	std::vector<Legend> legend;
+	std::vector<uint8_t> rgb; // la page de l'atlas comme le jeu la dessine (320 x 200, RVB)
 };
 
 // Le niveau en cours, pour le donjon en 3D (patches/0003). Les gros tableaux ne sont recopiés que

@@ -273,6 +273,7 @@ int main(int argc, char **argv) {
 				map.cls = m.map.cls;
 				map.walls = m.walls;
 				map.title = m.map.title;
+				map.rgb = m.map.rgb.size() >= 320 * 200 * 3 ? m.map.rgb.data() : nullptr;
 				for (const MapSnapshot::Legend &e : m.map.legend) {
 					UiMap::Mark k;
 					k.trigger = e.trigger;

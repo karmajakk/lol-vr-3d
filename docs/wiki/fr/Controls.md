@@ -31,6 +31,8 @@ En bas de ce menu, à gauche de « Resume game », **Réglages VR** ouvre devant
 - **Manettes et boutons** : un panneau qui résume tous les boutons, par-dessus l'écran du jeu. Clique sur le panneau pour le fermer.
 - **Fermer**.
 
+Sous les boutons, un merci à l'équipe de ScummVM et à KForestland ([lands-of-lore-1-re](https://github.com/KForestland/lands-of-lore-1-re)).
+
 L'application parle la langue choisie dans les options du jeu (« Language is » dans Game controls) : anglais, français ou allemand.
 
 Le clavier s'ouvre tout seul quand le jeu demande le nom d'une sauvegarde, et se referme quand la sauvegarde est faite.

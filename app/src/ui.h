@@ -52,6 +52,7 @@ struct UiMap {
 		std::string text;
 	};
 	std::vector<Mark> legend;       // les lieux nommés : affichés quand leur case a été vue
+	const uint8_t *rgb = nullptr;   // la page de l'atlas dessinée par le jeu (320 x 200, RVB)
 };
 
 struct UiFrameInput {

@@ -31,6 +31,8 @@ At the bottom of that menu, left of "Resume game", **VR controls** opens the hea
 - **Controller mapping**: shows a panel summing up every button, over the game screen. Click the panel to close it.
 - **Close**.
 
+Under the buttons, a thank-you to the ScummVM team and to KForestland ([lands-of-lore-1-re](https://github.com/KForestland/lands-of-lore-1-re)).
+
 The app speaks the language chosen in the game's own options ("Language is" in Game controls): English, French or German.
 
 The keyboard opens by itself when the game asks for a save description, and closes when the save is done.

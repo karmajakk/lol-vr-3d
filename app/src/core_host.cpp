@@ -119,6 +119,7 @@ struct LolvrLevelData {
 	int32_t mapLegendCount;
 	uint16_t mapLegend[32][3];
 	char mapLegendText[32][40];
+	const uint8_t *mapRgb;
 };
 const LolvrLevelData *retro_lolvr_level(void);
 }
@@ -433,6 +434,8 @@ void copyLevel() {
 		else
 			memset(m.cls, 0x1F, sizeof(m.cls));
 		m.title.assign(s->mapTitle, strnlen(s->mapTitle, sizeof(s->mapTitle)));
+		if (s->mapRgb)
+			m.rgb.assign(s->mapRgb, s->mapRgb + 320 * 200 * 3);
 		m.legend.clear();
 		for (int i = 0; i < s->mapLegendCount && i < 32; i++) {
 			MapSnapshot::Legend e;

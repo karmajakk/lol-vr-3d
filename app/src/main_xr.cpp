@@ -2099,6 +2099,7 @@ void updateUi(App &app, XrTime time, float dt, double now, bool pointer, bool tr
 			m.cls = l.map.cls;
 			m.walls = l.walls;
 			m.title = l.map.title;
+			m.rgb = l.map.rgb.size() >= 320 * 200 * 3 ? l.map.rgb.data() : nullptr;
 			m.legend.clear();
 			for (const lolvr::MapSnapshot::Legend &e : l.map.legend) {
 				lolvr::UiMap::Mark k;

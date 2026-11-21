@@ -3,6 +3,15 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.23.0] — The game's own atlas, straight to the title screen, thanks
+
+- The Atlas window now shows the game's own atlas page — the same parchment, colors, symbols, font
+  and legend — drawn again by the engine at every step (patch 0003), with your arrow.
+- The ScummVM logo no longer shows at launch: the game opens on its title screen.
+- A thank-you to the ScummVM team and to KForestland
+  ([lands-of-lore-1-re](https://github.com/KForestland/lands-of-lore-1-re)) under "VR controls",
+  on the first-launch window and in the README.
+
 ## [0.22.0] — Live atlas window
 
 - New **Atlas** window, to the right of the party once the party has the map: the map of the level

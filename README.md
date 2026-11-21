@@ -102,6 +102,14 @@ Pushes are built by GitHub Actions (`.github/workflows/build.yml`, `scripts/buil
 is published when the `VERSION` file holds a number without a release. To test on a Linux PC
 without the headset, see [scripts/dev](scripts/dev/README.md).
 
+## Thanks
+
+To the [ScummVM](https://www.scummvm.org/) team, whose engine runs the game, and to
+[KForestland](https://github.com/KForestland) for
+[lands-of-lore-1-re](https://github.com/KForestland/lands-of-lore-1-re), the documentation of the
+game's formats this mod relies on. Thanks for their hard work. (Also shown under "VR controls" and
+on the first-launch window.)
+
 ## License
 
 GPL-3.0, like ScummVM (see `COPYING`).
