@@ -3,6 +3,32 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.21.0] — Whole-game check of every fix, wide cutscenes, item cursor in classic view
+
+Every fix since 0.1 was checked again on levels 3 to 24 (doors closed, half open and open; empty
+views from every block; every wall seen from the block in front, clicks compared with the game's
+own picture; every entrance seen from inside). What it found, now fixed:
+
+- Walls the game never draws are no longer drawn: passages through the Southland forest that looked
+  like trees, a room behind an invisible barrier (level 12), the edges of some levels (7, 8, 11,
+  14). You see what the game shows, and you can click what lies beyond.
+- Houses of Yvel and other entrances you walk into: when you come out, you stand in the doorway
+  and see the street, instead of an empty view.
+- The mine cart is an object in the tunnel, as in the game, not a picture stretched over the wall.
+- Clicks land on what you see on every other wall checked (bushes, holes, levers, buttons, doors).
+
+Also:
+
+- Classic view: an item you pick up shows on the pointer again.
+- Cutscenes wider than the view (Scotia poisoning King Richard, Baccata's energy cage): the screen
+  widens to the whole scene, with all its characters and its exit button (patch 0003).
+- When the party learns a spell, the spellbook window opens by itself. During a conversation, the
+  spellbook keeps showing what the game draws (a spell given then is written in it), and the
+  windows no longer stay black after a scene that starts with a fade.
+- The grab bars of the game's windows (party, inventory, spellbook) are always under the window.
+- Dev: the audit also checks clicks and entrances; the bench's party takes no damage
+  (`LOLVR_BOUCLIER=0` to take it), `sort N` teaches a spell with the game's animation.
+
 ## [0.20.0] — Doors on the floor, standing in the doorway, places in full from the start
 
 - Doors set back in their frame (Roland's manor): the door now stands on the floor. Each column of

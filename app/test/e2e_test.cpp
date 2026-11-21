@@ -55,6 +55,8 @@ static void saveGl(const std::string &path) {
 }
 
 extern "C" void retro_lolvr_teleport(int level, int block, int dir);
+extern "C" void retro_lolvr_test_spell(int spell);
+extern "C" void retro_lolvr_test_shield(int on);
 
 static unsigned keyCode(const std::string &k) {
 	if (k == "esc") return RETROK_ESCAPE;
@@ -86,6 +88,12 @@ int main(int argc, char **argv) {
 	CoreHost &host = CoreHost::get();
 	if (!host.start(cfg))
 		return 1;
+	// Le groupe ne prend pas de coups (LOLVR_BOUCLIER=0 pour les prendre) : les longues vérifications
+	// traversent des lieux dangereux.
+	{
+		const char *b = getenv("LOLVR_BOUCLIER");
+		retro_lolvr_test_shield(!b || atoi(b) != 0);
+	}
 
 	// OpenGL hors écran pour le donjon
 	EGLDisplay dpy = eglGetPlatformDisplay(0x31DD, EGL_DEFAULT_DISPLAY, nullptr);
@@ -161,6 +169,11 @@ int main(int argc, char **argv) {
 						}
 				}
 			}
+		} else if (op == "sort") {
+			// sort N : le groupe apprend le sort N, avec l'animation du jeu (le livre de sorts)
+			int sp = 0;
+			cs >> sp;
+			retro_lolvr_test_spell(sp);
 		} else if (op == "etat") {
 			// etat S [NOM] : pendant S secondes, chaque changement de l'état du jeu (vue, scène, texte,
 			// case, direction) ; avec NOM, une image NOM_<ms>.ppm à chaque changement
@@ -392,7 +405,7 @@ int main(int argc, char **argv) {
 			// comme l'app à l'arrivée sur une entrée (sortie du manoir, de la hutte) : le groupe s'y tient,
 			// le bloc montré ouvert
 			const int viewBlock = atBlock >= 0 ? atBlock : lvl.block;
-			const int openBlock = isHoldBlock(lvl.walls, viewBlock & 1023, g) ? (viewBlock & 1023) : -1;
+			const int openBlock = isHoldBlock(lvl.walls, viewBlock & 1023, g) || isSolidBlock(lvl.walls, viewBlock & 1023, g) ? (viewBlock & 1023) : -1;
 			const int overrideKey = (ovBlock < 0 ? -1 : (ovBlock * 4 + ovFace) * 256 + ovType) * 2048 + openBlock;
 			if (lvl.wallsSerial != builtWalls || meshDir != builtDir || overrideKey != builtOverride) {
 				builtDir = meshDir;
@@ -581,7 +594,11 @@ int main(int argc, char **argv) {
 			}
 			if (getenv("LOLVR_CLIC") && placeAhead)
 				printf("  CLIC case %d dir %d : image de lieu en grand, non comparée\n", vb, vd);
-			if (getenv("LOLVR_CLIC") && !placeAhead && vb == lvl.block && vd == lvl.direction && f.width == 320 && f.height == 200) {
+			GameState gsClic;
+			host.gameState(gsClic);
+			if (getenv("LOLVR_CLIC") && !placeAhead && (lvl.sceneBusy || lvl.scenePicture || gsClic.menuOpen))
+				printf("  CLIC case %d dir %d : scène en cours, non comparée\n", vb, vd);
+			else if (getenv("LOLVR_CLIC") && !placeAhead && vb == lvl.block && vd == lvl.direction && f.width == 320 && f.height == 200) {
 				// Les clics tombent-ils sur ce qu'on voit ? Des rayons à travers l'image 3D, comme le doigt :
 				// le mur devant visé, le point du jeu où l'appli enverrait le clic ; sa couleur dans l'image
 				// du jeu comparée à celle de l'image 3D (à un facteur d'éclairage près). Témoin : le même

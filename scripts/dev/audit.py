@@ -120,11 +120,29 @@ def audit_clicks(level, rows, types, pos, out):
         for b, k in pos[t]:
             nb = (b + DX[k] + DZ[k] * 32) & 1023
             if open_block(rows, nb):
-                ops.append(f"goto {level} {nb} {(k + 2) & 3}; wait 1.5; dungeon c{t}")
+                ops.append((nb, (k + 2) & 3, f"goto {level} {nb} {(k + 2) & 3}; wait 1.5; dungeon c{t}"))
                 break
-    text = batches(level, ops, out, {"LOLVR_CLIC": "1"})
-    bad = re.findall(r"CLIC case (\d+) dir (\d) : \d+ rayons sur le mur devant, écart (\d+) % \(décalé de 8 px : (\d+) %\) MAUVAIS", text)
-    checked = len(re.findall(r"CLIC case", text))
+    # by batches; a wall that a scene or a fight in the batch spoiled is tried again alone
+    def parse(text):
+        res = {}
+        for m in re.finditer(r"CLIC case (\d+) dir (\d) : (.*)", text):
+            res[(int(m.group(1)), int(m.group(2)))] = m.group(3)
+        return res
+    found = {}
+    for i in range(0, len(ops), 8):
+        chunk = ops[i:i + 8]
+        found.update(parse(run(out, f"goto {level} 0 0; wait 2; " + "; ".join(op for _, _, op in chunk), {"LOLVR_CLIC": "1"})))
+    bad, checked = [], 0
+    for nb, d, op in ops:
+        r = found.get((nb, d))
+        if r is None or "non comparée" in r or "MAUVAIS" in r:
+            r = parse(run(out, f"goto {level} 0 0; wait 2; {op}", {"LOLVR_CLIC": "1"})).get((nb, d))
+        if r is None or "non comparée" in r:
+            continue
+        checked += 1
+        e = re.match(r"\d+ rayons sur le mur devant, écart (\d+) % \(décalé de 8 px : (\d+) %\)( MAUVAIS)?", r)
+        if e and e.group(3):
+            bad.append((nb, d, e.group(1), e.group(2)))
     return checked, len(ops), bad
 
 

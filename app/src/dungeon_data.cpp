@@ -98,10 +98,24 @@ bool isPictureType(const DungeonGfx &g, uint8_t t) {
 	return !(g.wallFlags[t] & 0x89);
 }
 
-// Un mur invisible : ni dessin ni image pour le moteur, et franchissable (drapeau 0x80). Le jeu
-// n'en dessine rien (des cases de forêt qu'on traverse, comme le passage au sud du niveau 3).
+// Un mur invisible : ni dessin ni image pour le moteur. Le jeu n'en dessine rien (des cases de
+// forêt qu'on traverse, comme le passage au sud du niveau 3).
 static bool invisibleWall(const DungeonGfx &g, uint8_t t) {
-	return t && !g.vmpMap[t] && (g.wallFlags[t] & 0x80) && g.wallSlot && g.wallSlot[t] < 0;
+	// Plus généralement, tout type sans page de murs ni dessin du moteur : le jeu n'en dessine rien
+	// (le type 255 au bord du niveau 14, une barrière invisible devant une salle au niveau 12).
+	if (!t || g.vmpMap[t] || !g.wallSlot)
+		return false;
+	const int slot = g.wallSlot[t];
+	if (slot < 0)
+		return true;
+	// un dessin capturé, mais vide
+	if (!g.wallAlpha || slot >= g.wallSlots)
+		return false;
+	const uint8_t *al = g.wallAlpha + (size_t)slot * kDunTexSize * kDunWallRows;
+	for (int i = 0; i < kDunTexSize * kDunWallRows; i++)
+		if (al[i])
+			return false;
+	return true;
 }
 
 bool hasSolidWall(const DungeonGfx &g, uint8_t t) {
@@ -110,6 +124,13 @@ bool hasSolidWall(const DungeonGfx &g, uint8_t t) {
 	if (g.wallSlot && g.wallSlot[t] >= 0 && !g.vmpMap[t]) {
 		if (!isPictureType(g, t))
 			return false;
+		// Un dessin posé sur le sol (le wagonnet d'une mine) : un objet au milieu de la case, pas un mur.
+		if (g.wallAlpha && g.wallSlot[t] < g.wallSlots) {
+			const uint8_t *al = g.wallAlpha + (size_t)g.wallSlot[t] * kDunTexSize * kDunWallRows;
+			for (int i = 88 * kDunTexSize; i < kDunWallRows * kDunTexSize; i++)
+				if (al[i])
+					return false;
+		}
 		// Un dessin seulement sous l'horizon (rails d'une mine, dalle) : quelque chose au sol, pas un
 		// mur ; la case reste un passage (sinon ni sol ni plafond : un trou dans la vue).
 		const int slot = g.wallSlot[t];
@@ -295,7 +316,7 @@ void decodeDungeonTextures(const DungeonGfx &g, DungeonTextures &out) {
 					}
 					continue;
 				}
-				if (!isPictureType(g, t))
+				if (!isPictureType(g, t) || bottom >= 88) // (posé sur le sol : un objet, comme le wagonnet)
 					out.kind[t] = kWallObject;
 			}
 			out.typeLayer[t] = out.layers;

@@ -504,9 +504,20 @@ void Ui::Impl::compose(int which, const UiFrameInput &in) {
 		if (in.textBoxActive && heldW == in.gameW && heldH == in.gameH) {
 			game = heldFrame.data();
 		} else if (!in.textBoxActive && which == kCompParty) {
-			heldFrame.assign(in.gameRgba, in.gameRgba + (size_t)in.gameW * in.gameH * 4);
-			heldW = in.gameW;
-			heldH = in.gameH;
+			// Pas une image assombrie (le fondu au noir qui ouvre une scène) : sinon les fenêtres
+			// resteraient noires toute la conversation.
+			uint64_t sum = 0;
+			int n = 0;
+			for (int y = 140; y < 200; y += 4)
+				for (int x = 0; x < 320; x += 4, n++) {
+					const uint8_t *q = in.gameRgba + ((size_t)(y * in.gameH / 200) * in.gameW + (size_t)(x * in.gameW / 320)) * 4;
+					sum += q[0] + q[1] + q[2];
+				}
+			if (sum > (uint64_t)n * 3 * 24) {
+				heldFrame.assign(in.gameRgba, in.gameRgba + (size_t)in.gameW * in.gameH * 4);
+				heldW = in.gameW;
+				heldH = in.gameH;
+			}
 		}
 	}
 	c.serial = in.gameSerial;
@@ -564,7 +575,10 @@ void Ui::Impl::compose(int which, const UiFrameInput &in) {
 					}
 					int gx = pc.sx + x * pc.sw / pc.dw, gy = pc.sy + y * pc.sh / pc.dh;
 					int sx = gx * in.gameW / 320, sy = gy * in.gameH / 200;
-					const uint8_t *src = game + ((size_t)sy * in.gameW + sx) * 4;
+					// Le parchemin des sorts (au-dessus de la boîte de texte) reste à jour : un sort
+					// appris pendant une conversation s'y écrit.
+					const uint8_t *from = which == kCompSpells && pc.sy + pc.sh <= 122 ? in.gameRgba : game;
+					const uint8_t *src = from + ((size_t)sy * in.gameW + sx) * 4;
 					p[0] = src[0]; p[1] = src[1]; p[2] = src[2];
 				}
 		}
@@ -1321,24 +1335,16 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 		float thick = clampf(0.017f * dist, 0.008f, 0.06f), longSide = clampf(0.10f * dist, 0.03f, 0.35f);
 		hq.r = q.r;
 		hq.u = q.u;
-		if (i == kPanelInventory) {
-			// Rangée d'objets (longue et basse) : barrette dessous.
+		if (i < kPanelKeyboard) {
+			// Fenêtres du jeu (inventaire, livre de sorts, personnages) : barrette dessous, toujours.
 			hq.hh = thick;
 			hq.hw = fminf(q.hw, longSide);
 			hq.c = q.c - q.u * (q.hh + border + hq.hh + 0.002f);
-		} else if (i >= kPanelKeyboard) {
+		} else {
 			// Clavier, aide : barrette au-dessus.
 			hq.hh = thick;
 			hq.hw = fminf(q.hw, longSide);
 			hq.c = q.c + q.u * (q.hh + border + hq.hh + 0.002f);
-		} else {
-			// Fenêtres du jeu : barrette sur le côté, pour ne jamais se trouver sur le chemin du
-			// pointeur entre l'écran et une fenêtre placée dessous. À droite pour la boussole, à gauche
-			// pour les autres.
-			float side = i == kPanelParty ? 1.0f : -1.0f;
-			hq.hw = thick;
-			hq.hh = fminf(q.hh, longSide);
-			hq.c = q.c + q.r * (side * (q.hw + border + hq.hw + 0.002f));
 		}
 	}
 	// Poignée de l'écran : au-dessus du cadre (ou du moniteur)

@@ -36,7 +36,7 @@ it changes), `dungeon NAME` (the 3D dungeon next to the game picture), `watch S`
 flight, step by step, for S seconds), `goto LEVEL BLOCK DIR` (move the party there),
 `carte` (print the map: `#` solid, `.` open, `@` the party), `dungeonat NAME BLOCK DIR [B FACE TYPE]`
 (the 3D dungeon seen from any block, optionally with one wall face set to another type),
-`etat SECONDS [NAME]` (every change of the game state: view, scene, text box, block, direction;
+`sort N` (the party learns spell N, with the game's animation), `etat SECONDS [NAME]` (every change of the game state: view, scene, text box, block, direction;
 with NAME, a picture at each change).
 
 `LOLVR_DUMP_TYPE=portes` lists every door type (depth, plane, how far raised) and writes their
@@ -44,6 +44,9 @@ pictures; `LOLVR_FORCE_DOOR=T` shows the closed doors (type 3) as type T, to see
 `LOLVR_CAM=x,y,z,yaw,pitch` moves the camera of `dungeon`/`dungeonat` inside the block (metres,
 degrees); `LOLVR_DUMP_TYPE=tous` (or a type number, or `portes`) lists the wall types with their
 pictures (`typeN_mur.ppm` as used in 3D, `typeN_brut.ppm` as the engine drew it);
+`LOLVR_CLIC=1` checks clicks: rays through the 3D picture, the point of the game's screen the app
+would click, its colour compared with the 3D view (and with a point 8 pixels aside, as a witness).
+The bench's party takes no damage unless `LOLVR_BOUCLIER=0`.
 `LOLVR_MURS=1` makes `carte` also list the wall types of every block (north, east, south, west);
 `LOLVR_NOIR=1` makes `dungeon`/`dungeonat` report views with empty (black) areas instead of
 writing pictures.

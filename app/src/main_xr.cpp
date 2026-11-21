@@ -604,6 +604,7 @@ struct App {
 	bool zoomDown = false, zoomUsed = false;
 	double zoomSince = 0;
 	bool settingsDirty = false;
+	int spellsSeen = -1, spellsLevel = 0; // sorts du parchemin vus au dernier coup d'œil, et dans quel niveau
 
 	// Jeu
 	std::string systemDir, saveDir, gameRoot, gameDir, settingsPath, decorDir;
@@ -1744,8 +1745,19 @@ void updateLayout(App &app, double now) {
 		// aux fenêtres du groupe et de l'inventaire dessous, dans le même plan.
 		// La fiche d'un personnage couvre la vue et la colonne de droite : l'écran s'élargit vers la
 		// droite pour la montrer en entier, et les fenêtres restent en place.
-		float cw = app.charSheet ? 320.0f - kViewX : kViewW;
-		app.cropX = kViewX; app.cropY = kViewY; app.cropW = cw; app.cropH = kViewH;
+		float cw = app.charSheet ? 320.0f - kViewX : kViewW, cx = kViewX, ch = kViewH;
+		// Une cinématique plus large que la vue (l'empoisonnement du roi Richard, la cage de Baccata) :
+		// l'écran s'élargit à toute la scène, ses personnages et son bouton de sortie.
+		const uint32_t sr = app.level.sceneRect;
+		if (app.dungeonMode && app.level.scenePicture && sr && !app.charSheet) {
+			const float rx = (float)(sr & 511), rw = (float)((sr >> 16) & 511), rh = (float)((sr >> 25) & 127);
+			if (rw > kViewW + 1.0f && rx + rw <= 320.0f && rh >= 60.0f) {
+				cx = rx;
+				cw = rw;
+				ch = rh;
+			}
+		}
+		app.cropX = cx; app.cropY = kViewY; app.cropW = cw; app.cropH = ch;
 		// Mode immersif, boutique ou rencontre : la ligne de messages (les choix à faire) est collée
 		// sous la scène, à sa largeur.
 		const bool band = app.dungeonMode && (app.level.sceneBusy || app.level.textRect != 0 || app.cutscene) && !app.charSheet;
@@ -1764,10 +1776,11 @@ void updateLayout(App &app, double now) {
 		app.bandShown = band;
 		app.bandH = 0.0f;
 		const float viewOnlyH = w * lolvr::kSplitViewHeight;
-		app.dispH = viewOnlyH * (kViewH + app.bandH) / kViewH;
+		app.dispH = viewOnlyH * (ch + app.bandH) / kViewH;
 		app.dispW = viewOnlyH * cw / (kViewH * 1.2f);
 		app.viewLift = w * lolvr::kSplitViewLift - (app.dispH - viewOnlyH) * 0.5f;
-		app.viewShift = (app.dispW - viewOnlyH * kViewW / (kViewH * 1.2f)) * 0.5f;
+		// le centre de ce qui est montré, par rapport au centre de la vue
+		app.viewShift = ((cx + cw * 0.5f) - (kViewX + kViewW * 0.5f)) * viewOnlyH / (kViewH * 1.2f);
 	} else {
 		app.viewShift = 0.0f;
 		app.bandH = 0.0f;
@@ -2697,10 +2710,25 @@ void placeFlights(App &app) {
 void updateDungeon(App &app, float dt) {
 	app.clock += dt;
 	app.dungeonVisible = false;
-	if (!app.dungeonOk || !app.dungeonMode || !app.coreStarted || !app.gameStarted)
+	if (!app.coreStarted || !app.gameStarted)
 		return;
+	// Le niveau et le curseur du jeu, dans toutes les vues : en vue classique aussi, l'appli dessine
+	// le curseur elle-même (l'objet tenu), il doit suivre celui du jeu.
 	lolvr::LevelSnapshot &l = app.level;
-	if (!CoreHost::get().levelSnapshot(l) || l.level <= 0 || l.vmp.empty())
+	const bool snap = CoreHost::get().levelSnapshot(l);
+	// Un sort de plus (le jeu l'écrit sur le parchemin, avec son animation ; le premier fait apparaître
+	// le parchemin) : le livre de sorts s'ouvre. Pas au chargement d'une partie (le niveau change).
+	if (snap && l.level > 0) {
+		if (app.spellsSeen >= 0 && l.spellCount > app.spellsSeen && l.level == app.spellsLevel && app.ui.spellsCollapsed()) {
+			app.ui.setSpellsCollapsed(false);
+			app.settingsDirty = true;
+		}
+		app.spellsSeen = l.spellCount;
+		app.spellsLevel = l.level;
+	}
+	if (!app.dungeonOk || !app.dungeonMode)
+		return;
+	if (!snap || l.level <= 0 || l.vmp.empty())
 		return;
 	lolvr::DungeonGfx g;
 	g.vmpMap = l.vmpMap;
@@ -2903,12 +2931,15 @@ void updateDungeon(App &app, float dt) {
 		app.holdScene = false;
 		leftScene = true;
 	}
+	// Un bloc plein qu'on traverse (ses murs portent le drapeau 0x80 : un faux mur, l'entrée d'une
+	// maison à Yvel) : le jeu y fait entrer le groupe et dessine ce qui l'entoure ; ici aussi.
+	const bool fake = !hold && lolvr::isSolidBlock(l.walls, l.block, g);
 	if (gfxChanged || app.shownLevel != l.level || app.visBlock < 0 || !hold || leftScene) {
 		app.visBlock = l.block;
 		// Arrivée sur une entrée (le bloc de l'image, à la sortie du château, du manoir, de la hutte de
 		// Buck) : comme le jeu, on se tient dans ce bloc, ouvert (ses murs ne se voient que de dehors).
 		// On en repart comme d'une case ordinaire, et les clics visent les murs autour.
-		app.openBlock = hold ? l.block : -1;
+		app.openBlock = hold || fake ? l.block : -1;
 	} else if (!hold || app.openBlock != l.block) {
 		app.openBlock = -1;
 	}
