@@ -15,6 +15,8 @@ Each window is **independent**: moving or resizing the screen doesn't move the o
 
 During cutscenes, menus, the map and full-width scenes, the whole image comes back by itself. The ScummVM menu is shown as a whole image too.
 
+The **inventory** is a quick bar of 8 slots (3D dungeon); the button on its right unfolds the 40 other slots, and the second button sorts them by kind. Click an item to take it, click a slot to put it down.
+
 A **character sheet** is shown in full on the screen, which widens to the right while it's open. The windows stay where they are; the atlas column goes dark, because the sheet uses that part of the image.
 
 The **Reset layout** button of the keyboard arranges the windows around the screen, wherever it is. To move or resize a window, see [Controls](Controls.md).

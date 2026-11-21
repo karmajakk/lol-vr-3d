@@ -31,6 +31,7 @@ struct LolvrGameState {
 };
 const LolvrGameState *retro_lolvr_state(void);
 void retro_lolvr_set_lang(int lang);
+void retro_lolvr_inventory(int op, int arg);
 void retro_lolvr_hide_cursor(int hide);
 int retro_lolvr_cursor_shown(void);
 
@@ -120,6 +121,8 @@ struct LolvrLevelData {
 	uint16_t mapLegend[32][3];
 	char mapLegendText[32][40];
 	const uint8_t *mapRgb;
+	uint32_t invSerial;
+	const uint8_t *invRgb;
 };
 const LolvrLevelData *retro_lolvr_level(void);
 }
@@ -446,6 +449,10 @@ void copyLevel() {
 			m.legend.push_back(e);
 		}
 	}
+	if (s->invRgb && l.invSerial != s->invSerial) {
+		l.invSerial = s->invSerial;
+		l.invRgb.assign(s->invRgb, s->invRgb + 176 * 132 * 3);
+	}
 	l.magicMenu = s->magicMenu;
 	l.magicLevels = s->magicLevels;
 	// Les images des lieux (176 x 120, RVB), à poser sur leur mur
@@ -633,6 +640,9 @@ CoreHost &CoreHost::get() {
 }
 
 void CoreHost::setGameLanguage(int language) { retro_lolvr_set_lang(language); }
+void CoreHost::inventoryEnable() { retro_lolvr_inventory(0, 0); }
+void CoreHost::inventoryClick(int slot) { retro_lolvr_inventory(1, slot); }
+void CoreHost::inventorySort() { retro_lolvr_inventory(2, 0); }
 void CoreHost::setOwnCursor(bool own) { retro_lolvr_hide_cursor(own ? 1 : 0); }
 bool CoreHost::cursorShown() const { return retro_lolvr_cursor_shown() != 0; }
 
@@ -780,6 +790,10 @@ bool CoreHost::levelSnapshot(LevelSnapshot &out) const {
 	out.spellCount = l.spellCount;
 	if (out.map.serial != l.map.serial)
 		out.map = l.map;
+	if (out.invSerial != l.invSerial) {
+		out.invSerial = l.invSerial;
+		out.invRgb = l.invRgb;
+	}
 	out.magicMenu = l.magicMenu;
 	out.magicLevels = l.magicLevels;
 	if (out.placeSerial != l.placeSerial) {

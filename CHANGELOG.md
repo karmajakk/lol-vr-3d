@@ -3,6 +3,14 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.27.0] — New inventory
+
+- **Inventory** (3D dungeon): the 48 slots of the game are now a fixed **quick bar of 8 slots**; the
+  arrow button on its right unfolds the other 40 slots (5 more rows). The sort button groups those
+  40 by kind (the quick bar is not sorted). Click an item to pick it up, click a slot to drop it or swap.
+- The castle fountain is back to its size; the cave alcove keys sit deeper in the alcove; monsters
+  that start a scene face you squarely.
+
 ## [0.26.0] — Atlas icon, scenes
 
 - **Atlas**: the game's atlas icon opens the movable atlas window; "Close" on the page closes it.

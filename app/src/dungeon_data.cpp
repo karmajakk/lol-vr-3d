@@ -341,7 +341,7 @@ void decodeDungeonTextures(const DungeonGfx &g, DungeonTextures &out) {
 							y0 = y < y0 ? y : y0; y1 = y > y1 ? y : y1;
 						}
 				const int bw = x1 - x0 + 1, bh = y1 - y0 + 1;
-				if (x1 >= 0 && bw >= 56 && bh >= 44 && y0 < 40) {
+				if (x1 >= 0 && bw >= 56 && bh >= 44 && y0 < 28) { // (la fontaine du château : y0 36)
 					out.scenery[t] = true;
 					for (int y = 0; y < kDunWallRows; y++)
 						for (int x = 0; x < kDunTexSize; x++) {

@@ -137,6 +137,10 @@ struct UiFrameInput {
 	// L'atlas : sa fenêtre est montrée (réglage) et la carte (nulle : pas de fenêtre).
 	bool atlasOn = false;
 	const UiMap *map = nullptr;
+	// Les 48 cases d'inventaire dessinées par le jeu (8 par rangée, 6 rangées, 176 x 132, RVB) : la
+	// fenêtre d'inventaire de l'application (barre rapide + grille). Nul : la bande du jeu.
+	const uint8_t *invRgb = nullptr;
+	uint32_t invSerial = 0;
 	double time = 0.0;
 
 };
@@ -165,6 +169,8 @@ struct UiFrameOutput {
 	int keyCount = 0;
 	unsigned keys[4] = {0, 0, 0, 0}, keyMods[4] = {0, 0, 0, 0};
 	int action = kUiActionNone;
+	int invSlot = -1;      // la case d'inventaire cliquée (0..47)
+	bool invSort = false;  // le bouton de tri a été cliqué
 	bool gearMenuOpened = false; // le joueur a ouvert le menu du poignet (l'invitation peut disparaître)
 	bool clicked = false;
 };
@@ -200,6 +206,8 @@ public:
 	bool spellsCollapsed() const;
 	void setSpellsCollapsed(bool collapsed);
 	// L'atlas : la fenêtre repliée (le bandeau seul) ou ouverte ; le réglage montré dans le menu VR.
+	bool inventoryExpanded() const;
+	void setInventoryExpanded(bool expanded);
 	bool atlasCollapsed() const;
 	void setAtlasCollapsed(bool collapsed);
 	void setAtlasOption(bool on);

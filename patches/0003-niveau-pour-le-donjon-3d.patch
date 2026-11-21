@@ -81,7 +81,7 @@ index 1016080..bfba10b 100644
  		// the global subtitles settings, we're using this hack to enable subtitles
  		// for fan translations
 diff --git a/engines/kyra/engine/lol.cpp b/engines/kyra/engine/lol.cpp
-index c4f86a3..5f66d37 100644
+index c4f86a3..ffeda36 100644
 --- a/engines/kyra/engine/lol.cpp
 +++ b/engines/kyra/engine/lol.cpp
 @@ -21,6 +21,8 @@
@@ -101,7 +101,7 @@ index c4f86a3..5f66d37 100644
  #include "common/system.h"
  #include "common/translation.h"
  
-@@ -45,6 +48,52 @@ LolvrGameState g_lolvrState = {1, 0, {0}, 0, 0, 0, 0, 0, 0, 0, {0}, {0}};
+@@ -45,6 +48,65 @@ LolvrGameState g_lolvrState = {1, 0, {0}, 0, 0, 0, 0, 0, 0, 0, {0}, {0}};
  __attribute__((visibility("default"))) const LolvrGameState *retro_lolvr_state(void) {
  	return &g_lolvrState;
  }
@@ -151,10 +151,23 @@ index c4f86a3..5f66d37 100644
 +__attribute__((visibility("default"))) void retro_lolvr_set_lang(int lang) {
 +	g_lolvrLangRequest = lang >= 0 && lang <= 2 ? lang : -1;
 +}
++
++// The headset's inventory window: op 0 switches it on (the quick bar is the first 8 slots), op 1
++// clicks slot `arg` (0..47) as the game does with the pointer, op 2 sorts slots 8..47 by kind.
++int g_lolvrInvMode = 0;
++static int g_lolvrInvOp = -1, g_lolvrInvArg = 0;
++__attribute__((visibility("default"))) void retro_lolvr_inventory(int op, int arg) {
++	if (op == 0) {
++		g_lolvrInvMode = 1;
++		return;
++	}
++	g_lolvrInvArg = arg;
++	g_lolvrInvOp = op;
++}
  }
  
  namespace Kyra {
-@@ -95,6 +144,10 @@ LoLEngine::LoLEngine(OSystem *system, const GameFlags &flags) : KyraRpgEngine(sy
+@@ -95,6 +157,10 @@ LoLEngine::LoLEngine(OSystem *system, const GameFlags &flags) : KyraRpgEngine(sy
  		warning("unsupported language, switching back to English");
  		break;
  	}
@@ -165,7 +178,7 @@ index c4f86a3..5f66d37 100644
  
  	_chargenFrameTable = _flags.isTalkie ? _chargenFrameTableTalkie : _chargenFrameTableFloppy;
  	_chargenWSA = 0;
-@@ -367,6 +420,10 @@ LoLEngine::~LoLEngine() {
+@@ -367,6 +433,10 @@ LoLEngine::~LoLEngine() {
  
  	delete[] _defaultLegendData;
  	delete[] _mapCursorOverlay;
@@ -176,7 +189,7 @@ index c4f86a3..5f66d37 100644
  	delete[] _mapOverlay;
  
  	for (Common::Array<const SpellProc *>::iterator i = _spellProcs.begin(); i != _spellProcs.end(); ++i)
-@@ -964,10 +1021,79 @@ void LoLEngine::runLoop() {
+@@ -964,10 +1034,81 @@ void LoLEngine::runLoop() {
  			_nextScriptFunc = 0;
  		}
  
@@ -220,6 +233,8 @@ index c4f86a3..5f66d37 100644
 +		g_lolvrLevel.itemInHand = _itemInHand;
 +		lolvrExportMagicMenu();
 +		lolvrApplyLangRequest();
++		lolvrInventoryService();
++		lolvrExportInventory();
 +		g_lolvrLevel.spellCount = 0;
 +		for (int i = 0; i < 7; i++)
 +			g_lolvrLevel.spellCount += _availableSpells[i] != -1 ? 1 : 0;
@@ -256,7 +271,7 @@ index c4f86a3..5f66d37 100644
  
  		_timer->update();
  
-@@ -1049,6 +1175,13 @@ void LoLEngine::readSettings() {
+@@ -1049,6 +1190,13 @@ void LoLEngine::readSettings() {
  }
  
  void LoLEngine::update() {
@@ -270,7 +285,7 @@ index c4f86a3..5f66d37 100644
  	updateSequenceBackgroundAnimations();
  
  	if (_updateCharNum != -1 && _system->getMillis() > _updatePortraitNext)
-@@ -1621,9 +1754,11 @@ void LoLEngine::setupScreenDims() {
+@@ -1621,9 +1769,11 @@ void LoLEngine::setupScreenDims() {
  		_screen->modifyScreenDim(4, 11, 124, 28, 9);
  		_screen->modifyScreenDim(5, 85, 123, 233, 18);
  	}
@@ -282,7 +297,7 @@ index c4f86a3..5f66d37 100644
  	resetPortraitsAndDisableSysTimer();
  	gui_prepareForSequence(112, 0, 176, 120, controlMode);
  
-@@ -1633,6 +1768,8 @@ void LoLEngine::initSceneWindowDialogue(int controlMode) {
+@@ -1633,6 +1783,8 @@ void LoLEngine::initSceneWindowDialogue(int controlMode) {
  	_txt->expandField();
  	setupScreenDims();
  	gui_disableControls(controlMode);
@@ -291,7 +306,7 @@ index c4f86a3..5f66d37 100644
  }
  
  void LoLEngine::toggleSelectedCharacterFrame(bool mode) {
-@@ -1649,6 +1786,9 @@ void LoLEngine::toggleSelectedCharacterFrame(bool mode) {
+@@ -1649,6 +1801,9 @@ void LoLEngine::toggleSelectedCharacterFrame(bool mode) {
  }
  
  void LoLEngine::gui_prepareForSequence(int x, int y, int w, int h, int buttonFlags) {
@@ -301,7 +316,7 @@ index c4f86a3..5f66d37 100644
  	setSequenceButtons(x, y, w, h, buttonFlags);
  
  	_seqWindowX1 = x;
-@@ -1690,6 +1830,10 @@ void LoLEngine::gui_specialSceneRestoreControls(int restoreLamp) {
+@@ -1690,6 +1845,10 @@ void LoLEngine::gui_specialSceneRestoreControls(int restoreLamp) {
  }
  
  void LoLEngine::restoreAfterSceneWindowDialogue(int redraw) {
@@ -312,7 +327,7 @@ index c4f86a3..5f66d37 100644
  	gui_enableControls();
  	_txt->setupField(false);
  	_updateFlags &= 0xFFDF;
-@@ -1711,9 +1855,12 @@ void LoLEngine::restoreAfterSceneWindowDialogue(int redraw) {
+@@ -1711,9 +1870,12 @@ void LoLEngine::restoreAfterSceneWindowDialogue(int redraw) {
  
  	_needSceneRestore = 0;
  	enableSysTimer(2);
@@ -325,7 +340,7 @@ index c4f86a3..5f66d37 100644
  	if (controlMode) {
  		_timer->disable(11);
  		_fadeText = false;
-@@ -1734,6 +1881,7 @@ void LoLEngine::initDialogueSequence(int controlMode, int pageNum) {
+@@ -1734,6 +1896,7 @@ void LoLEngine::initDialogueSequence(int controlMode, int pageNum) {
  		_txt->clearDim(4);
  
  		_updateFlags |= 2;
@@ -333,7 +348,7 @@ index c4f86a3..5f66d37 100644
  		_currentControlMode = controlMode;
  		calcCharPortraitXpos();
  
-@@ -1758,11 +1906,16 @@ void LoLEngine::initDialogueSequence(int controlMode, int pageNum) {
+@@ -1758,11 +1921,16 @@ void LoLEngine::initDialogueSequence(int controlMode, int pageNum) {
  
  	_currentControlMode = controlMode;
  	_dialogueField = true;
@@ -350,7 +365,7 @@ index c4f86a3..5f66d37 100644
  
  	stopPortraitSpeechAnim();
  	_currentControlMode = controlMode;
-@@ -1780,6 +1933,8 @@ void LoLEngine::restoreAfterDialogueSequence(int controlMode) {
+@@ -1780,6 +1948,8 @@ void LoLEngine::restoreAfterDialogueSequence(int controlMode) {
  	}
  
  	_dialogueField = false;
@@ -359,7 +374,7 @@ index c4f86a3..5f66d37 100644
  }
  
  void LoLEngine::resetPortraitsAndDisableSysTimer() {
-@@ -1922,6 +2077,21 @@ void LoLEngine::loadTalkFile(int index) {
+@@ -1922,6 +2092,21 @@ void LoLEngine::loadTalkFile(int index) {
  	_res->loadPakFile(Common::Path(Common::String::format("%02d.TLK", index)));
  }
  
@@ -381,7 +396,7 @@ index c4f86a3..5f66d37 100644
  int LoLEngine::characterSays(int track, int charId, bool redraw) {
  	if (charId == 1) {
  		charId = _selectedCharacter;
-@@ -2020,6 +2190,7 @@ int LoLEngine::playCharacterScriptChat(int charId, int mode, int restorePortrait
+@@ -2020,6 +2205,7 @@ int LoLEngine::playCharacterScriptChat(int charId, int mode, int restorePortrait
  	_fadeText = false;
  	if (!skipAnim && charId < 3)
  		updatePortraitSpeechAnim();
@@ -389,7 +404,7 @@ index c4f86a3..5f66d37 100644
  
  	return 1;
  }
-@@ -2123,8 +2294,12 @@ int LoLEngine::castSpell(int charNum, int spellType, int spellLevel) {
+@@ -2123,8 +2309,12 @@ int LoLEngine::castSpell(int charNum, int spellType, int spellLevel) {
  
  	if (charNum < 0) {
  		_activeSpell.charNum = (charNum * -1) - 1;
@@ -404,7 +419,7 @@ index c4f86a3..5f66d37 100644
  	} else {
  		if (_activeSpell.p->mpRequired[spellLevel] > _characters[charNum].magicPointsCur)
  			return 0;
-@@ -2136,13 +2311,447 @@ int LoLEngine::castSpell(int charNum, int spellType, int spellLevel) {
+@@ -2136,13 +2326,530 @@ int LoLEngine::castSpell(int charNum, int spellType, int spellLevel) {
  		setCharacterMagicOrHitPoints(charNum, 0, -_activeSpell.p->hpRequired[spellLevel], 1);
  		gui_drawCharPortraitWithStats(charNum);
  
@@ -758,7 +773,9 @@ index c4f86a3..5f66d37 100644
 +		const int mx = m->block & 31, my = m->block >> 5;
 +		if (ABS(mx - px) > 3 || ABS(my - py) > 3)
 +			continue;
-+		const int dir = calcMonsterDirection(m->x, m->y, _partyPosX, _partyPosY);
++		// Face à l'œil du joueur : à l'opposé de la direction du groupe (une direction du jeu en 8 : 2 par
++		// quart de tour), pas vers le point exact du groupe, qui le montrait de trois quarts.
++		const int dir = ((_currentDirection << 1) + 4) & 7;
 +		if (m->direction == dir && m->facing == (dir >> 1))
 +			continue;
 +		m->direction = dir;
@@ -803,6 +820,87 @@ index c4f86a3..5f66d37 100644
 +			}
 +	if (changed)
 +		g_lolvrLevel.wallsSerial++;
++}
++
++void LoLEngine::lolvrInventoryService() {
++	if (!g_lolvrInvMode)
++		return;
++	_inventoryCurItem = 0; // new items go to the first free slot, the quick bar first
++	const int op = g_lolvrInvOp, arg = g_lolvrInvArg;
++	g_lolvrInvOp = -1;
++	if (op == 1 && arg >= 0 && arg < 48) {
++		if (_dialogueField || (_currentControlMode && _needSceneRestore))
++			return;
++		Button b;
++		b.arg = 0;
++		b.x = 0x6A;
++		b.y = 179;
++		_inventoryCurItem = arg;
++		clickedInventorySlot(&b);
++		_inventoryCurItem = 0;
++		gui_drawInventory();
++	} else if (op == 2) {
++		Common::Array<Item> items;
++		for (int i = 8; i < 48; i++)
++			if (_inventory[i])
++				items.push_back(_inventory[i]);
++		for (uint a = 1; a < items.size(); a++) {
++			Item it = items[a];
++			const ItemProperty &pa = _itemProperties[_itemsInPlay[it].itemPropertyIndex];
++			uint b = a;
++			while (b > 0) {
++				const Item o = items[b - 1];
++				const ItemProperty &pb = _itemProperties[_itemsInPlay[o].itemPropertyIndex];
++				const bool before = pa.type != pb.type ? pa.type < pb.type : _itemsInPlay[it].itemPropertyIndex < _itemsInPlay[o].itemPropertyIndex;
++				if (!before)
++					break;
++				items[b] = o;
++				b--;
++			}
++			items[b] = it;
++		}
++		for (int i = 8; i < 48; i++)
++			_inventory[i] = (uint)(i - 8) < items.size() ? items[i - 8] : 0;
++		gui_drawInventory();
++	}
++}
++
++void LoLEngine::lolvrExportInventory() {
++	static const int kCell = 22, kCols = 8, kRows = 6, kW = kCols * kCell, kH = kRows * kCell;
++	static uint8 rgb[kW * kH * 3];
++	static uint32 serial = 0, lastHash = 0;
++	g_lolvrLevel.invRgb = rgb;
++	if (!g_lolvrInvMode || !_screen || !_itemsInPlay || !_itemProperties)
++		return;
++	const uint8 *pal = _screen->getPalette(0).getData();
++	uint32 hash = 17;
++	for (int i = 0; i < 48; i++)
++		hash = hash * 31 + _inventory[i] + (_inventory[i] ? _itemsInPlay[_inventory[i]].itemPropertyIndex * 977 : 0);
++	for (int i = 0; i < 768; i += 7)
++		hash = hash * 31 + pal[i];
++	if (hash == lastHash && serial)
++		return;
++	lastHash = hash;
++	static uint8 backup[kW * kH];
++	_screen->copyRegionToBuffer(_sceneDrawPage1, 112, 0, kW, kH, backup);
++	for (int i = 0; i < 48; i++) {
++		const int x = 112 + (i % kCols) * kCell, y = (i / kCols) * kCell;
++		_screen->drawShape(_sceneDrawPage1, _gameShapes[4], x, y, 0, (((i % kCols) + (i / kCols)) & 1) ? 0 : 1);
++		if (_inventory[i])
++			_screen->drawShape(_sceneDrawPage1, getItemIconShapePtr(_inventory[i]), x + 1, y + 1, 0, 0);
++	}
++	const uint8 *page = _screen->getCPagePtr(_sceneDrawPage1);
++	for (int y = 0; y < kH; y++)
++		for (int x = 0; x < kW; x++) {
++			const uint8 c = page[y * 320 + 112 + x];
++			uint8 *o = rgb + (y * kW + x) * 3;
++			for (int k = 0; k < 3; k++) {
++				const uint8 v = pal[c * 3 + k] & 0x3F;
++				o[k] = (v << 2) | (v >> 4);
++			}
++		}
++	_screen->copyBlockToPage(_sceneDrawPage1, 112, 0, kW, kH, backup);
++	g_lolvrLevel.invSerial = ++serial;
 +}
 +
 +void LoLEngine::lolvrApplyLangRequest() {
@@ -852,7 +950,7 @@ index c4f86a3..5f66d37 100644
  int LoLEngine::castSpark(ActiveSpell *a) {
  	processMagicSpark(a->charNum, a->level);
  	return 1;
-@@ -3206,6 +3815,10 @@ void LoLEngine::addSpellToScroll(int spell, int charNum) {
+@@ -3206,6 +3913,10 @@ void LoLEngine::addSpellToScroll(int spell, int charNum) {
  		}
  	}
  
@@ -863,7 +961,7 @@ index c4f86a3..5f66d37 100644
  	if (spell > 1)
  		transferSpellToScollAnimation(charNum, spell, slot - 1);
  
-@@ -3521,6 +4134,8 @@ int LoLEngine::calcInflictableDamage(int16 attacker, int16 target, int hitType)
+@@ -3521,6 +4232,8 @@ int LoLEngine::calcInflictableDamage(int16 attacker, int16 target, int hitType)
  int LoLEngine::inflictDamage(uint16 target, int damage, uint16 attacker, int skill, int flags) {
  	LoLMonster *m = 0;
  	LoLCharacter *c = 0;
@@ -872,7 +970,7 @@ index c4f86a3..5f66d37 100644
  
  	if (target & 0x8000) {
  		m = &_monsters[target & 0x7FFF];
-@@ -4130,7 +4745,6 @@ uint16 LoLEngine::getNearestPartyMemberFromPos(int x, int y) {
+@@ -4130,7 +4843,6 @@ uint16 LoLEngine::getNearestPartyMemberFromPos(int x, int y) {
  // magic atlas
  
  void LoLEngine::displayAutomap() {
@@ -880,7 +978,7 @@ index c4f86a3..5f66d37 100644
  	snd_playSoundEffect(105, -1);
  	gui_toggleButtonDisplayMode(_flags.isTalkie ? 78 : 76, 1);
  
-@@ -4174,6 +4788,9 @@ void LoLEngine::displayAutomap() {
+@@ -4174,6 +4886,9 @@ void LoLEngine::displayAutomap() {
  
  	_screen->copyPage(2, 0);
  	_screen->updateScreen();
@@ -891,10 +989,10 @@ index c4f86a3..5f66d37 100644
  	uint32 delayTimer = _system->getMillis() + 8 * _tickLength;
  
 diff --git a/engines/kyra/engine/lol.h b/engines/kyra/engine/lol.h
-index a9028a2..4dd0718 100644
+index a9028a2..8da53ee 100644
 --- a/engines/kyra/engine/lol.h
 +++ b/engines/kyra/engine/lol.h
-@@ -50,6 +50,133 @@ struct LolvrGameState {
+@@ -50,6 +50,137 @@ struct LolvrGameState {
  	int32 reserved[4];  // [0] dungeon loop ticks, [1] control mode, [2] bit 0: automap open, bit 1: game menu open
  };
  extern LolvrGameState g_lolvrState;
@@ -1023,12 +1121,16 @@ index a9028a2..4dd0718 100644
 +	char mapLegendText[32][40];
 +	// The atlas page itself, as the game draws it (320 x 200, RGB), at each change (mapSerial).
 +	const uint8 *mapRgb;
++	// The 48 inventory slots, as the game draws them (8 per row, 6 rows, cells of 22 x 22 pixels:
++	// 176 x 132, RGB), for the headset's inventory window; invSerial changes with them.
++	uint32 invSerial;
++	const uint8 *invRgb;
 +};
 +extern LolvrLevelData g_lolvrLevel;
  }
  
  namespace Audio {
-@@ -335,6 +462,45 @@ private:
+@@ -335,6 +466,47 @@ private:
  
  	// main loop
  	void runLoop();
@@ -1067,6 +1169,8 @@ index a9028a2..4dd0718 100644
 +	bool lolvrExportPlace(int type, const char *name);
 +	void lolvrPartyMoved();           // lol-vr-3d: called wherever the party's block or direction changes
 +	void lolvrTurnPause();            // lol-vr-3d: before a scene starts, the time to turn
++	void lolvrExportInventory(); // lol-vr-3d: the 48 slots as pictures
++	void lolvrInventoryService(); // lol-vr-3d: a click on a slot, a sort, asked by the headset
 +	bool lolvrFaceMonsters();         // lol-vr-3d: monsters near the party turn to face it
 +	void lolvrScenePicture() { g_lolvrLevel.scenePicture = 1; } // lol-vr-3d: the scene window shows a picture
 +private:

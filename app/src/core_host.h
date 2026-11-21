@@ -104,6 +104,8 @@ struct LevelSnapshot {
 	bool scenePicture = false; // une scène montre sa propre image (boutique, personnage), pas le donjon
 	int spellCount = 0;        // les sorts du parchemin
 	MapSnapshot map;           // l'atlas
+	uint32_t invSerial = 0;    // les 48 cases d'inventaire (176 x 132, RVB), refaites à chaque changement
+	std::vector<uint8_t> invRgb;
 	uint32_t sceneRect = 0;    // où la scène se montre : x | y << 9 | l << 16 | (h / 2) << 25 (0 : la vue)
 	uint32_t placeSerial = 0;
 	std::vector<int> placeTypes;
@@ -153,6 +155,10 @@ public:
 	bool start(const HostConfig &cfg);
 	// Change la langue du jeu (version CD) : appliquée au prochain tour de sa boucle.
 	void setGameLanguage(int language);
+	// La fenêtre d'inventaire de l'application : l'activer, cliquer une case (0..47), trier.
+	void inventoryEnable();
+	void inventoryClick(int slot);
+	void inventorySort();
 	// L'app dessine elle-même le curseur du jeu, là où vise le joueur (le cœur ne le met plus dans l'image).
 	void setOwnCursor(bool own);
 	bool cursorShown() const; // le jeu montre son curseur (ni caché, ni menu de ScummVM)

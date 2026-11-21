@@ -2145,6 +2145,13 @@ void updateUi(App &app, XrTime time, float dt, double now, bool pointer, bool tr
 	app.ui.setOptions(app.fireOn, app.detached);
 	app.ui.setDungeonOption(app.dungeonMode);
 	app.ui.setAtlasOption(app.atlasOn);
+	if (app.dungeonMode) {
+		CoreHost::get().inventoryEnable();
+		if (app.level.invSerial != 0 && app.level.invRgb.size() == 176 * 132 * 3) {
+			in.invRgb = app.level.invRgb.data();
+			in.invSerial = app.level.invSerial;
+		}
+	}
 	{
 		const lolvr::LevelSnapshot &l = app.level;
 		lolvr::UiMap &m = app.atlasMap;
@@ -2239,6 +2246,10 @@ void updateUi(App &app, XrTime time, float dt, double now, bool pointer, bool tr
 		resizeScreen(app, out.screenZoom);
 	for (int i = 0; i < out.keyCount; i++)
 		typeKey(app, out.keys[i], out.keyMods[i], now);
+	if (out.invSlot >= 0)
+		CoreHost::get().inventoryClick(out.invSlot);
+	if (out.invSort)
+		CoreHost::get().inventorySort();
 	switch (out.action) {
 	case lolvr::kUiActionToggleFire:
 		app.fireOn = !app.fireOn;
@@ -2995,7 +3006,7 @@ void updateDungeon(App &app, float dt) {
 				// Posé en hauteur dans le mur (une alcôve) : le jeu le dessine plus haut, de 6 pixels par
 				// cran (pixels du mur vu de face : sa hauteur fait 96 pixels).
 				if (s.flying > 1) {
-					const float rows = (float)(s.flying - 1) * 6.0f - 13.0f;
+					const float rows = (float)(s.flying - 1) * 6.0f - 13.0f + 5.0f; // (+5 : au fond de l'alcôve, pas sur son bord)
 					d.base += (rows > 0.0f ? rows : 0.0f) * lolvr::kWallHeight / 96.0f * r;
 				}
 				d.width *= r;

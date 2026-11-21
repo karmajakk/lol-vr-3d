@@ -303,6 +303,49 @@ int main(int argc, char **argv) {
 					seen += (m.map.flags[b] & 7) == 7;
 				printf("  atlas : carte %s, %d cases vues, %d lieux, titre \"%s\"\n", m.map.available ? "oui" : "non", seen, (int)m.map.legend.size(), m.map.title.c_str());
 			}
+		} else if (op == "inv") {
+			// inv NOM [deplie] [tri] : la fenêtre d'inventaire (image NOM.ppm)
+			std::string name, a1, a2;
+			cs >> name >> a1 >> a2;
+			host.inventoryEnable();
+			pump(1.5);
+			if (a1 == "deplace" || a2 == "deplace") { // la case 2 vers la case 20 (prendre, poser)
+				host.inventoryClick(2);
+				pump(0.5);
+				host.inventoryClick(20);
+				pump(1.0);
+			}
+			if (a1 == "tri" || a2 == "tri") {
+				host.inventorySort();
+				pump(0.3);
+			}
+			LevelSnapshot m;
+			const bool okL = host.levelSnapshot(m);
+			printf("  inv : niveau %d, serial %u, %d octets\n", (int)okL, m.invSerial, (int)m.invRgb.size());
+			if (okL && m.invRgb.size() == 176 * 132 * 3) {
+				static Ui ui;
+				static bool fontLoaded = false;
+				if (!fontLoaded) {
+					fontLoaded = true;
+					ui.initGl(false);
+					ui.loadGameFont(argv[3]);
+				}
+				ui.setInventoryExpanded(a1 == "deplie" || a2 == "deplie");
+				UiFrameInput in;
+				in.split = true;
+				in.invRgb = m.invRgb.data();
+				in.invSerial = m.invSerial;
+				in.screenPos = in.basePos;
+				ui.resetLayout(in);
+				const std::string dir = out;
+				setenv("LOLVR_UI_DUMP", dir.c_str(), 1);
+				UiFrameOutput o;
+				SceneState ss;
+				ui.update(in, o, ss);
+				unsetenv("LOLVR_UI_DUMP");
+				const std::string src = dir + "/inventaire.ppm", dst = dir + "/" + name + ".ppm";
+				rename(src.c_str(), dst.c_str());
+			}
 		} else if (op == "lang") {
 			int l = 0;
 			cs >> l;

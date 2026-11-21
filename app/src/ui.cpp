@@ -73,7 +73,7 @@ struct Composite {
 	int key = -1;          // nombre de personnages, fenêtre éteinte... : refaire si cela change
 };
 const int kCompParty = 0, kCompSpells = 1, kCompAtlas = 2, kCompInv = 3;
-const int kCompTexW[4] = {104, 240, kAtlasW, 240}, kCompTexH[4] = {200, 288, kAtlasH, 24};
+const int kCompTexW[4] = {104, 240, kAtlasW, 240}, kCompTexH[4] = {200, 288, kAtlasH, 132};
 const int kSpellTabH = 18; // bandeau du haut de la fenêtre de gauche : ouvrir ou replier le livre de sorts
 
 // Les pixels du jeu sont 1,2 fois plus hauts que larges ; ceux du clavier sont carrés.
@@ -379,6 +379,9 @@ struct Ui::Impl {
 	int chooserHot = -1; // bouton visé dans la fenêtre du choix de la vue
 	Composite comp[4];
 	bool atlasCollapsed = false, atlasTabHot = false, atlasOn = true;
+	bool invExpanded = false;
+	int invHot = -1; // case visée : 0..47, 100 le bouton qui déplie, 101 le tri
+	void composeInv(const UiFrameInput &in);
 	uint32_t atlasSerial = 0;
 	int atlasKey = -1;
 	void composeAtlas(const UiFrameInput &in);
@@ -528,7 +531,84 @@ void Ui::Impl::upload(GLuint &tex, const std::vector<uint8_t> &px, int w, int h,
 //  - à droite, les personnages l'un sous l'autre, à leur droite la colonne de l'atlas (lampe,
 //    bourse), et sous la bourse le bouton du repos ;
 //  - à gauche, le parchemin des sorts (pixels doublés), et dessous la ligne de messages, à sa largeur.
+// La fenêtre d'inventaire : la barre rapide (les 8 premières cases) toujours, et dépliée les 5
+// autres rangées (40 cases, triables). Les cases sont celles que dessine le jeu.
+void Ui::Impl::composeInv(const UiFrameInput &in) {
+	Composite &c = comp[kCompInv];
+	const int key = 1000 + (invExpanded ? 1 : 0) + (invHot + 1) * 2;
+	if (c.tex && c.serial == in.invSerial && c.key == key)
+		return;
+	c.serial = in.invSerial;
+	c.key = key;
+	c.texW = kCompTexW[kCompInv];
+	c.texH = kCompTexH[kCompInv];
+	c.pieces.clear();
+	c.w = 200;
+	c.h = invExpanded ? 132 : 22;
+	c.px.assign((size_t)c.texW * c.texH * 4, 0);
+	auto put = [&](int x, int y, uint8_t r, uint8_t g, uint8_t b) {
+		if (x < 0 || y < 0 || x >= c.texW || y >= c.texH)
+			return;
+		uint8_t *p = &c.px[((size_t)y * c.texW + x) * 4];
+		p[0] = r; p[1] = g; p[2] = b; p[3] = 255;
+	};
+	for (int y = 0; y < c.h; y++)
+		for (int x = 0; x < c.w; x++)
+			put(x, y, 42, 28, 20);
+	const int rows = invExpanded ? 6 : 1;
+	for (int y = 0; y < rows * 22; y++)
+		for (int x = 0; x < 176; x++) {
+			const uint8_t *s = in.invRgb + ((size_t)y * 176 + x) * 3;
+			put(x, y, s[0], s[1], s[2]);
+		}
+	// Un filet entre la barre rapide et le reste.
+	if (invExpanded)
+		for (int x = 0; x < 176; x++)
+			put(x, 21, 200, 160, 80);
+	auto box = [&](int x0, int y0, int x1, int y1, bool hot) {
+		for (int x = x0; x < x1; x++) {
+			put(x, y0, hot ? 255 : 140, hot ? 230 : 108, hot ? 140 : 72);
+			put(x, y1 - 1, hot ? 255 : 140, hot ? 230 : 108, hot ? 140 : 72);
+		}
+		for (int y = y0; y < y1; y++) {
+			put(x0, y, hot ? 255 : 140, hot ? 230 : 108, hot ? 140 : 72);
+			put(x1 - 1, y, hot ? 255 : 140, hot ? 230 : 108, hot ? 140 : 72);
+		}
+	};
+	if (invHot >= 0 && invHot < 48 && invHot / 8 < rows) {
+		const int cx = (invHot % 8) * 22, cy = (invHot / 8) * 22;
+		box(cx, cy, cx + 22, cy + 22, true);
+		box(cx + 1, cy + 1, cx + 21, cy + 21, true);
+	}
+	// Les boutons à droite : déplier / replier, et trier.
+	auto button = [&](int y0, bool hot) {
+		for (int y = y0 + 1; y < y0 + 21; y++)
+			for (int x = 179; x < 199; x++)
+				put(x, y, hot ? 110 : 80, hot ? 80 : 58, hot ? 52 : 40);
+		box(178, y0, 200, y0 + 22, hot);
+	};
+	button(0, invHot == 100);
+	const uint8_t gr = invHot == 100 ? 255 : 230, gg = invHot == 100 ? 235 : 190, gb = invHot == 100 ? 170 : 90;
+	for (int i = 0; i < 6; i++) { // un triangle : vers le bas = déplier, vers le haut = replier
+		const int w = invExpanded ? i : 5 - i;
+		for (int x = 189 - w; x <= 189 + w; x++)
+			put(x, 8 + i * 1 + (invExpanded ? 0 : 0), gr, gg, gb);
+	}
+	if (invExpanded) {
+		button(22, invHot == 101);
+		const uint8_t sr = invHot == 101 ? 255 : 230, sg = invHot == 101 ? 235 : 190, sb = invHot == 101 ? 170 : 90;
+		for (int i = 0; i < 4; i++) // trois barres de longueurs croissantes : le tri
+			for (int x = 183; x < 183 + 4 + i * 3; x++)
+				put(x, 28 + i * 3, sr, sg, sb);
+	}
+	upload(c.tex, c.px, c.texW, c.texH, "inventaire");
+}
+
 void Ui::Impl::compose(int which, const UiFrameInput &in) {
+	if (which == kCompInv && in.invRgb) {
+		composeInv(in);
+		return;
+	}
 	Composite &c = comp[which];
 	const int n = in.characters < 0 ? 0 : in.characters > 4 ? 4 : in.characters;
 	const bool blank = in.compassBlank;
@@ -1308,6 +1388,11 @@ void Ui::setSpellsCollapsed(bool collapsed) {
 	}
 }
 
+bool Ui::inventoryExpanded() const { return d->invExpanded; }
+void Ui::setInventoryExpanded(bool expanded) {
+	d->invExpanded = expanded;
+	d->comp[kCompInv].key = -1;
+}
 bool Ui::atlasCollapsed() const {
 	return d->atlasCollapsed;
 }
@@ -1759,6 +1844,7 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 
 	bool tabHot = false; // le doigt est sur le bandeau du livre de sorts
 	bool atlasHot = false; // … ou sur celui de l'atlas
+	int invHot = -1;       // … ou sur une case de la fenêtre d'inventaire
 	// --- 3. Que vise le doigt ? ---
 	enum { kHitNone, kHitHandle, kHitPanel, kHitScreen, kHitCorner, kHitWrist };
 	int hitKind = kHitNone, hitIndex = -1;
@@ -2152,6 +2238,34 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 						out.clicked = true;
 					}
 				}
+			} else if (hitIndex == kPanelInventory && in.invRgb) {
+				// La fenêtre d'inventaire de l'application : une case, le bouton qui déplie, le tri.
+				const Composite &c = d->comp[kCompInv];
+				const float cx = u * (float)c.w, cy = v * (float)c.h;
+				if (cx >= 178.0f && cy < 22.0f)
+					invHot = 100;
+				else if (cx >= 178.0f && cy >= 22.0f && cy < 44.0f && d->invExpanded)
+					invHot = 101;
+				else if (cx < 176.0f && cy >= 0.0f && cy < (float)c.h)
+					invHot = ((int)cy / 22) * 8 + (int)cx / 22;
+				if (invHot >= 0 && in.triggerPressed) {
+					if (invHot == 100) {
+						Composite &cc = d->comp[kCompInv];
+						const int oldH = cc.h;
+						d->invExpanded = !d->invExpanded;
+						cc.key = -1;
+						d->composeInv(in);
+						UiPlacement &pl = placement[kPanelInventory];
+						const float dh = (float)(cc.h - oldH) * pixelAspect(kPanelInventory) * pl.scale * 0.5f;
+						pl.b -= atan2f(dh, pl.c);
+						out.layoutChanged = true;
+					} else if (invHot == 101) {
+						out.invSort = true;
+					} else {
+						out.invSlot = invHot;
+					}
+					out.clicked = true;
+				}
 			} else if (d->compOf(hitIndex) >= 0) {
 				// Fenêtre recomposée : retrouver le morceau visé, et l'endroit du jeu qu'il montre.
 				const Composite &c = d->comp[d->compOf(hitIndex)];
@@ -2192,6 +2306,10 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 		}
 	}
 
+	if (invHot != d->invHot) {
+		d->invHot = invHot;
+		d->comp[kCompInv].key = -1;
+	}
 	if (atlasHot != d->atlasTabHot) {
 		d->atlasTabHot = atlasHot;
 		d->atlasKey = -1;
