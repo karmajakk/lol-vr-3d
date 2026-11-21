@@ -36,9 +36,9 @@ struct Source {
 // Clavier : grille de 11 colonnes sur 6 rangées.
 const int kCellW = 46, kCellH = 40, kCols = 11, kRows = 6;
 // Menu du poignet : engrenage et petit menu
-const int kGearSize = 64, kHintW = 440, kHintH = 84, kMenuW = 360, kMenuRowH = 44, kMenuMaxRows = 6, kMenuFootH = 46;
+const int kGearSize = 64, kHintW = 440, kHintH = 84, kMenuW = 360, kMenuRowH = 44, kMenuMaxRows = 7, kMenuFootH = 26;
 // Panneau d'aide
-const int kHelpW = 640, kHelpH = 520;
+const int kHelpW = 640, kHelpH = 520, kChooserH = 590; // (le choix du premier lancement : un peu plus haut, pour les crédits)
 const int kInfoH = 0; // (plus de lignes d'information sous les touches)
 const int kKbW = kCellW * kCols, kKbH = kCellH * kRows + kInfoH;
 
@@ -341,16 +341,17 @@ struct Ui::Impl {
 	int vrMode = 1, classicView = 0;
 	// Le rappel « L3 change la vue », devant le joueur
 	bool noticeOpen = false, noticeAhead = false, noticeDirty = true;
+	int noticeKind = 0; // 0 : « L3 change la vue », 1 : crédits et prérequis
 	Vec3 noticePos{0, 0, 0}, noticeRight{1, 0, 0}, noticeUp{0, 1, 0};
 	void renderNotice();
 	Vec3 menuPos = {0, 0, 0}, menuRight = {1, 0, 0}, menuUp = {0, 1, 0};
 	int menuHot = -1;
 	// Mode immersif : pas de ligne « vue » (l'écran du jeu n'apparaît que quand il le faut).
-	// Lignes : le titre, le mode VR, la vue, l'atlas, les manettes, fermer.
-	int menuRows() const { return dungeonMode ? 5 : 6; }
+	// Lignes : le titre, le mode VR, la vue, l'atlas, les manettes, crédits et prérequis, fermer.
+	int menuRows() const { return dungeonMode ? 6 : 7; }
 	// (dessous, sans bouton, les remerciements)
 	int menuH() const { return kMenuRowH * menuRows() + kMenuFootH; }
-	int menuItem(int row) const { return menuRows() == 5 && row >= 2 ? row + 1 : row; }
+	int menuItem(int row) const { return menuRows() == 6 && row >= 2 ? row + 1 : row; }
 	// Colonne du groupe recomposée
 	int chooserHot = -1; // bouton visé dans la fenêtre du choix de la vue
 	Composite comp[3];
@@ -734,16 +735,17 @@ static void drawFlag(Canvas &cv, int lang, int x0, int y0, int w, int h) {
 	cv.rect(x0 + w, y0, x0 + w + 1, y0 + h, kDark);
 }
 
-// Merci à ceux sans qui ce mod n'existerait pas.
-static const char *thanks(int lang) {
-	return tr(lang, "Thanks to the ScummVM team and to KForestland (lands-of-lore-1-re) for their hard work.",
-	          "Merci à l'équipe de ScummVM et à KForestland (lands-of-lore-1-re) pour leur travail.",
-	          "Danke an das ScummVM-Team und an KForestland (lands-of-lore-1-re) für ihre Arbeit.");
+// Crédits et prérequis : sur quoi le mod repose, et merci.
+static const char *creditsTitle(int lang) { return tr(lang, "Credits & Requirements", "Crédits et prérequis", "Credits & Voraussetzungen"); }
+static const char *creditsText(int lang) {
+	return tr(lang, "This VR mod runs on ScummVM and was made possible thanks to the hard work of KForestland (lands-of-lore-1-re).",
+	          "Ce mod VR fonctionne avec ScummVM et a été rendu possible grâce au travail acharné de KForestland (lands-of-lore-1-re).",
+	          "Diese VR-Mod läuft mit ScummVM und wurde dank der harten Arbeit von KForestland (lands-of-lore-1-re) möglich.");
 }
 
 // Premier lancement : vue classique ou mode immersif.
 void Ui::Impl::renderChooser() {
-	Canvas cv{kHelpW, kHelpH, std::vector<uint8_t>((size_t)kHelpW * kHelpH * 4)};
+	Canvas cv{kHelpW, kChooserH, std::vector<uint8_t>((size_t)kHelpW * kChooserH * 4)};
 	cv.window();
 	cv.gcenter(latin1(tr(language, "Choose your view and language", "Choisis ta vue et ta langue", "Wähle Ansicht und Sprache")), 0, kHelpW, 20, 3, kWhite);
 	static const char *const labels[3][2] = {{"Classic", "Immersive"}, {"Classique", "Immersif"}, {"Klassisch", "Immersiv"}};
@@ -782,13 +784,18 @@ void Ui::Impl::renderChooser() {
 		cv.gcenter(l, 0, kHelpW, y, 2, kGold);
 		y += 22;
 	}
-	// Merci
-	y += 4;
-	for (const std::string &l : Canvas::wrap(latin1(thanks(language)), kHelpW - 48, 1)) {
-		cv.gcenter(l, 0, kHelpW, y, 1, kPale);
-		y += 12;
+	// Crédits et prérequis, sous un filet
+	y += 6;
+	cv.rect(24, y, kHelpW - 24, y + 1, kDark);
+	cv.rect(24, y + 1, kHelpW - 24, y + 2, kLight);
+	y += 8;
+	cv.gcenter(latin1(creditsTitle(language)), 0, kHelpW, y, 2, kWhite);
+	y += 24;
+	for (const std::string &l : Canvas::wrap(latin1(creditsText(language)), kHelpW - 48, 2)) {
+		cv.gcenter(l, 0, kHelpW, y, 2, kPale);
+		y += 20;
 	}
-	upload(chooserTex, cv.px, kHelpW, kHelpH, "choix");
+	upload(chooserTex, cv.px, kHelpW, kChooserH, "choix");
 	chooserDirty = false;
 }
 
@@ -1008,7 +1015,7 @@ void Ui::Impl::renderMenu() {
 			cv.bevel(split, by0, kMenuW - 12, by1, 2, true);
 			cv.gcenter(v, split, kMenuW - 12, ty, Canvas::fit(v, kMenuW - 24 - split, 2), kGold);
 		} else {
-			const std::string l = latin1(i == 4 ? tr(L, "Controller mapping", "Manettes et boutons", "Steuerung und Tasten") : tr(L, "Close", "Fermer", "Schließen"));
+			const std::string l = latin1(i == 4 ? tr(L, "Controller mapping", "Manettes et boutons", "Steuerung und Tasten") : i == 5 ? creditsTitle(L) : tr(L, "Close", "Fermer", "Schließen"));
 			cv.bevel(12, by0, kMenuW - 12, by1, 2, true);
 			cv.gcenter(l, 12, kMenuW - 12, ty, 2, kGold);
 		}
@@ -1017,11 +1024,8 @@ void Ui::Impl::renderMenu() {
 	{
 		cv.rect(12, kMenuH - kMenuFootH + 2, kMenuW - 12, kMenuH - kMenuFootH + 3, kDark);
 		cv.rect(12, kMenuH - kMenuFootH + 3, kMenuW - 12, kMenuH - kMenuFootH + 4, kLight);
-		int y = kMenuH - kMenuFootH + 7;
-		for (const std::string &l : Canvas::wrap(latin1(thanks(L)), kMenuW - 28, 1)) {
-			cv.gcenter(l, 0, kMenuW, y, 1, kPale);
-			y += 12;
-		}
+		const std::string t = latin1(tr(L, "Made possible by ScummVM & KForestland", "Ce mod est possible grâce à ScummVM et KForestland", "Möglich gemacht durch ScummVM & KForestland"));
+		cv.gcenter(t, 0, kMenuW, kMenuH - kMenuFootH + 9, 1, kPale);
 	}
 	upload(menuTex, cv.px, kMenuW, kMenuH, "menu");
 	menuDirty = false;
@@ -1034,6 +1038,22 @@ const int kNoticeW = 480, kNoticeH = 200;
 void Ui::Impl::renderNotice() {
 	Canvas cv{kNoticeW, kNoticeH, std::vector<uint8_t>((size_t)kNoticeW * kNoticeH * 4)};
 	cv.window();
+	if (noticeKind == 1) {
+		// Crédits et prérequis
+		cv.gcenter(latin1(creditsTitle(language)), 0, kNoticeW, 14, 2, kWhite);
+		cv.rect(12, 34, kNoticeW - 12, 35, kDark);
+		cv.rect(12, 35, kNoticeW - 12, 36, kLight);
+		int y = 50;
+		for (const std::string &l : Canvas::wrap(latin1(creditsText(language)), kNoticeW - 40, 2)) {
+			cv.gcenter(l, 0, kNoticeW, y, 2, kGold);
+			y += 20;
+		}
+		cv.bevel(kNoticeW / 2 - 50, kNoticeH - 42, kNoticeW / 2 + 50, kNoticeH - 12, 2, true);
+		cv.gcenter("OK", kNoticeW / 2 - 50, kNoticeW / 2 + 50, kNoticeH - 36, 2, kGold);
+		upload(noticeTex, cv.px, kNoticeW, kNoticeH, "credits");
+		noticeDirty = false;
+		return;
+	}
 	cv.gcenter(latin1(tr(language, "Change the view", "Changer de vue", "Ansicht wechseln")), 0, kNoticeW, 14, 2, kWhite);
 	cv.rect(12, 34, kNoticeW - 12, 35, kDark);
 	cv.rect(12, 35, kNoticeW - 12, 36, kLight);
@@ -1113,6 +1133,9 @@ void Ui::setVrState(int mode, int view) {
 }
 
 void Ui::openViewNotice() {
+	if (d->noticeKind != 0)
+		d->noticeDirty = true;
+	d->noticeKind = 0;
 	d->noticeOpen = true;
 	d->noticeAhead = true;
 }
@@ -1421,6 +1444,8 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 		float scale = pl.scale;
 		const int ci = d->compOf(i);
 		float sw = ci >= 0 && d->comp[ci].w ? (float)d->comp[ci].w : kSources[i].w, sh = ci >= 0 && d->comp[ci].h ? (float)d->comp[ci].h : kSources[i].h;
+		if (i == kPanelHelp && in.chooserOpen)
+			sh = (float)kChooserH;
 		q.hw = sw * scale * 0.5f;
 		q.hh = sh * pixelAspect(i) * scale * 0.5f;
 		if (in.roomClamp)
@@ -1779,6 +1804,13 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 				} else if (row == 4) {
 					out.action = kUiActionToggleHelp;
 					d->menuOpen = false;
+				} else if (row == 5) {
+					// Crédits et prérequis : un petit mot devant le joueur, un clic le ferme.
+					d->noticeKind = 1;
+					d->noticeDirty = true;
+					d->noticeOpen = true;
+					d->noticeAhead = true;
+					d->menuOpen = false;
 				} else {
 					d->menuOpen = false;
 				}
@@ -1794,7 +1826,7 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 		float u = (hx + 1.0f) * 0.5f, v = (1.0f - hy) * 0.5f;
 		if (hitIndex == kPanelHelp && in.chooserOpen) {
 			// Choix de la vue : un des deux grands boutons.
-			int px = (int)(u * (float)kHelpW), py = (int)(v * (float)kHelpH);
+			int px = (int)(u * (float)kHelpW), py = (int)(v * (float)kChooserH);
 			for (int b = 0; b < 2; b++)
 				if (px >= kChooseX[b][0] && px < kChooseX[b][1] && py >= kChooseY0 && py < kChooseY1)
 					d->chooserHot = b;
@@ -1931,15 +1963,15 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 			if (i == kPanelHelp && in.chooserOpen) {
 				p.texture = d->chooserTex;
 				p.texW = kHelpW;
-				p.texH = kHelpH;
+				p.texH = kChooserH;
 				if (d->chooserHot >= 0) {
 					p.hotOutline = true;
 					const bool lg = d->chooserHot >= 2;
 					const int *xs = lg ? kLangX[d->chooserHot - 2] : kChooseX[d->chooserHot];
 					p.hot[0] = (float)xs[0] / (float)kHelpW;
-					p.hot[1] = (float)(lg ? kLangY0 : kChooseY0) / (float)kHelpH;
+					p.hot[1] = (float)(lg ? kLangY0 : kChooseY0) / (float)kChooserH;
 					p.hot[2] = (float)xs[1] / (float)kHelpW;
-					p.hot[3] = (float)(lg ? kLangY1 : kChooseY1) / (float)kHelpH;
+					p.hot[3] = (float)(lg ? kLangY1 : kChooseY1) / (float)kChooserH;
 				}
 			} else if (i == kPanelHelp) {
 				p.texture = d->helpTex;

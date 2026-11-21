@@ -29,9 +29,10 @@ At the bottom of that menu, left of "Resume game", **VR controls** opens the hea
 - In Classic and Mixed reality, **View (L3)**: **Big screen** (the whole game image, like the original game), **Windows** (the interface windows float on their own) or **486 PC** (the game on a curved 90s monitor standing on a 486 PC). A short click of the left stick does the same.
 - **Atlas**: **On** or **Off**, the live map window (see [Detached interface](Detached-interface.md)).
 - **Controller mapping**: shows a panel summing up every button, over the game screen. Click the panel to close it.
+- **Credits & Requirements**: a short note on what the mod runs on and who made it possible (also on the first-launch window).
 - **Close**.
 
-Under the buttons, a thank-you to the ScummVM team and to KForestland ([lands-of-lore-1-re](https://github.com/KForestland/lands-of-lore-1-re)).
+At the bottom: "Made possible by ScummVM & KForestland" ([lands-of-lore-1-re](https://github.com/KForestland/lands-of-lore-1-re)).
 
 The app speaks the language chosen in the game's own options ("Language is" in Game controls): English, French or German.
 

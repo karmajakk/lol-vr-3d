@@ -3,6 +3,13 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.24.0] — Credits & Requirements
+
+- "VR controls" ends with "Made possible by ScummVM & KForestland", and has a new
+  **Credits & Requirements** button: a short note saying the mod runs on ScummVM and was made
+  possible thanks to the hard work of KForestland (lands-of-lore-1-re). The same note is on the
+  first-launch window, which is a little taller for it.
+
 ## [0.23.0] — The game's own atlas, straight to the title screen, thanks
 
 - The Atlas window now shows the game's own atlas page — the same parchment, colors, symbols, font

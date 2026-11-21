@@ -29,9 +29,10 @@ Unten in diesem Menü, links von „Resume game“, öffnet **VR-Optionen** die 
 - In Klassisch und Mixed Reality **Ansicht (L3)**: **Großbild** (das ganze Spielbild, wie im Originalspiel), **Fenster** (die Fenster der Oberfläche schweben jedes für sich) oder **486er-PC** (das Spiel auf einem gewölbten 90er-Jahre-Monitor auf einem 486er-PC). Ein kurzer Klick auf den linken Stick macht dasselbe.
 - **Atlas**: **An** oder **Aus**, das Fenster mit der Live-Karte (siehe [Losgelöste Oberfläche](Detached-interface.md)).
 - **Steuerung und Tasten**: ein Feld, das alle Tasten zusammenfasst, über dem Spielbildschirm. Klicke auf das Feld, um es zu schließen.
+- **Credits & Voraussetzungen**: ein kurzer Hinweis, worauf die Mod läuft und wer sie möglich gemacht hat (auch im Fenster beim ersten Start).
 - **Schließen**.
 
-Unter den Knöpfen ein Dank an das ScummVM-Team und an KForestland ([lands-of-lore-1-re](https://github.com/KForestland/lands-of-lore-1-re)).
+Ganz unten: „Möglich gemacht durch ScummVM & KForestland“ ([lands-of-lore-1-re](https://github.com/KForestland/lands-of-lore-1-re)).
 
 Die App spricht die Sprache, die in den Optionen des Spiels gewählt ist („Language is“ unter Game controls): Englisch, Französisch oder Deutsch.
 

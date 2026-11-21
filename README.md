@@ -107,8 +107,8 @@ without the headset, see [scripts/dev](scripts/dev/README.md).
 To the [ScummVM](https://www.scummvm.org/) team, whose engine runs the game, and to
 [KForestland](https://github.com/KForestland) for
 [lands-of-lore-1-re](https://github.com/KForestland/lands-of-lore-1-re), the documentation of the
-game's formats this mod relies on. Thanks for their hard work. (Also shown under "VR controls" and
-on the first-launch window.)
+game's formats this mod relies on. Thanks for their hard work. (Also in "VR controls", under
+"Credits & Requirements", and on the first-launch window.)
 
 ## License
 
