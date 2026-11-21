@@ -606,7 +606,7 @@ struct App {
 	bool settingsDirty = false;
 	// L'atlas : sa fenêtre (réglage « Atlas » du menu VR), et la carte montrée (refaite quand la carte,
 	// les murs ou la place du groupe changent).
-	bool atlasOn = true;
+	bool atlasOn = false; // la fenêtre de l'atlas est ouverte (l'icône de l'atlas, un bouton, ou « Fermer »)
 	bool fnWasDown[lolvr::kFnCount] = {false}; // les fonctions des boutons à l'image précédente
 	lolvr::UiMap atlasMap;
 	uint32_t atlasMapSerial = 0, atlasWallsSerial = 0;
@@ -1210,12 +1210,8 @@ void loadSettings(App &app, int &environment) {
 			activeProfile = rest;
 			while (!activeProfile.empty() && (activeProfile.back() == '\n' || activeProfile.back() == '\r' || activeProfile.back() == ' '))
 				activeProfile.pop_back();
-		} else if (!strcmp(name, "atlas")) {
-			if (sscanf(rest, "%d", &iv) == 1)
-				app.atlasOn = iv != 0;
-		} else if (!strcmp(name, "atlasreplie")) {
-			if (sscanf(rest, "%d", &iv) == 1)
-				app.ui.setAtlasCollapsed(iv != 0);
+		} else if (!strcmp(name, "atlas") || !strcmp(name, "atlasreplie")) {
+			// (anciens réglages : la fenêtre de l'atlas s'ouvre désormais avec son icône)
 		} else if (!strcmp(name, "rappelvue")) {
 			if (sscanf(rest, "%d", &iv) == 1)
 				app.viewNotices = iv & 3;
@@ -1278,9 +1274,7 @@ void saveSettings(App &app) {
 	fprintf(f, "choixvue %d\n", app.viewChosen ? 1 : 0);
 	fprintf(f, "rappelvue %d\n", app.viewNotices);
 	fprintf(f, "livresorts %d\n", app.ui.spellsCollapsed() ? 1 : 0);
-	fprintf(f, "atlas %d\n", app.atlasOn ? 1 : 0);
 	fputs(app.ui.profilesText().c_str(), f);
-	fprintf(f, "atlasreplie %d\n", app.ui.atlasCollapsed() ? 1 : 0);
 	for (int i = 0; i < kEnvCount; i++)
 		fprintf(f, "visee %d %.4f %.4f\n", app.aimSaved[i] ? 1 : 0, app.aimYaw[i], app.aimPitch[i]);
 	if (app.ui.hasLayout())
@@ -2039,6 +2033,49 @@ bool dungeonPick(App &app, Vec3 tip, Vec3 dir, float &gu, float &gv, Vec3 &hitW,
 	Vec3 o = toLevel(tip), v = dirLevel(dir);
 	lolvr::DungeonPick pk;
 	lolvr::pickDungeon(l.walls, l.block, l.direction, app.dunTex, o, v, pk);
+	// Un objet posé par terre, visé sur son image : le clic va à l'endroit du sol où le jeu le dessine
+	// (sinon le rayon traverse l'objet et touche le sol derrière, une case plus loin).
+	if (app.headValid) {
+		const Vec3 cam = toLevel(app.headPos);
+		const float wallT = pk.px >= 0.0f ? length(pk.hit - o) : 1e30f;
+		float bestT = 1e30f;
+		for (size_t j = 0; j < app.spriteList.size(); j++) {
+			const lolvr::DungeonSprite &d = app.spriteList[j];
+			if (d.layer < 0 || (size_t)d.layer >= l.sprites.size() || l.sprites[d.layer].kind != 1)
+				continue;
+			if (d.ceiling || d.base > 0.02f || app.flightOf[j] >= 0)
+				continue;
+			float tx = cam.x - d.x, tz = cam.z - d.z;
+			const float tl = sqrtf(tx * tx + tz * tz);
+			if (tl < 1e-3f)
+				continue;
+			const float nx = tx / tl, nz = tz / tl, rx = nz, rz = -nx;
+			const float cx = d.x + rx * d.offset, cz = d.z + rz * d.offset;
+			const float den = v.x * nx + v.z * nz;
+			if (fabsf(den) < 1e-4f)
+				continue;
+			const float t = ((cx - o.x) * nx + (cz - o.z) * nz) / den;
+			if (t <= 0.0f || t >= bestT || t > wallT + 0.02f)
+				continue;
+			const Vec3 h = o + v * t;
+			const float u = (h.x - cx) * rx + (h.z - cz) * rz;
+			const float pad = 0.03f;
+			if (fabsf(u) > d.width * 0.5f + pad || h.y < d.base - pad || h.y > d.base + d.height + pad)
+				continue;
+			float spx, spy;
+			if (!lolvr::floorGamePoint(l.block, l.direction, d.x, d.z, spx, spy))
+				continue;
+			bestT = t;
+			pk.px = spx;
+			pk.py = spy;
+			pk.face = -1;
+			pk.hit = Vec3{d.x, 0.0f, d.z};
+			pk.forward = Vec3{0, 1, 0};
+			static const int ddx[4] = {0, 1, 0, -1}, ddz[4] = {-1, 0, 1, 0};
+			const int dd = l.direction & 3;
+			pk.right = Vec3{-(float)ddz[dd], 0.0f, (float)ddx[dd]};
+		}
+	}
 	static const int dx[4] = {0, 1, 0, -1}, dz[4] = {-1, 0, 1, 0};
 	const int d = l.direction & 3;
 	const Vec3 fAhead{(float)dx[d], 0.0f, (float)dz[d]};
@@ -2225,7 +2262,6 @@ void updateUi(App &app, XrTime time, float dt, double now, bool pointer, bool tr
 		break;
 	case lolvr::kUiActionToggleAtlas:
 		app.atlasOn = !app.atlasOn;
-		app.settingsDirty = true;
 		break;
 	case lolvr::kUiActionCloseHelp:
 		app.helpOpen = false;
@@ -2615,11 +2651,14 @@ void updateInput(App &app, XrTime time, float dt, double now) {
 	app.magicDown = bDown;
 	setKey(app.kEnter, (aDown && !combat) || fnDown[lolvr::kFnEnter], RETROK_RETURN);
 	setKey(app.kEsc, (bDown && !combat) || fnDown[lolvr::kFnEscape], RETROK_ESCAPE);
-	setKey(app.kMap, fnDown[lolvr::kFnMap], RETROK_m);
-	if (fnPressed[lolvr::kFnAtlas]) {
-		app.ui.setAtlasCollapsed(!app.ui.atlasCollapsed());
-		app.settingsDirty = true;
+	// La carte (bouton « Carte » ou « Fenêtre de l'atlas ») : la fenêtre de l'atlas, pas la page plein écran.
+	if (fnPressed[lolvr::kFnMap] || fnPressed[lolvr::kFnAtlas]) {
+		if (app.atlasMap.available)
+			app.atlasOn = !app.atlasOn;
+		else
+			app.atlasOn = false;
 	}
+	setKey(app.kMap, false, RETROK_m);
 	if (fnPressed[lolvr::kFnKeyboard]) {
 		app.keyboardOpen = !app.keyboardOpen;
 		app.keyboardAuto = false;

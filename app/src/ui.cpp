@@ -44,7 +44,9 @@ const int kKbW = kCellW * kCols, kKbH = kCellH * kRows + kInfoH;
 
 // L'atlas : le bandeau, le nom du niveau, la carte (carrée), la légende.
 // (la page du jeu, 320 x 200, en pixels doublés, sous le bandeau)
-const int kAtlasW = 640, kAtlasH = 18 + 400;
+const int kAtlasW = 640, kAtlasH = 400;
+// La case vide en bas à droite de la page du jeu : on y écrit « Fermer » (pixels de la fenêtre).
+const int kAtlasCloseX0 = 553, kAtlasCloseX1 = 630, kAtlasCloseY0 = 352, kAtlasCloseY1 = 390;
 
 const Source kSources[kUiPanelCount] = {
 	{0, 0, 100, 150},    // à droite : recomposé (voir compose), taille variable
@@ -369,10 +371,10 @@ struct Ui::Impl {
 	int menuHot = -1;
 	// Mode immersif : pas de ligne « vue » (l'écran du jeu n'apparaît que quand il le faut).
 	// Lignes : le titre, le mode VR, la vue, l'atlas, les manettes, crédits et prérequis, fermer.
-	int menuRows() const { return dungeonMode ? 6 : 7; }
+	int menuRows() const { return dungeonMode ? 5 : 6; }
 	// (dessous, sans bouton, les remerciements)
 	int menuH() const { return kMenuRowH * menuRows() + kMenuFootH; }
-	int menuItem(int row) const { return menuRows() == 6 && row >= 2 ? row + 1 : row; }
+	int menuItem(int row) const { return menuRows() == 5 && row >= 2 ? row + 1 : row; }
 	// Colonne du groupe recomposée
 	int chooserHot = -1; // bouton visé dans la fenêtre du choix de la vue
 	Composite comp[3];
@@ -637,7 +639,7 @@ void Ui::Impl::compose(int which, const UiFrameInput &in) {
 void Ui::Impl::composeAtlas(const UiFrameInput &in) {
 	const UiMap &m = *in.map;
 	Composite &c = comp[kCompAtlas];
-	const int key = (atlasCollapsed ? 1 : 0) + (atlasTabHot ? 2 : 0) + language * 4;
+	const int key = (atlasTabHot ? 2 : 0) + language * 4;
 	if (c.tex && atlasSerial == m.serial && atlasKey == key)
 		return;
 	atlasSerial = m.serial;
@@ -646,20 +648,24 @@ void Ui::Impl::composeAtlas(const UiFrameInput &in) {
 	c.texH = kAtlasH;
 	c.pieces.clear();
 	c.w = kAtlasW;
-	c.h = atlasCollapsed ? kSpellTabH : kAtlasH;
+	c.h = kAtlasH;
 	Canvas cv{kAtlasW, kAtlasH, std::vector<uint8_t>((size_t)kAtlasW * kAtlasH * 4)};
-	cv.bevel(0, 0, kAtlasW, kSpellTabH, 2, true, atlasTabHot ? kLight : kFace);
-	cv.gcenter(atlasCollapsed ? "Atlas  +" : "Atlas  -", 0, kAtlasW, 1, g_font.ok() ? 2 : 1, atlasTabHot ? kWhite : kGold);
-	if (!atlasCollapsed && m.rgb)
+	if (m.rgb)
 		for (int y = 0; y < 400; y++)
 			for (int x = 0; x < 640; x++) {
 				const uint8_t *src = m.rgb + ((size_t)(y >> 1) * 320 + (x >> 1)) * 3;
-				uint8_t *p = &cv.px[((size_t)(kSpellTabH + y) * kAtlasW + x) * 4];
+				uint8_t *p = &cv.px[((size_t)y * kAtlasW + x) * 4];
 				p[0] = src[0];
 				p[1] = src[1];
 				p[2] = src[2];
 				p[3] = 255;
 			}
+	// « Fermer » dans la case vide de la page : un clic ferme la fenêtre.
+	{
+		const std::string t = latin1(tr(language, "Close", "Fermer", "Schließen"));
+		const int sc = Canvas::fit(t, kAtlasCloseX1 - kAtlasCloseX0 - 8, 2);
+		cv.gcenter(t, kAtlasCloseX0, kAtlasCloseX1, (kAtlasCloseY0 + kAtlasCloseY1 - Canvas::textH(sc)) / 2, sc, atlasTabHot ? kWhite : kGold);
+	}
 	upload(c.tex, cv.px, kAtlasW, kAtlasH, "atlas");
 }
 
@@ -669,7 +675,7 @@ void Ui::Impl::placeAtlas(UiPlacement *placement) {
 	const float ph = (comp[kCompParty].h ? (float)comp[kCompParty].h : kSources[kPanelParty].h) * 1.2f * p.scale * 0.5f;
 	UiPlacement &a = placement[kPanelAtlas];
 	a.scale = clampf(p.scale * (0.0008f / 0.0034f), 0.0004f, 0.02f);
-	const float aw = kAtlasW * a.scale * 0.5f, ah = (atlasCollapsed ? kSpellTabH : kAtlasH) * 1.2f * a.scale * 0.5f;
+	const float aw = kAtlasW * a.scale * 0.5f, ah = kAtlasH * 1.2f * a.scale * 0.5f;
 	const float dist = p.c >= 0.2f ? p.c : 1.0f;
 	a.c = dist;
 	a.a = wrapAngle(p.a - (pw + 0.03f + aw) / dist);
@@ -1084,14 +1090,14 @@ void Ui::Impl::renderMenu() {
 	cv.gcenter(latin1(tr(L, "VR controls", "Réglages VR", "VR-Optionen")), 0, kMenuW, (kMenuRowH - th) / 2 + 2, 2, kWhite);
 	for (int r = 1; r < kMenuRows; r++) {
 		const int i = menuItem(r), y0 = r * kMenuRowH, by0 = y0 + 5, by1 = y0 + kMenuRowH - 5, ty = (by0 + by1 - th) / 2;
-		if (i <= 3) {
-			const std::string n = latin1(i == 3 ? "Atlas" : names[i - 1]);
-			const std::string v = latin1(i == 3 ? (atlasOn ? tr(L, "On", "Oui", "An") : tr(L, "Off", "Non", "Aus")) : values[i - 1]);
+		if (i <= 2) {
+			const std::string n = latin1(names[i - 1]);
+			const std::string v = latin1(values[i - 1]);
 			cv.gtext(n, split - 10 - Canvas::textW(n, Canvas::fit(n, split - 24, 2)), ty, Canvas::fit(n, split - 24, 2), kGold);
 			cv.bevel(split, by0, kMenuW - 12, by1, 2, true);
 			cv.gcenter(v, split, kMenuW - 12, ty, Canvas::fit(v, kMenuW - 24 - split, 2), kGold);
 		} else {
-			const std::string l = latin1(i == 4 ? tr(L, "Controller mapping", "Manettes et boutons", "Steuerung und Tasten") : i == 5 ? creditsTitle(L) : tr(L, "Close", "Fermer", "Schließen"));
+			const std::string l = latin1(i == 3 ? tr(L, "Controller mapping", "Manettes et boutons", "Steuerung und Tasten") : i == 4 ? creditsTitle(L) : tr(L, "Close", "Fermer", "Schließen"));
 			cv.bevel(12, by0, kMenuW - 12, by1, 2, true);
 			cv.gcenter(l, 12, kMenuW - 12, ty, 2, kGold);
 		}
@@ -1954,11 +1960,9 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 				} else if (row == 2) {
 					out.action = kUiActionCycleView;
 				} else if (row == 3) {
-					out.action = kUiActionToggleAtlas;
-				} else if (row == 4) {
 					out.action = kUiActionToggleHelp;
 					d->menuOpen = false;
-				} else if (row == 5) {
+				} else if (row == 4) {
 					// Crédits et prérequis : un petit mot devant le joueur, un clic le ferme.
 					d->noticeKind = 1;
 					d->noticeDirty = true;
@@ -2131,20 +2135,15 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 					out.clicked = true;
 					out.layoutChanged = true;
 				}
-			} else if (hitIndex == kPanelAtlas && v * (float)d->comp[kCompAtlas].h < (float)kSpellTabH) {
-				// Le bandeau de l'atlas : ouvrir ou replier la carte. Le haut de la fenêtre ne bouge pas.
-				atlasHot = true;
-				if (in.triggerPressed) {
-					Composite &c = d->comp[kCompAtlas];
-					const int oldH = c.h;
-					d->atlasCollapsed = !d->atlasCollapsed;
-					d->atlasKey = -1;
-					d->composeAtlas(in);
-					UiPlacement &pl = placement[kPanelAtlas];
-					float dh = (float)(c.h - oldH) * pixelAspect(kPanelAtlas) * pl.scale * 0.5f;
-					pl.b -= atan2f(dh, pl.c);
-					out.clicked = true;
-					out.layoutChanged = true;
+			} else if (hitIndex == kPanelAtlas) {
+				// La case « Fermer » de la page de l'atlas.
+				const float ax = u * (float)kAtlasW, ay = v * (float)kAtlasH;
+				if (ax >= kAtlasCloseX0 && ax < kAtlasCloseX1 && ay >= kAtlasCloseY0 && ay < kAtlasCloseY1) {
+					atlasHot = true;
+					if (in.triggerPressed) {
+						out.action = kUiActionToggleAtlas;
+						out.clicked = true;
+					}
 				}
 			} else if (d->compOf(hitIndex) >= 0) {
 				// Fenêtre recomposée : retrouver le morceau visé, et l'endroit du jeu qu'il montre.
@@ -2160,6 +2159,18 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 					out.gu = ((float)pc.sx + (cx - (float)pc.dx) * (float)pc.sw / (float)pc.dw) / 320.0f;
 					out.gv = ((float)pc.sy + (cy - (float)pc.dy) * (float)pc.sh / (float)pc.dh) / 200.0f;
 					out.hitPixel = 2.0f * q.hw / (float)c.w * (float)pc.dw / (float)(pc.sw > 0 ? pc.sw : 1);
+					// L'icône de l'atlas (le livre ouvert, sous la boussole) ouvre la fenêtre de l'atlas,
+					// à la place de la page plein écran du jeu.
+					if (hitIndex == kPanelParty && pc.sx == 288 && in.map && in.map->available) {
+						const float gx = out.gu * 320.0f, gy = out.gv * 200.0f;
+						if (gx >= 289.0f && gx < 319.0f && gy >= 31.0f && gy < 52.0f) {
+							out.buttonsToGame = false;
+							if (in.triggerPressed) {
+								out.action = kUiActionToggleAtlas;
+								out.clicked = true;
+							}
+						}
+					}
 					break;
 				}
 			} else {

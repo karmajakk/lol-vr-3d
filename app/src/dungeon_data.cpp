@@ -916,6 +916,32 @@ void applyPlacePicture(DungeonTextures &tex, int type, const uint8_t *rgb) {
 }
 
 
+// Où le jeu dessine un point du sol (x, z en coordonnées du niveau) dans sa vue 320 x 200 : même calcul
+// que le sol de pickDungeon. Faux si le point est hors de la vue (derrière, trop loin, de côté).
+bool floorGamePoint(int block, int direction, float x, float z, float &px, float &py) {
+	static const int dx[4] = {0, 1, 0, -1}, dz[4] = {-1, 0, 1, 0};
+	const int d = direction & 3;
+	Vec3 fAhead{(float)dx[d], 0.0f, (float)dz[d]}, rAhead{-fAhead.z, 0.0f, fAhead.x};
+	float cx, cz;
+	blockCenter(block, cx, cz);
+	const Vec3 rel{x - cx, 0.0f, z - cz};
+	const float fw = dot(rel, fAhead) / kBlockSize, lat = dot(rel, rAhead) / kBlockSize;
+	if (fw < 0.0f || fw > 1.5f || fabsf(lat) > 0.6f)
+		return false;
+	float y, w;
+	if (fw >= 0.5f) {
+		const float k = fw - 0.5f;
+		y = 104.0f - 24.0f * k;
+		w = 128.0f - 48.0f * k;
+	} else {
+		y = 120.0f - 32.0f * fw;
+		w = 176.0f - 96.0f * fw;
+	}
+	px = 112.0f + 88.0f + clampf(lat, -0.5f, 0.5f) * w;
+	py = clampf(y, 1.0f, 119.0f);
+	return true;
+}
+
 // Le rayon d'un doigt dans le donjon (coordonnées du niveau) : le mur touché autour de la case où se
 // tient le groupe, le sol devant, ou au loin ; et le point correspondant dans la vue du jeu (pixels
 // de l'écran 320 x 200), là où le jeu attend le clic. Partagé par l'appli et le banc d'essai.

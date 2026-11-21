@@ -634,8 +634,8 @@ int main(int argc, char **argv) {
 				if (tmp.panels[i].visible) { shown4++; menu = i; }
 			SceneState::Panel m = tmp.panels[menu];
 			check(shown4 >= shown + 1 && m.center.z < in.headPos.z - 0.4f && fabsf(m.center.x - in.headPos.x) < 0.05f, "réglages VR : la fenêtre s'ouvre devant le joueur");
-			int rows = 6; // mode immersif : titre, mode VR, atlas, manettes, crédits, fermer
-			check(fabsf(m.halfH / m.halfW - (6.0f * 44.0f + 38.0f) / 360.0f) < 0.01f, "réglages VR : mode immersif, pas de ligne « écran du jeu »");
+			int rows = 5; // mode immersif : titre, mode VR, manettes, crédits, fermer
+			check(fabsf(m.halfH / m.halfW - (5.0f * 44.0f + 38.0f) / 360.0f) < 0.01f, "réglages VR : mode immersif, pas de ligne « écran du jeu »");
 			auto row = [&](int r) { return m.center + m.up * ((1.0f - 2.0f * (r + 0.5f) * 44.0f / (44.0f * rows + 38.0f)) * m.halfH); };
 			in.tip = in.headPos + Vec3{0.15f, -0.15f, 0.0f};
 			auto click = [&](int r) {
@@ -649,27 +649,25 @@ int main(int argc, char **argv) {
 			};
 			UiFrameOutput c1 = click(1);
 			check(c1.action == kUiActionToggleDungeon && !c1.buttonsToGame, "réglages VR : première ligne, le mode VR suivant");
-			check(click(2).action == kUiActionToggleAtlas, "réglages VR (immersif) : deuxième ligne, l'atlas");
-			check(click(3).action == kUiActionToggleHelp, "réglages VR (immersif) : troisième ligne, les manettes");
+			check(click(2).action == kUiActionToggleHelp, "réglages VR (immersif) : deuxième ligne, les manettes");
 			ui.setDungeonOption(0);
 			ui.setVrState(1, 0);
 			ui.openMenu();
 			ui.update(in, o, tmp);
 			for (int i = 0; i < SceneState::kMaxPanels; i++)
 				if (tmp.panels[i].visible && tmp.panels[i].texW == 360) m = tmp.panels[i];
-			rows = 7;
-			check(fabsf(m.halfH / m.halfW - (7.0f * 44.0f + 38.0f) / 360.0f) < 0.01f, "réglages VR : vue classique, sept lignes");
+			rows = 6;
+			check(fabsf(m.halfH / m.halfW - (6.0f * 44.0f + 38.0f) / 360.0f) < 0.01f, "réglages VR : vue classique, six lignes");
 			check(click(2).action == kUiActionCycleView, "réglages VR : deuxième ligne, la vue (classique, réalité mixte)");
-			check(click(3).action == kUiActionToggleAtlas, "réglages VR : troisième ligne, l'atlas");
 			ui.openMenu();
 			ui.update(in, o, tmp);
-			check(click(4).action == kUiActionToggleHelp, "réglages VR : quatrième ligne, les manettes (et la fenêtre se ferme)");
+			check(click(3).action == kUiActionToggleHelp, "réglages VR : troisième ligne, les manettes (et la fenêtre se ferme)");
 			ui.openMenu();
 			ui.update(in, o, tmp);
 			int shown4b = 0;
 			for (int i = 0; i < SceneState::kMaxPanels; i++) shown4b += tmp.panels[i].visible ? 1 : 0;
 			{
-				UiFrameOutput cr = click(5);
+				UiFrameOutput cr = click(4);
 				int withNotice = 0;
 				for (int i = 0; i < SceneState::kMaxPanels; i++) withNotice += tmp.panels[i].visible ? 1 : 0;
 				ui.update(in, o, tmp);
@@ -686,7 +684,7 @@ int main(int argc, char **argv) {
 				ui.openMenu();
 				ui.update(in, o, tmp);
 			}
-			UiFrameOutput c4 = click(6);
+			UiFrameOutput c4 = click(5);
 			int shown5 = 0;
 			for (int i = 0; i < SceneState::kMaxPanels; i++) shown5 += tmp.panels[i].visible ? 1 : 0;
 			check(c4.action == kUiActionNone && shown5 == shown4b - 1, "réglages VR : dernière ligne, fermer");

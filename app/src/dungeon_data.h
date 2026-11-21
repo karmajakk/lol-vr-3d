@@ -135,6 +135,8 @@ struct DungeonPick {
 	int face = -1;
 	Vec3 hit{0, 0, 0}, forward{0, 0, 1}, right{1, 0, 0};
 };
+// Où le jeu dessine un point du sol dans sa vue (320 x 200) ; faux s'il est hors de la vue.
+bool floorGamePoint(int block, int direction, float x, float z, float &px, float &py);
 bool pickDungeon(const uint8_t *walls, int block, int direction, const DungeonTextures &tex, Vec3 o, Vec3 v, DungeonPick &out);
 
 } // namespace lolvr
