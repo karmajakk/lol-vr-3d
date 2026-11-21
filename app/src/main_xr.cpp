@@ -2715,10 +2715,10 @@ void updateDungeon(App &app, float dt) {
 	// Le niveau et le curseur du jeu, dans toutes les vues : en vue classique aussi, l'appli dessine
 	// le curseur elle-même (l'objet tenu), il doit suivre celui du jeu.
 	lolvr::LevelSnapshot &l = app.level;
-	const bool snap = CoreHost::get().levelSnapshot(l);
+	const bool gotLevel = CoreHost::get().levelSnapshot(l);
 	// Un sort de plus (le jeu l'écrit sur le parchemin, avec son animation ; le premier fait apparaître
 	// le parchemin) : le livre de sorts s'ouvre. Pas au chargement d'une partie (le niveau change).
-	if (snap && l.level > 0) {
+	if (gotLevel && l.level > 0) {
 		if (app.spellsSeen >= 0 && l.spellCount > app.spellsSeen && l.level == app.spellsLevel && app.ui.spellsCollapsed()) {
 			app.ui.setSpellsCollapsed(false);
 			app.settingsDirty = true;
@@ -2728,7 +2728,7 @@ void updateDungeon(App &app, float dt) {
 	}
 	if (!app.dungeonOk || !app.dungeonMode)
 		return;
-	if (!snap || l.level <= 0 || l.vmp.empty())
+	if (!gotLevel || l.level <= 0 || l.vmp.empty())
 		return;
 	lolvr::DungeonGfx g;
 	g.vmpMap = l.vmpMap;
