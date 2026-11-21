@@ -562,6 +562,8 @@ struct App {
 	bool holdOverScene = false;
 	double holdOverUntil = 0.0;
 	int holdOverBlock = -1;
+	double holdOverIdle = 0.0; // depuis quand aucune scène ne tourne
+	bool atHold = false;       // le groupe est sur le bloc d'entrée d'un lieu (sa porte)
 	int openBlock = -1;       // bloc d'entrée où l'on se tient (montré ouvert), -1 sinon
 	int builtOpen = -1;
 	float lightLevel = 1.0f;  // clarté du jeu (pénombre, lampe), adoucie
@@ -2112,6 +2114,7 @@ void updateUi(App &app, XrTime time, float dt, double now, bool pointer, bool tr
 	}
 	in.triggerDown = pointer && app.triggerDown[hand];
 	in.triggerPressed = pointer && triggerPressed;
+	in.holdToMove = true;
 	in.stickX = rightStick.x;
 	in.stickY = rightStick.y;
 	in.screenPos = viewCenter(app);
@@ -2455,6 +2458,14 @@ void updateInput(App &app, XrTime time, float dt, double now) {
 	lolvr::UiFrameOutput ui;
 	updateUi(app, time, dt, now, true, clicked[hand] && app.triggerDown[hand], right, ui);
 	bool toGame = ui.buttonsToGame && !ui.dragging;
+	if (ui.gameClick && ui.pointerValid) {
+		// Un appui bref sur une fenêtre (la gâchette maintenue la déplace) : le clic, au relâcher.
+		app.synthU = ui.gu;
+		app.synthV = ui.gv;
+		app.synthClickUntil = now + 0.16;
+		app.clickPulse = 1.0f;
+		pulse(app, hand, 0.28f, 0.018f);
+	}
 	// Le curseur du jeu : l'app le dessine elle-même sur l'écran ou la fenêtre visée, et nulle part
 	// ailleurs (dans l'image du jeu, il débordait sur deux fenêtres voisines).
 	{
@@ -2506,7 +2517,7 @@ void updateInput(App &app, XrTime time, float dt, double now) {
 		// Clic droit (boire une potion, utiliser un objet) : les boutons du profil qui le font
 		// (dans « Classique », X et la poignée de la main qui vise).
 		bool xRight = fnDown[lolvr::kFnRightClick] && ui.pointerValid && !ui.dragging;
-		CoreHost::get().setMouseButtons(app.triggerDown[hand] && toGame, xRight);
+		CoreHost::get().setMouseButtons(app.triggerDown[hand] && toGame && !ui.pressPending, xRight);
 		if (xRight && !app.keyboardButtonDown) {
 			app.clickPulse = 1.0f;
 			pulse(app, hand, 0.28f, 0.018f);
@@ -3074,6 +3085,7 @@ void updateDungeon(App &app, float dt) {
 	// Porte d'une boutique, entrée d'une autre région : le jeu fait entrer le groupe dans un bloc
 	// plein. La vue reste devant, face à l'image ; le jeu montre la scène ou change de région.
 	const bool hold = lolvr::isHoldBlock(l.walls, l.block, g);
+	app.atHold = hold;
 	// Une scène jouée sur ce bloc (l'intérieur de la hutte de Buck) : à la fin, le jeu y laisse le
 	// groupe tourné vers la sortie. C'est une arrivée, comme dans une nouvelle région.
 	bool leftScene = false;
@@ -3093,11 +3105,14 @@ void updateDungeon(App &app, float dt) {
 	// avant ; autrement on voit, derrière la scène, le mur de forêt de la case où le groupe est entré.
 	{
 		const bool pictureScene = l.sceneBusy && l.scenePicture;
-		if (app.prevHold && !hold && !gfxChanged && app.shownLevel == l.level && app.visBlock >= 0) {
+		// (seulement quand une scène est en cours : celle du lieu, qui va montrer son intérieur ; en
+		// repartant d'une porte, ou après la sortie d'un lieu, la vue suit le groupe aussitôt)
+		if (app.prevHold && !hold && l.sceneBusy && !gfxChanged && app.shownLevel == l.level && app.visBlock >= 0) {
 			app.holdOver = true;
 			app.holdOverScene = false;
 			app.holdOverUntil = app.clock + 1.0;
 			app.holdOverBlock = l.block;
+			app.holdOverIdle = 0.0;
 		}
 		app.prevHold = hold;
 		if (app.holdOver) {
@@ -3105,7 +3120,13 @@ void updateDungeon(App &app, float dt) {
 				app.holdOverScene = true;
 				app.holdOverUntil = app.clock + 120.0;
 			}
-			if (gfxChanged || app.shownLevel != l.level || hold || (!app.holdOverScene && l.block != app.holdOverBlock) || (app.holdOverScene && !pictureScene) || app.clock > app.holdOverUntil)
+			if (!l.sceneBusy && !app.holdOverScene) {
+				if (app.holdOverIdle <= 0.0)
+					app.holdOverIdle = app.clock;
+			} else {
+				app.holdOverIdle = 0.0;
+			}
+			if ((app.holdOverIdle > 0.0 && app.clock - app.holdOverIdle > 0.2) || gfxChanged || app.shownLevel != l.level || hold || (!app.holdOverScene && l.block != app.holdOverBlock) || (app.holdOverScene && !pictureScene) || app.clock > app.holdOverUntil)
 				app.holdOver = false;
 		}
 	}
@@ -3222,7 +3243,9 @@ void updateScreenShown(App &app, double now) {
 	// Une scène qui montre sa propre image (une boutique, un personnage, une cinématique). Une
 	// remarque ou un monstre qui parle (les chandeliers, le gros orc) laisse le donjon dans la fenêtre
 	// du jeu : seule la boîte de texte apparaît, le donjon en 3D le montre déjà.
-	const bool scene = app.level.scenePicture && (app.level.sceneBusy || app.cutscene);
+	// Devant la porte d'un lieu (l'auberge, la hutte de Buck) : la vue du jeu montre le lieu, où l'on
+	// clique la porte ; elle apparaît aussi.
+	const bool scene = (app.level.scenePicture || (app.atHold && app.level.sceneBusy && app.dungeonMode)) && (app.level.sceneBusy || app.cutscene);
 	if (scene)
 		app.screenNeededAt = now;
 	bool show = need || scene || now - app.screenNeededAt < 0.1;

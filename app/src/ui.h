@@ -83,6 +83,9 @@ struct UiFrameInput {
 	bool aimValid = false;
 	Vec3 tip = {0, 0, 0}, dir = {0, 0, -1};
 	bool triggerDown = false, triggerPressed = false;
+	// Gâchette maintenue sur une fenêtre ou l'écran : on la déplace (plus de poignées) ; un appui
+	// bref est un clic, envoyé au relâcher.
+	bool holdToMove = false;
 	float stickX = 0.0f, stickY = 0.0f; // joystick droit
 	// Repère des panneaux : centre et largeur de l'image entière
 	Vec3 basePos = {0, 0, -2.2f};
@@ -173,6 +176,8 @@ struct UiFrameOutput {
 	bool invSort = false;  // le bouton de tri a été cliqué
 	bool gearMenuOpened = false; // le joueur a ouvert le menu du poignet (l'invitation peut disparaître)
 	bool clicked = false;
+	bool gameClick = false;    // (gâchette maintenue pour déplacer) un appui bref : un clic au jeu, ici
+	bool pressPending = false; // la gâchette vient d'être enfoncée sur une fenêtre : rien au jeu encore
 };
 
 class Ui {
@@ -224,6 +229,11 @@ public:
 	// Une fois par image : calcule le pointeur, gère les poignées et le clavier, et remplit
 	// les panneaux et poignées de la scène.
 	void update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene);
+
+private:
+	void updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene);
+
+public:
 
 	UiPlacement placement[kUiPanelCount];
 	static UiPlacement defaultHelpPlacement(float yaw);

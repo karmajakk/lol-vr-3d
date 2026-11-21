@@ -49,10 +49,8 @@ To **drink a potion** or use an item: aim at it in the inventory and press **X**
 
 ## Moving the screen and windows
 
-The screen and the keyboard carry a **brass bar** above them; the game windows carry it on their side, so it never gets in the pointer's way.
-
-1. Aim at the bar (the yellow beam gets longer as soon as you leave the screen and the windows).
-2. Squeeze the trigger and keep it squeezed: the object follows your hand.
+1. Aim anywhere on the screen or a window.
+2. **Hold the trigger** a moment (less than half a second): the object follows your hand. A short press stays an ordinary click, sent when you release.
 3. While you hold it, the right stick pushes or pulls it (up/down) and shrinks or enlarges it (left/right).
 4. Release to drop it.
 

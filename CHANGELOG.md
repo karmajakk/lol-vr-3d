@@ -3,6 +3,16 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.28.0] — Windows held to move
+
+- **Moving windows**: hold the trigger anywhere on a window or on the screen for a moment and it
+  follows your hand; a short press is a click (sent on release). The brass bars are gone.
+- The spellbook no longer folds; its title strip is thinner.
+- The item in hand is drawn as the pointer over the inventory window too.
+- Items bought or given in a shop or a conversation can be put in the inventory window right away.
+- In front of a place's door (the Southland inn, Buck's hut), the game's view of the place shows up.
+- After leaving a place, the view follows the party at once (no more short freeze).
+
 ## [0.27.1] — Fixes
 
 - Leaving a place no longer freezes the view for two seconds: the view follows at the next step.

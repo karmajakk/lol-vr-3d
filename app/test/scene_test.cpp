@@ -314,26 +314,58 @@ int main(int argc, char **argv) {
 		aimAt(panel(1).center);
 		ui.update(in, o, tmp);
 		check(near(201.5f, 189), "fenêtre de l'inventaire");
-		// À gauche, livre de sorts replié (224 x 39) : le bandeau, et la ligne de messages dessous.
-		aimIn(2, 112, 28, 224, 39);
-		check(near(200, 131.5f), "à gauche, replié : la ligne de messages");
+		// À gauche, le livre de sorts toujours ouvert (236 x 277) : un mince bandeau, le parchemin, les messages.
 		{
-			SceneState::Panel before = panel(2);
-			aimIn(2, 112, 9, 224, 39);
+			aimIn(2, 118, 5, 236, 277);
 			check(!o.pointerValid, "à gauche : le bandeau n'est pas un clic dans le jeu");
 			in.triggerDown = in.triggerPressed = true;
 			ui.update(in, o, tmp);
 			in.triggerDown = in.triggerPressed = false;
 			ui.update(in, o, tmp);
-			SceneState::Panel after = panel(2);
-			check(!ui.spellsCollapsed() && after.halfH > before.halfH * 3.0f, "à gauche : un clic sur le bandeau ouvre le livre de sorts");
-			float b0 = (before.center - before.up * before.halfH).y, b1 = (after.center - after.up * after.halfH).y;
-			check(fabsf(b0 - b1) < 0.01f, "à gauche : les messages restent en place");
-			// Ouvert (224 x 283) : bandeau, parchemin, messages.
-			aimIn(2, 112, 118, 224, 283);
-			check(near(56, 50), "à gauche, ouvert : le parchemin des sorts");
-			aimIn(2, 112, 272, 224, 283);
-			check(near(200, 131.5f), "à gauche, ouvert : dessous, la ligne de messages");
+			check(!ui.spellsCollapsed(), "à gauche : le livre de sorts ne se replie plus");
+			aimIn(2, 118, 111, 236, 277);
+			check(near(56, 50), "à gauche : le parchemin des sorts");
+			aimIn(2, 118, 266, 236, 277);
+			check(near(200, 131.5f), "à gauche : dessous, la ligne de messages");
+		}
+		// Gâchette maintenue pour déplacer une fenêtre (plus de poignées) ; un appui bref reste un clic.
+		{
+			in.holdToMove = true;
+			in.time = 100.0;
+			const SceneState::Panel before = panel(1);
+			aimAt(before.center);
+			ui.update(in, o, tmp);
+			in.triggerDown = in.triggerPressed = true;
+			ui.update(in, o, tmp);
+			check(o.pressPending && !o.dragging && !o.gameClick, "gâchette enfoncée sur une fenêtre : en attente, rien au jeu");
+			in.triggerPressed = false;
+			in.time += 0.1;
+			ui.update(in, o, tmp);
+			in.triggerDown = false;
+			in.time += 0.05;
+			ui.update(in, o, tmp);
+			check(o.gameClick && near(201.5f, 189), "appui bref sur une fenêtre : un clic au jeu, au relâcher");
+			in.time += 1.0;
+			ui.update(in, o, tmp);
+			in.triggerDown = in.triggerPressed = true;
+			ui.update(in, o, tmp);
+			in.triggerPressed = false;
+			in.time += 0.5;
+			ui.update(in, o, tmp);
+			check(o.dragging && o.grabbed && !o.gameClick, "gâchette maintenue : la fenêtre est prise");
+			aimAt(before.center + Vec3{0.2f, 0, 0});
+			in.time += 0.05;
+			const SceneState::Panel moved = panel(1);
+			check(fabsf(moved.center.x - before.center.x - 0.2f) < 0.05f, "gâchette maintenue : la fenêtre suit le doigt");
+			in.triggerDown = false;
+			ui.update(in, o, tmp);
+			check(o.released && !o.dragging && !o.gameClick, "gâchette relâchée : la fenêtre reste là, pas de clic");
+			int handles = 0;
+			for (int i = 0; i < SceneState::kMaxHandles; i++)
+				handles += tmp.handles[i].visible ? 1 : 0;
+			check(handles == 0, "plus de poignées sous les fenêtres");
+			in.holdToMove = false;
+			ui.resetLayout(in);
 		}
 		// 3. Tout est dans le plan de l'écran, au-dessus du plancher
 		{

@@ -74,7 +74,7 @@ struct Composite {
 };
 const int kCompParty = 0, kCompSpells = 1, kCompAtlas = 2, kCompInv = 3;
 const int kCompTexW[4] = {104, 240, kAtlasW, 240}, kCompTexH[4] = {200, 288, kAtlasH, 132};
-const int kSpellTabH = 18; // bandeau du haut de la fenêtre de gauche : ouvrir ou replier le livre de sorts
+const int kSpellTabH = 11; // bandeau du haut de la fenêtre de gauche : ouvrir ou replier le livre de sorts
 
 // Les pixels du jeu sont 1,2 fois plus hauts que larges ; ceux du clavier sont carrés.
 float pixelAspect(int id) {
@@ -387,12 +387,19 @@ struct Ui::Impl {
 	void composeAtlas(const UiFrameInput &in);
 	std::vector<uint8_t> heldFrame; // l'image du jeu d'avant la boîte de texte (voir textBoxActive)
 	int heldW = 0, heldH = 0;
-	bool spellsCollapsed = true; // livre de sorts replié : seuls le bandeau et les messages restent
+	bool spellsCollapsed = false; // (le livre de sorts ne se replie plus)
 	bool spellTabHot = false;
 	void compose(int which, const UiFrameInput &in);
 	int compOf(int panel) const { return panel == kPanelParty ? kCompParty : panel == kPanelSpells ? kCompSpells : panel == kPanelAtlas ? kCompAtlas : panel == kPanelInventory ? kCompInv : -1; }
 	// L'atlas à droite de la fenêtre des personnages, haut contre haut.
 	void placeAtlas(UiPlacement *placement);
+	// Gâchette maintenue pour déplacer : l'appui en attente, et ce que vise le doigt.
+	bool pendPress = false;
+	double pendSince = 0.0;
+	bool lastHoldable = false;
+	int lastHoldTarget = -1;
+	float lastHoldT = 1.0f;
+	Vec3 lastHoldOffset = {0, 0, 0};
 	int drag = -1;
 	float grabDist = 1.0f;
 	Vec3 grabOffset = {0, 0, 0};
@@ -710,9 +717,9 @@ void Ui::Impl::compose(int which, const UiFrameInput &in) {
 		// Un bouton du jeu, à la taille de ses pixels (doublés ici comme le parchemin).
 		Canvas cv{c.w, kSpellTabH, std::vector<uint8_t>((size_t)c.w * kSpellTabH * 4)};
 		cv.bevel(0, 0, c.w, kSpellTabH, 2, true, spellTabHot ? kLight : kFace);
-		std::string label = latin1(spellsCollapsed ? tr(language, "Spellbook  +", "Livre de sorts  +", "Zauberbuch  +") : tr(language, "Spellbook  -", "Livre de sorts  -", "Zauberbuch  -"));
-		const int sc = g_font.ok() ? 2 : 1;
-		cv.gcenter(label, 0, c.w, 1, sc, spellTabHot ? kWhite : kGold);
+		std::string label = latin1(tr(language, "Spellbook", "Livre de sorts", "Zauberbuch"));
+		const int sc = 1;
+		cv.gcenter(label, 0, c.w, (kSpellTabH - Canvas::textH(sc)) / 2 > 0 ? (kSpellTabH - Canvas::textH(sc)) / 2 : 0, sc, spellTabHot ? kWhite : kGold);
 		for (int y = 0; y < kSpellTabH; y++)
 			memcpy(&c.px[(size_t)y * c.texW * 4], &cv.px[(size_t)y * c.w * 4], (size_t)c.w * 4);
 	}
@@ -1382,6 +1389,7 @@ bool Ui::spellsCollapsed() const {
 }
 
 void Ui::setSpellsCollapsed(bool collapsed) {
+	collapsed = false; // (le livre de sorts ne se replie plus)
 	if (collapsed != d->spellsCollapsed) {
 		d->spellsCollapsed = collapsed;
 		d->comp[kCompSpells].key = -1;
@@ -1573,7 +1581,51 @@ Vec3 clampToRoom(const UiFrameInput &in, Vec3 c, float hw, float hh) {
 
 } // namespace
 
-void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
+// Gâchette maintenue sur une fenêtre (ou l'écran) : au bout d'un instant, la fenêtre suit le doigt.
+// Relâchée avant, c'est un clic ordinaire, joué au relâcher.
+void Ui::update(const UiFrameInput &in0, UiFrameOutput &out, SceneState &scene) {
+	if (!in0.holdToMove) {
+		d->pendPress = false;
+		updateFrame(in0, out, scene);
+		return;
+	}
+	static const double kHoldToMove = 0.4;
+	UiFrameInput in = in0;
+	bool synth = false, startDrag = false;
+	if (d->pendPress) {
+		if (!in0.triggerDown || !in0.aimValid) {
+			d->pendPress = false;
+			synth = in0.aimValid;
+			in.triggerPressed = synth;
+			in.triggerDown = synth;
+		} else if (in0.time - d->pendSince >= kHoldToMove) {
+			d->pendPress = false;
+			startDrag = d->lastHoldTarget != -1;
+			in.triggerPressed = false;
+		} else {
+			in.triggerPressed = false;
+			in.triggerDown = false;
+		}
+	} else if (in0.triggerPressed && in0.aimValid && d->drag == -1 && d->resize == -1 && d->lastHoldable) {
+		d->pendPress = true;
+		d->pendSince = in0.time;
+		in.triggerPressed = false;
+		in.triggerDown = false;
+	}
+	if (startDrag) {
+		d->drag = d->lastHoldTarget;
+		d->grabDist = d->lastHoldT;
+		d->grabOffset = d->lastHoldOffset;
+	}
+	updateFrame(in, out, scene);
+	if (startDrag)
+		out.grabbed = true;
+	if (synth)
+		out.gameClick = out.pointerValid && out.buttonsToGame;
+	out.pressPending = d->pendPress;
+}
+
+void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 	out = UiFrameOutput();
 	for (int i = 0; i < SceneState::kMaxPanels; i++)
 		scene.panels[i].visible = false;
@@ -1744,7 +1796,7 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 		hq.c = in.screenPos + screenU * (top + hq.hh) + screenN * (in.crt ? -0.02f * in.dispW : 0.02f * in.dispW);
 	}
 
-	auto handleShown = [&](int i) { return i == kHandleScreen ? !in.screenHidden : visible[i]; };
+	auto handleShown = [&](int i) { return !in.holdToMove && (i == kHandleScreen ? !in.screenHidden : visible[i]); };
 	if (in.screenHidden && (d->drag == Impl::kScreenTarget || d->resize == Impl::kScreenTarget)) {
 		d->drag = -1;
 		d->resize = -1;
@@ -1964,6 +2016,15 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 	if (d->drag != -1)
 		handleGlow[d->drag == Impl::kScreenTarget ? kHandleScreen : d->drag] = 1.0f;
 	out.pointerLong = hitKind != kHitScreen && hitKind != kHitPanel && hitKind != kHitWrist;
+	// Ce qu'une gâchette maintenue déplacerait (voir update).
+	d->lastHoldable = false;
+	if (in.aimValid && d->drag == -1 && d->resize == -1 && ((hitKind == kHitPanel && hitIndex >= 0 && hitIndex < kUiPanelCount) || (hitKind == kHitScreen && !in.screenHidden))) {
+		const Vec3 p = in.tip + in.dir * bestT;
+		d->lastHoldable = true;
+		d->lastHoldTarget = hitKind == kHitScreen ? Impl::kScreenTarget : hitIndex;
+		d->lastHoldT = bestT;
+		d->lastHoldOffset = (hitKind == kHitScreen ? in.screenPos : content[hitIndex].c) - p;
+	}
 
 	if (hitKind == kHitScreen && screenHitOk) {
 		out.pointerValid = true;
@@ -2212,7 +2273,7 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 				}
 			}
 		} else {
-			if (hitIndex == kPanelSpells && v * (float)d->comp[kCompSpells].h < (float)kSpellTabH) {
+			if (false) {
 				// Le bandeau : ouvrir ou replier le livre de sorts. Le bas de la fenêtre (les messages)
 				// ne bouge pas.
 				tabHot = true;
@@ -2242,6 +2303,13 @@ void Ui::update(const UiFrameInput &in, UiFrameOutput &out, SceneState &scene) {
 				// La fenêtre d'inventaire de l'application : une case, le bouton qui déplie, le tri.
 				const Composite &c = d->comp[kCompInv];
 				const float cx = u * (float)c.w, cy = v * (float)c.h;
+				// Le curseur du jeu (l'objet tenu) se dessine ici aussi ; le pointeur du jeu attend sur sa
+				// propre bande d'objets, sans clic.
+				out.pointerValid = true;
+				out.buttonsToGame = false;
+				out.gu = 160.0f / 320.0f;
+				out.gv = 189.0f / 200.0f;
+				out.hitPixel = c.w > 0 ? 2.0f * q.hw / (float)c.w : 0.0f;
 				if (cx >= 178.0f && cy < 22.0f)
 					invHot = 100;
 				else if (cx >= 178.0f && cy >= 22.0f && cy < 44.0f && d->invExpanded)
