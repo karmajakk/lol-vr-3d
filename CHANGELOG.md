@@ -3,6 +3,11 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.33.0] — Pressure plates
+
+- **Pressure plates** are round slabs in relief: an engraved circle, a lighter bevelled edge and a
+  dark groove around them; a pressed plate sits almost flush with the floor.
+
 ## [0.32.0] — Atlas pages, menu alone
 
 - The arrows of the atlas window work: they open the game's own atlas on the screen, one page

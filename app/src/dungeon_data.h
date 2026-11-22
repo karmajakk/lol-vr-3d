@@ -62,7 +62,11 @@ struct DungeonTextures {
 	float doorDepth[256];      // la porte est à cette fraction de la case (1 = sur la face, 2 = au milieu)
 	float faceDepth[256];      // de même pour le mur lui-même (cadres de porte : au milieu de la case)
 	int decalLayer[256];       // type de mur -> dessin au sol (-1 = aucun)
-	float holeHalf[256];       // un dessin au sol qui est un trou (une fosse) : demi-côté du puits (0..0.5 de la case), 0 sinon
+	float holeHalf[256];
+	float plateR[256];         // une dalle à presser (ronde) : son rayon (fraction de la case), 0 sinon
+	int plateLayer[256];       // son dessus, vu d'en haut (couche), -1 sinon
+	bool platePressed[256];    // la dalle enfoncée (le même dessin, un pixel plus bas)
+	int plateFoot[256];       // un dessin au sol qui est un trou (une fosse) : demi-côté du puits (0..0.5 de la case), 0 sinon
 	// Une porte dans son renfoncement : le jeu peint les côtés du renfoncement en perspective, puis,
 	// au fond, la porte et les piliers qui la bordent, sur toute la largeur de la case. Ce plan du
 	// fond est remis à sa vraie place : à cette profondeur (0 = pas de plan), colonnes u0..u1 et

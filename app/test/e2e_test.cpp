@@ -468,11 +468,11 @@ int main(int argc, char **argv) {
 						}
 						fclose(fo);
 					}
-					const int ls[2] = {tex.typeLayer[t], tex.doorLayer[t]};
-					for (int k = 0; k < 2; k++) {
+					const int ls[3] = {tex.typeLayer[t], tex.doorLayer[t], tex.decalLayer[t]};
+					for (int k = 0; k < 3; k++) {
 						if (ls[k] < 0)
 							continue;
-						FILE *fo = fopen((out + "/type" + std::to_string(t) + (k ? "_porte" : "_mur") + ".ppm").c_str(), "wb");
+						FILE *fo = fopen((out + "/type" + std::to_string(t) + (k == 2 ? "_sol" : k ? "_porte" : "_mur") + ".ppm").c_str(), "wb");
 						fprintf(fo, "P6\n128 128\n255\n");
 						const uint8_t *src = &tex.rgba[(size_t)ls[k] * 128 * 128 * 4];
 						for (int i = 0; i < 128 * 128; i++) {
