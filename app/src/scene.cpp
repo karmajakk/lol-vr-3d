@@ -1072,7 +1072,7 @@ void Scene::render(const Mat4 &view, const Mat4 &proj, const SceneState &s) {
 			glDrawArrays(GL_TRIANGLES, 0, d->roomSolid.count);
 		}
 		glUniformMatrix4fv(d->lit.model, 1, GL_FALSE, d->screenMat.m);
-		if (s.screenVisible) {
+		if (s.screenVisible && !s.screenFrameless) {
 			GlMesh &around = crt ? d->crtBody : d->frameMesh;
 			glBindVertexArray(around.vao);
 			glDrawArrays(GL_TRIANGLES, 0, around.count);

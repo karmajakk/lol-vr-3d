@@ -125,6 +125,7 @@ struct LolvrLevelData {
 	const uint8_t *invRgb;
 	uint32_t animBusy;
 	int32_t lamp;
+	uint32_t menuRect;
 };
 const LolvrLevelData *retro_lolvr_level(void);
 }
@@ -453,6 +454,7 @@ void copyLevel() {
 	}
 	l.animBusy = s->animBusy != 0;
 	l.lamp = s->lamp;
+	l.menuRect = s->menuRect;
 	if (s->invRgb && l.invSerial != s->invSerial) {
 		l.invSerial = s->invSerial;
 		l.invRgb.assign(s->invRgb, s->invRgb + 176 * 132 * 3);
@@ -797,6 +799,7 @@ bool CoreHost::levelSnapshot(LevelSnapshot &out) const {
 		out.map = l.map;
 	out.animBusy = l.animBusy;
 	out.lamp = l.lamp;
+	out.menuRect = l.menuRect;
 	if (out.invSerial != l.invSerial) {
 		out.invSerial = l.invSerial;
 		out.invRgb = l.invRgb;

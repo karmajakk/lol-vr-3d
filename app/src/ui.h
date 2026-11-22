@@ -32,7 +32,7 @@ struct UiPlacement {
 const float kSplitViewHeight = 0.54f;
 const float kSplitViewLift = 0.16f;
 
-enum UiAction { kUiActionNone = 0, kUiActionToggleFire, kUiActionToggleDetach, kUiActionResetLayout, kUiActionCloseKeyboard, kUiActionToggleHelp, kUiActionCloseHelp, kUiActionToggleLanguage, kUiActionToggleKeyboard, kUiActionToggleDungeon, kUiActionToggleScreenAlways, kUiActionChooseClassic, kUiActionChooseImmersive, kUiActionGameMenu, kUiActionCycleView, kUiActionChooseLanguage, kUiActionToggleAtlas, kUiActionOpenKeyboard };
+enum UiAction { kUiActionNone = 0, kUiActionToggleFire, kUiActionToggleDetach, kUiActionResetLayout, kUiActionCloseKeyboard, kUiActionToggleHelp, kUiActionCloseHelp, kUiActionToggleLanguage, kUiActionToggleKeyboard, kUiActionToggleDungeon, kUiActionToggleScreenAlways, kUiActionChooseClassic, kUiActionChooseImmersive, kUiActionGameMenu, kUiActionCycleView, kUiActionChooseLanguage, kUiActionToggleAtlas, kUiActionOpenKeyboard, kUiActionAtlasPrev, kUiActionAtlasNext };
 
 // Les boutons qu'on peut changer dans un profil de manettes, et ce que chacun peut faire. La gâchette,
 // les joysticks (marcher, tourner), le bouton menu et la disquette restent fixes.

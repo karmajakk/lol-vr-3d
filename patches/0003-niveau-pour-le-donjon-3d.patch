@@ -1020,10 +1020,10 @@ index c4f86a3..5d41eec 100644
  	uint32 delayTimer = _system->getMillis() + 8 * _tickLength;
  
 diff --git a/engines/kyra/engine/lol.h b/engines/kyra/engine/lol.h
-index a9028a2..f24e610 100644
+index a9028a2..107f603 100644
 --- a/engines/kyra/engine/lol.h
 +++ b/engines/kyra/engine/lol.h
-@@ -50,6 +50,143 @@ struct LolvrGameState {
+@@ -50,6 +50,145 @@ struct LolvrGameState {
  	int32 reserved[4];  // [0] dungeon loop ticks, [1] control mode, [2] bit 0: automap open, bit 1: game menu open
  };
  extern LolvrGameState g_lolvrState;
@@ -1162,12 +1162,14 @@ index a9028a2..f24e610 100644
 +	// The lantern, in a dark place (caves...): 0 full of oil .. 7 nearly empty, 8 out ; -1 where
 +	// the lantern does not matter (outdoors, lit places).
 +	int32 lamp;
++	// The game menu open (the floppy): its box, x | y << 9 | w << 16 | (h / 2) << 25 (0: none).
++	uint32 menuRect;
 +};
 +extern LolvrLevelData g_lolvrLevel;
  }
  
  namespace Audio {
-@@ -335,6 +472,47 @@ private:
+@@ -335,6 +474,47 @@ private:
  
  	// main loop
  	void runLoop();
@@ -1839,10 +1841,21 @@ index a2dd10a..eee69ed 100644
  
  void Screen_LoL::fadeClearSceneWindow(int delay) {
 diff --git a/engines/kyra/gui/gui_lol.cpp b/engines/kyra/gui/gui_lol.cpp
-index b2732d2..fbd3188 100644
+index b2732d2..9ff1309 100644
 --- a/engines/kyra/gui/gui_lol.cpp
 +++ b/engines/kyra/gui/gui_lol.cpp
-@@ -988,6 +988,7 @@ int LoLEngine::clickedTurnLeftArrow(Button *button) {
+@@ -424,7 +424,9 @@ void LoLEngine::gui_drawCharPortraitWithStats(int charNum) {
+ 	if (_characters[charNum].damageSuffered)
+ 		_screen->fprintString("%d", 17, 28, _flags.use16ColorMode ? 0x33 : 254, 0, 1, _characters[charNum].damageSuffered);
+ 
+-	uint8 col = (charNum != _selectedCharacter || countActiveCharacters() == 1) ? 1 : 212;
++	// lol-vr-3d: no pale blue frame for the game's selected character (the headset frames the
++	// character of the A and B buttons in yellow; two frames were confusing)
++	uint8 col = 1;
+ 	if (_flags.use16ColorMode)
+ 		col = (charNum != _selectedCharacter || countActiveCharacters() == 1) ? 0x44 : 0x22;
+ 	_screen->drawBox(0, 0, 65, 33, col);
+@@ -988,6 +990,7 @@ int LoLEngine::clickedTurnLeftArrow(Button *button) {
  
  	gui_toggleButtonDisplayMode(_flags.isTalkie ? 79 : 77, 1);
  	_currentDirection = (_currentDirection - 1) & 3;
@@ -1850,7 +1863,7 @@ index b2732d2..fbd3188 100644
  
  	_sceneDefaultUpdate = 1;
  
-@@ -1010,6 +1011,7 @@ int LoLEngine::clickedTurnRightArrow(Button *button) {
+@@ -1010,6 +1013,7 @@ int LoLEngine::clickedTurnRightArrow(Button *button) {
  
  	gui_toggleButtonDisplayMode(_flags.isTalkie ? 81 : 79, 1);
  	_currentDirection = (_currentDirection + 1) & 3;
@@ -1858,7 +1871,7 @@ index b2732d2..fbd3188 100644
  
  	_sceneDefaultUpdate = 1;
  
-@@ -1085,6 +1087,7 @@ int LoLEngine::clickedMagicButton(Button *button) {
+@@ -1085,6 +1089,7 @@ int LoLEngine::clickedMagicButton(Button *button) {
  	gui_drawCharPortraitWithStats(c);
  	gui_initMagicSubmenu(c);
  	_activeMagicMenu = c;
@@ -1866,7 +1879,7 @@ index b2732d2..fbd3188 100644
  
  	return 1;
  }
-@@ -1112,6 +1115,7 @@ int LoLEngine::clickedMagicSubmenu(Button *button) {
+@@ -1112,6 +1117,7 @@ int LoLEngine::clickedMagicSubmenu(Button *button) {
  	}
  
  	_activeMagicMenu = -1;
@@ -1874,7 +1887,7 @@ index b2732d2..fbd3188 100644
  	return 1;
  }
  
-@@ -1119,6 +1123,7 @@ int LoLEngine::clickedScreen(Button *button) {
+@@ -1119,6 +1125,7 @@ int LoLEngine::clickedScreen(Button *button) {
  	_characters[_activeMagicMenu].flags &= 0xFFEF;
  	gui_drawCharPortraitWithStats(_activeMagicMenu);
  	_activeMagicMenu = -1;
@@ -1882,16 +1895,25 @@ index b2732d2..fbd3188 100644
  
  	if (!(button->flags2 & 0x80)) {
  		if (button->flags2 & 0x100)
-@@ -2212,7 +2217,7 @@ int GUI_LoL::runMenu(Menu &menu) {
+@@ -2212,7 +2219,7 @@ int GUI_LoL::runMenu(Menu &menu) {
  	// lol-vr: a game menu covers the middle of the screen while this function runs
  	struct LolvrMenuFlag {
  		LolvrMenuFlag() { g_lolvrState.reserved[2] |= 2; }
 -		~LolvrMenuFlag() { g_lolvrState.reserved[2] &= ~2; }
-+		~LolvrMenuFlag() { g_lolvrState.reserved[2] &= ~(2 | 8); }
++		~LolvrMenuFlag() { g_lolvrState.reserved[2] &= ~(2 | 8); g_lolvrLevel.menuRect = 0; }
  	} lolvrMenuFlag;
  	_currentMenu = &menu;
  	_lastMenu = _currentMenu;
-@@ -2369,7 +2374,7 @@ int GUI_LoL::runMenu(Menu &menu) {
+@@ -2312,6 +2319,8 @@ int GUI_LoL::runMenu(Menu &menu) {
+ 		}
+ 
+ 		initMenu(*_currentMenu);
++		// lol-vr-3d: where the menu is, for the headset to show it alone
++		g_lolvrLevel.menuRect = (uint32)(_currentMenu->x & 511) | ((uint32)(_currentMenu->y & 127) << 9) | ((uint32)(_currentMenu->width & 511) << 16) | ((uint32)((_currentMenu->height >> 1) & 127) << 25);
+ 
+ 		if (_currentMenu == &_loadMenu || _currentMenu == &_deleteMenu) {
+ 			if (_saveSlots.begin() == _saveSlots.end())
+@@ -2369,7 +2378,7 @@ int GUI_LoL::runMenu(Menu &menu) {
  			_screen->updateScreen();
  		}
  
@@ -1900,7 +1922,7 @@ index b2732d2..fbd3188 100644
  			Screen::FontId f = _screen->setFont(Screen::FID_6_FNT);
  			_screen->fprintString("v%s", menu.x + 8, menu.y + menu.height - 12, 204, 0, 8, _vm->_versionString.c_str());
  			_screen->setFont(f);
-@@ -2592,6 +2597,12 @@ int GUI_LoL::getInput() {
+@@ -2592,6 +2601,12 @@ int GUI_LoL::getInput() {
  	_vm->_mouseX = p.x;
  	_vm->_mouseY = p.y;
  
@@ -1913,7 +1935,7 @@ index b2732d2..fbd3188 100644
  	if (_currentMenu == &_savenameMenu) {
  		_vm->updateInput();
  
-@@ -2656,6 +2667,11 @@ int GUI_LoL::clickedMainMenu(Button *button) {
+@@ -2656,6 +2671,11 @@ int GUI_LoL::clickedMainMenu(Button *button) {
  	case 0x4005:
  		_displayMenu = false;
  		break;
@@ -1925,7 +1947,7 @@ index b2732d2..fbd3188 100644
  	default:
  		break;
  	}
-@@ -2756,6 +2772,7 @@ int GUI_LoL::clickedOptionsMenu(Button *button) {
+@@ -2756,6 +2776,7 @@ int GUI_LoL::clickedOptionsMenu(Button *button) {
  		break;
  	case 0xFFF4:
  		_vm->_lang = (_vm->_lang + 1) % 3;
@@ -1933,7 +1955,7 @@ index b2732d2..fbd3188 100644
  		break;
  	case 0xFFF3:
  		_vm->_configVoice ^= 3;
-@@ -2934,6 +2951,9 @@ Common::String GUI_LoL::getMenuTitle(const Menu &menu) {
+@@ -2934,6 +2955,9 @@ Common::String GUI_LoL::getMenuTitle(const Menu &menu) {
  }
  
  Common::String GUI_LoL::getMenuItemTitle(const MenuItem &menuItem) {

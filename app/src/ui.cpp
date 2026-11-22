@@ -2336,6 +2336,11 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 						out.action = kUiActionToggleAtlas;
 						out.clicked = true;
 					}
+				} else if (ax >= 462.0f && ax < 546.0f && ay >= 350.0f && ay < 400.0f && in.triggerPressed) {
+					// Les flèches : les cartes des autres niveaux, dans l'atlas du jeu lui-même (il les
+					// recharge) ; il s'ouvre sur l'écran, déjà tourné d'une page.
+					out.action = ax < 504.0f ? kUiActionAtlasPrev : kUiActionAtlasNext;
+					out.clicked = true;
 				}
 			} else if (hitIndex == kPanelInventory && in.invRgb) {
 				// La fenêtre d'inventaire de l'application : une case, le bouton qui déplie, le tri.

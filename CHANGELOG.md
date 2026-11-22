@@ -3,6 +3,14 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.32.0] — Atlas pages, menu alone
+
+- The arrows of the atlas window work: they open the game's own atlas on the screen, one page
+  turned (the maps of the other levels); its arrows and EXIT then work as in the game.
+- Immersive mode: the game menu (the floppy) shows alone, without the rest of the image or the frame.
+- The game's pale blue frame around a selected portrait is gone (the yellow frame shows the
+  character of the A and B buttons).
+
 ## [0.31.0] — Typing with your fingers
 
 - The virtual keyboard can be typed on directly: touch a key with the tip of either index finger

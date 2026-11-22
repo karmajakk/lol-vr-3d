@@ -93,6 +93,7 @@ struct SceneState {
 	bool screenVisible = true; // le grand écran (et son cadre) est affiché
 	Mat4 dungeonModel = identity(); // repère du niveau -> monde
 	float dungeonLight = 1.0f;
+	bool screenFrameless = false; // l'écran sans son cadre (le menu du jeu seul)
 	float dungeonReach = 11.0f; // jusqu'où porte la lumière (la lanterne)
 };
 

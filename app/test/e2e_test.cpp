@@ -397,7 +397,7 @@ int main(int argc, char **argv) {
 				failures++;
 				continue;
 			}
-			printf("  lanterne %d, clarté %d ; niveau publié : %d, case %d (x=%d y=%d), direction %d, vmp=%zu vcn=%zu, murs n°%u, graphismes n°%u\n", lvl.lamp, lvl.light, lvl.level, lvl.block,
+			printf("  menu %08x, lanterne %d, clarté %d ; niveau publié : %d, case %d (x=%d y=%d), direction %d, vmp=%zu vcn=%zu, murs n°%u, graphismes n°%u\n", lvl.menuRect, lvl.lamp, lvl.light, lvl.level, lvl.block,
 			       lvl.block & 31, lvl.block >> 5, lvl.direction, lvl.vmp.size(), lvl.vcn.size() / 32, lvl.wallsSerial, lvl.gfxSerial);
 			DungeonGfx g;
 			g.vmpMap = lvl.vmpMap;

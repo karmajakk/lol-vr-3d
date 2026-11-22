@@ -7,7 +7,7 @@ While exploring, the game interface is spread over windows you place wherever yo
 - on the left, the spell scroll, with the message line joined under it; always open;
 - on the right, the characters one under the other, the atlas column (lamp, purse) to their right, and the rest button under the purse, all in one window (the options button, the floppy, is on your left wrist);
 - below, the inventory;
-- further right, once the party has the map, the **Atlas**: the game's own atlas page (same parchment, symbols, font and legend), updated at every step as you explore. It is closed by default: the atlas icon of the game (open book, right column) or the map button opens it, and the "Close" box on the page closes it. You can move it like the other windows.
+- further right, once the party has the map, the **Atlas**: the game's own atlas page (same parchment, symbols, font and legend), updated at every step as you explore. It is closed by default: the atlas icon of the game (open book, right column) or the map button opens it, and the "Close" box on the page closes it. Its arrows open the game's own atlas on the screen, one page turned, to browse the maps of the other levels. You can move it like the other windows.
 
 At first they sit around the screen: the pointer moves from one to the other with no offset, so you can pick up an item on the floor and drop it into the inventory. If you aim just beside a window, the pointer snaps to the nearest one.
 
