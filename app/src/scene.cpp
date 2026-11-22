@@ -1046,7 +1046,7 @@ void Scene::render(const Mat4 &view, const Mat4 &proj, const SceneState &s) {
 
 	// --- Le donjon en 3D, tout autour : l'interface (écran, fenêtres, mains) passe toujours devant. ---
 	if (inDungeon) {
-		d->dungeon->render(viewProj, s.dungeonModel, camPos, s.dungeonLight);
+		d->dungeon->render(viewProj, s.dungeonModel, camPos, s.dungeonLight, s.dungeonReach);
 		glClear(GL_DEPTH_BUFFER_BIT);
 		glEnable(GL_CULL_FACE);
 	}

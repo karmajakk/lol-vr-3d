@@ -46,7 +46,8 @@ public:
 	bool hasContent() const;
 	// model : repère du niveau -> monde. eye : position de l'œil (monde), pour la pénombre.
 	// light : 1 = éclairage normal (le jeu peut assombrir certaines zones).
-	void render(const Mat4 &viewProj, const Mat4 &model, Vec3 eye, float light) const;
+	// reach : distance (m) où la pénombre devient noire (la lanterne, dans un lieu sombre).
+	void render(const Mat4 &viewProj, const Mat4 &model, Vec3 eye, float light, float reach = 11.0f) const;
 
 private:
 	struct Impl;

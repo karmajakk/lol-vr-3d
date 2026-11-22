@@ -3,6 +3,15 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.30.0] — Lantern
+
+- **Lantern** (immersive mode): in dark places, how far you see follows the lantern's oil, with a
+  slight flicker; with the lantern out you see almost nothing beyond your own block.
+- **L3** also picks the next spell level when the levels are open; **R3** only recenters
+  (immersive mode).
+- Hit monsters show the game's blood splash in the 3D dungeon (blows, thrown daggers and stars,
+  spells).
+
 ## [0.29.0] — Caves QA
 
 - **L3** (immersive mode): next spell of the spellbook.

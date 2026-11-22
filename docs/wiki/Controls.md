@@ -15,8 +15,8 @@
 | **X** | **Right click** where you aim: drink a potion, use an item (same as the grip) |
 | Menu button (left controller) | ScummVM menu: save, load, quit |
 | **Floppy on the left wrist** | The game menu (load, save, language...), and in it "VR controls": VR mode, view, controller mapping |
-| Right stick click | Recenter the screen, the room and the windows in front of you; in immersive mode it also puts your eyes at the party's height, seated or standing. With the spell levels open: next level |
-| Short left stick click (L3) | Immersive mode: next spell of the spellbook. Classic and mixed reality: next view (big screen → windows → 486 PC) |
+| Right stick click | Recenter the screen, the room and the windows in front of you; in immersive mode it also puts your eyes at the party's height, seated or standing. With the spell levels open (classic and mixed reality): next level |
+| Short left stick click (L3) | Immersive mode: next spell of the spellbook; with the spell levels open, next level. Classic and mixed reality: next view (big screen → windows → 486 PC) |
 | Left stick click held + right stick | Up/down: screen size; left/right: distance |
 
 ## Floppy on the wrist, VR controls
@@ -43,7 +43,7 @@ The keyboard opens by itself when the game asks for a save description, and clos
 
 ## Button combat
 
-In the dungeon, one character is "selected": they are framed in yellow in the party column. **A** makes them attack, **B** opens the levels of the spell chosen in the spellbook, level 1 framed; the **right stick click** frames the next level the character can cast (1, 2, 3, 4, back to 1), and **B** again casts it. Clicking a level with the trigger works too. Flick the right stick down or up to pick the next or previous character (in the order of the party window). In menus, cutscenes, the map and a character sheet, A and B go back to Enter and Escape; the Escape key is also on the keyboard.
+In the dungeon, one character is "selected": they are framed in yellow in the party column. **A** makes them attack, **B** opens the levels of the spell chosen in the spellbook, level 1 framed; the **left stick click** (immersive mode; right stick click in the other modes) frames the next level the character can cast (1, 2, 3, 4, back to 1), and **B** again casts it. Clicking a level with the trigger works too. Flick the right stick down or up to pick the next or previous character (in the order of the party window). In menus, cutscenes, the map and a character sheet, A and B go back to Enter and Escape; the Escape key is also on the keyboard.
 
 To **drink a potion** or use an item: aim at it in the inventory and press **X** (a right click, like in the original game). The grip of the aiming hand does the same.
 

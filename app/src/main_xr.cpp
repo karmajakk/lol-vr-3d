@@ -460,6 +460,7 @@ struct App {
 	double gazeOffSince = 0; // depuis quand le regard s'écarte de la direction du groupe
 	float wallDim = 0;              // la tête du joueur entre dans un mur : on assombrit
 	float dungeonLight = 1.0f;
+	float dungeonReach = 11.0f; // jusqu'où porte la lumière (lanterne), adouci
 	bool dungeonVisible = false;
 	lolvr::LevelSnapshot level;
 	GLuint cursorTex = 0;       // le curseur du jeu (l'objet tenu), pour le donjon en 3D
@@ -2425,7 +2426,7 @@ void updateInput(App &app, XrTime time, float dt, double now) {
 	}
 	// Recentrer : l'écran (et la pièce) devant soi (menu de magie ouvert : niveau de sort suivant).
 	const bool r3Raw = fnDown[lolvr::kFnRecenter];
-	bool recenter = r3Raw && app.level.magicMenu < 0;
+	bool recenter = r3Raw && (app.level.magicMenu < 0 || app.dungeonMode);
 	if (app.headValid && recenter && !app.recenterDown) {
 		updateFloor(app, time);
 		placeScreen(app, true);
@@ -2634,7 +2635,13 @@ void updateInput(App &app, XrTime time, float dt, double now) {
 			setClassic(app, vrModeOf(app), (classicViewOf(app) + 1) % 3, time); // la vue suivante
 			pulse(app, kLeft, 0.3f, 0.03f);
 		} else if (!app.zoomUsed && now - app.zoomSince < 0.6 && app.dungeonMode && app.inDungeon) {
-			CoreHost::get().nextSpell(); // en immersif, L3 : le sort suivant
+			// En immersif, L3 : le sort suivant ; menu des niveaux ouvert, le niveau suivant.
+			if (app.level.magicMenu >= 0) {
+				const int n = app.level.magicLevels > 0 ? app.level.magicLevels : 1;
+				app.spellLevel = (app.spellLevel + 1) % n;
+			} else {
+				CoreHost::get().nextSpell();
+			}
 			pulse(app, kLeft, 0.25f, 0.02f);
 		}
 		app.settingsDirty = true;
@@ -2672,7 +2679,7 @@ void updateInput(App &app, XrTime time, float dt, double now) {
 		}
 		// R3, menu ouvert : niveau suivant parmi ceux que le personnage peut lancer
 		const bool r3 = fnDown[lolvr::kFnRecenter];
-		if (r3 && !app.r3Down && menu >= 0) {
+		if (r3 && !app.r3Down && menu >= 0 && !app.dungeonMode) {
 			const int n = app.level.magicLevels > 0 ? app.level.magicLevels : 1;
 			app.spellLevel = (app.spellLevel + 1) % n;
 			pulse(app, kRight, 0.20f, 0.02f);
@@ -3243,6 +3250,17 @@ void updateDungeon(App &app, float dt) {
 	app.lightLevel += ((float)l.light / 256.0f - app.lightLevel) * clampf(dt * 6.0f, 0.0f, 1.0f);
 	light *= app.lightLevel;
 	app.dungeonLight = light;
+	// La lanterne dans un lieu sombre : pleine d'huile, on voit loin ; presque vide, quelques pas ;
+	// éteinte, presque rien. Sa flamme vacille un peu.
+	{
+		static const float reachOf[9] = {10.0f, 10.0f, 8.0f, 8.0f, 6.0f, 6.0f, 4.5f, 4.5f, 2.6f};
+		float want = l.lamp < 0 || l.lamp > 8 ? 11.0f : reachOf[l.lamp];
+		if (l.lamp >= 0 && l.lamp < 8) {
+			const float t = (float)app.clock;
+			want *= 1.0f + 0.035f * sinf(t * 13.1f) + 0.025f * sinf(t * 7.3f + 1.0f);
+		}
+		app.dungeonReach += (want - app.dungeonReach) * clampf(dt * 3.0f, 0.0f, 1.0f);
+	}
 	app.shownLevel = l.level;
 	app.dungeonVisible = app.dungeon.hasContent();
 }
@@ -3299,6 +3317,7 @@ void fillSceneState(App &app, double now, bool focused) {
 	s.dungeonVisible = app.dungeonVisible;
 	s.dungeonModel = lolvr::dungeonModel(app.roomPos, app.dunYaw, app.partyX, app.partyZ, app.partyYaw);
 	s.dungeonLight = app.dungeonLight;
+	s.dungeonReach = app.dungeonReach;
 	s.screenVisible = app.screenShown;
 	for (int h = 0; h < 2; h++) {
 		lolvr::HandState &hand = s.hands[h];

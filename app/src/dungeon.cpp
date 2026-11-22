@@ -41,6 +41,7 @@ precision highp float;
 precision highp sampler2DArray;
 uniform sampler2DArray uTex;
 uniform float uLight;
+uniform float uReach;
 in vec3 vUvl;
 in float vShade;
 in float vDist;
@@ -57,10 +58,11 @@ void main() {
 		// Le ciel : pas de pénombre.
 		c *= (vShade - 2.0) * uLight;
 	} else {
-		// Comme dans le jeu : bien éclairé tout près, la pénombre gagne en trois ou quatre pas.
-		float k = clamp(1.15 - vDist / 11.0, 0.0, 1.0);
+		// Comme dans le jeu : bien éclairé tout près, la pénombre gagne en trois ou quatre pas ;
+		// dans un lieu sombre, la lanterne dit jusqu'où l'on voit (éteinte : presque rien).
+		float k = clamp(1.15 - vDist / uReach, 0.0, 1.0);
 		k = k * k * (3.0 - 2.0 * k);
-		c *= vShade * uLight * mix(0.04, 1.0, k);
+		c *= vShade * uLight * mix(uReach < 4.0 ? 0.0 : 0.04, 1.0, k);
 	}
 #ifdef MANUAL_SRGB
 	c = pow(c, vec3(1.0 / 2.2));
@@ -94,7 +96,7 @@ struct Dungeon::Impl {
 	float effectX = 0, effectZ = 0;
 	int effectDir = 0;
 	std::vector<DungeonSprite> sprites;
-	GLint uViewProj = -1, uModel = -1, uEye = -1, uLight = -1, uTex = -1;
+	GLint uViewProj = -1, uModel = -1, uEye = -1, uLight = -1, uReach = -1, uTex = -1;
 	GLsizei count = 0;
 	int layers = 0;
 };
@@ -128,6 +130,7 @@ bool Dungeon::init(bool srgbTarget) {
 	d->uModel = glGetUniformLocation(d->program, "uModel");
 	d->uEye = glGetUniformLocation(d->program, "uEye");
 	d->uLight = glGetUniformLocation(d->program, "uLight");
+	d->uReach = glGetUniformLocation(d->program, "uReach");
 	d->uTex = glGetUniformLocation(d->program, "uTex");
 	glGenVertexArrays(1, &d->vao);
 	glGenBuffers(1, &d->vbo);
@@ -223,7 +226,7 @@ bool Dungeon::hasContent() const {
 	return d->program && d->tex && d->count > 0;
 }
 
-void Dungeon::render(const Mat4 &viewProj, const Mat4 &model, Vec3 eye, float light) const {
+void Dungeon::render(const Mat4 &viewProj, const Mat4 &model, Vec3 eye, float light, float reach) const {
 	if (!hasContent())
 		return;
 	glUseProgram(d->program);
@@ -231,6 +234,7 @@ void Dungeon::render(const Mat4 &viewProj, const Mat4 &model, Vec3 eye, float li
 	glUniformMatrix4fv(d->uModel, 1, GL_FALSE, model.m);
 	glUniform3f(d->uEye, eye.x, eye.y, eye.z);
 	glUniform1f(d->uLight, light);
+	glUniform1f(d->uReach, reach);
 	glUniform1i(d->uTex, 0);
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D_ARRAY, d->tex);

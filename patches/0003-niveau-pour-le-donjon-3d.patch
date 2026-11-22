@@ -81,7 +81,7 @@ index 1016080..bfba10b 100644
  		// the global subtitles settings, we're using this hack to enable subtitles
  		// for fan translations
 diff --git a/engines/kyra/engine/lol.cpp b/engines/kyra/engine/lol.cpp
-index c4f86a3..d058ab8 100644
+index c4f86a3..5d41eec 100644
 --- a/engines/kyra/engine/lol.cpp
 +++ b/engines/kyra/engine/lol.cpp
 @@ -21,6 +21,8 @@
@@ -421,7 +421,7 @@ index c4f86a3..d058ab8 100644
  	} else {
  		if (_activeSpell.p->mpRequired[spellLevel] > _characters[charNum].magicPointsCur)
  			return 0;
-@@ -2136,13 +2328,552 @@ int LoLEngine::castSpell(int charNum, int spellType, int spellLevel) {
+@@ -2136,13 +2328,559 @@ int LoLEngine::castSpell(int charNum, int spellType, int spellLevel) {
  		setCharacterMagicOrHitPoints(charNum, 0, -_activeSpell.p->hpRequired[spellLevel], 1);
  		gui_drawCharPortraitWithStats(charNum);
  
@@ -810,6 +810,13 @@ index c4f86a3..d058ab8 100644
 +		full += base[i];
 +	}
 +	g_lolvrLevel.light = full ? (int32)MIN<uint32>(256, lit * 256 / full) : 256;
++	// (_brightness: how dark the place is, 0 = lit; flag 31/8: the party carries a lit lantern)
++	if (!_brightness)
++		g_lolvrLevel.lamp = -1;
++	else if (!(_flagsTable[31] & 0x08) || !_lampOilStatus)
++		g_lolvrLevel.lamp = 8;
++	else
++		g_lolvrLevel.lamp = (3 - ((MIN<int>(_lampOilStatus, 100) - 1) / 25)) << 1;
 +}
 +
 +void LoLEngine::lolvrExportWalls() {
@@ -974,7 +981,7 @@ index c4f86a3..d058ab8 100644
  int LoLEngine::castSpark(ActiveSpell *a) {
  	processMagicSpark(a->charNum, a->level);
  	return 1;
-@@ -3206,6 +3937,10 @@ void LoLEngine::addSpellToScroll(int spell, int charNum) {
+@@ -3206,6 +3944,10 @@ void LoLEngine::addSpellToScroll(int spell, int charNum) {
  		}
  	}
  
@@ -985,7 +992,7 @@ index c4f86a3..d058ab8 100644
  	if (spell > 1)
  		transferSpellToScollAnimation(charNum, spell, slot - 1);
  
-@@ -3521,6 +4256,8 @@ int LoLEngine::calcInflictableDamage(int16 attacker, int16 target, int hitType)
+@@ -3521,6 +4263,8 @@ int LoLEngine::calcInflictableDamage(int16 attacker, int16 target, int hitType)
  int LoLEngine::inflictDamage(uint16 target, int damage, uint16 attacker, int skill, int flags) {
  	LoLMonster *m = 0;
  	LoLCharacter *c = 0;
@@ -994,7 +1001,7 @@ index c4f86a3..d058ab8 100644
  
  	if (target & 0x8000) {
  		m = &_monsters[target & 0x7FFF];
-@@ -4130,7 +4867,6 @@ uint16 LoLEngine::getNearestPartyMemberFromPos(int x, int y) {
+@@ -4130,7 +4874,6 @@ uint16 LoLEngine::getNearestPartyMemberFromPos(int x, int y) {
  // magic atlas
  
  void LoLEngine::displayAutomap() {
@@ -1002,7 +1009,7 @@ index c4f86a3..d058ab8 100644
  	snd_playSoundEffect(105, -1);
  	gui_toggleButtonDisplayMode(_flags.isTalkie ? 78 : 76, 1);
  
-@@ -4174,6 +4910,9 @@ void LoLEngine::displayAutomap() {
+@@ -4174,6 +4917,9 @@ void LoLEngine::displayAutomap() {
  
  	_screen->copyPage(2, 0);
  	_screen->updateScreen();
@@ -1013,10 +1020,10 @@ index c4f86a3..d058ab8 100644
  	uint32 delayTimer = _system->getMillis() + 8 * _tickLength;
  
 diff --git a/engines/kyra/engine/lol.h b/engines/kyra/engine/lol.h
-index a9028a2..c7dbc41 100644
+index a9028a2..f24e610 100644
 --- a/engines/kyra/engine/lol.h
 +++ b/engines/kyra/engine/lol.h
-@@ -50,6 +50,140 @@ struct LolvrGameState {
+@@ -50,6 +50,143 @@ struct LolvrGameState {
  	int32 reserved[4];  // [0] dungeon loop ticks, [1] control mode, [2] bit 0: automap open, bit 1: game menu open
  };
  extern LolvrGameState g_lolvrState;
@@ -1152,12 +1159,15 @@ index a9028a2..c7dbc41 100644
 +	// An animation of a script is playing (a wall crumbling under a hammer...), even outside a
 +	// conversation: the headset shows the game's view while it runs.
 +	uint32 animBusy;
++	// The lantern, in a dark place (caves...): 0 full of oil .. 7 nearly empty, 8 out ; -1 where
++	// the lantern does not matter (outdoors, lit places).
++	int32 lamp;
 +};
 +extern LolvrLevelData g_lolvrLevel;
  }
  
  namespace Audio {
-@@ -335,6 +469,47 @@ private:
+@@ -335,6 +472,47 @@ private:
  
  	// main loop
  	void runLoop();
@@ -1452,10 +1462,10 @@ index 210b482..b88f0cd 100644
  
  #endif // ENABLE_LOL
 diff --git a/engines/kyra/engine/sprites_lol.cpp b/engines/kyra/engine/sprites_lol.cpp
-index 055e4f8..ac9046d 100644
+index 055e4f8..4546a8c 100644
 --- a/engines/kyra/engine/sprites_lol.cpp
 +++ b/engines/kyra/engine/sprites_lol.cpp
-@@ -1554,6 +1554,247 @@ void LoLEngine::killMonster(LoLMonster *monster) {
+@@ -1554,6 +1554,268 @@ void LoLEngine::killMonster(LoLMonster *monster) {
  	placeMonster(monster, 0, 0);
  }
  
@@ -1565,6 +1575,27 @@ index 055e4f8..ac9046d 100644
 +			uint8 *shp2 = _monsterDecorationShapes[m->properties->shapeIndex * 192 + v * 48 + curFrm * 3];
 +			if (shp2)
 +				drawDoorOrMonsterEquipment(shp2, 0, _shpDmX, _shpDmY, (flags & 0x30) | 1, bright);
++		}
++		// A monster just hit (a blow, a thrown dagger, a spell): the game's blood splash over it, as
++		// drawMonster draws it.
++		if (m->damageReceived && _gameShapes[6]) {
++			int dW = (_screen->getShapeScaledWidth(shp, _dmScaleW) >> 1) + m->hitOffsX;
++			int dH = (_screen->getShapeScaledHeight(shp, _dmScaleH) >> 1) + m->hitOffsY;
++			int bloodAmount = (m->mode == 13) ? (m->fightCurTick << 1) : (m->properties->hitPoints / MAX<int>(1, m->damageReceived & 0x7FFF));
++			int bloodType = m->properties->flags & 0xC000;
++			if (bloodType == 0x4000)
++				bloodType = _flags.use16ColorMode ? 0xBB : 63;
++			else if (bloodType == 0x8000)
++				bloodType = _flags.use16ColorMode ? 0x55 : 15;
++			else if (bloodType == 0xC000)
++				bloodType = _flags.use16ColorMode ? 0x33 : 74;
++			else
++				bloodType = 0;
++			uint8 tbl[256];
++			for (int i = 0; i < 256; i++)
++				tbl[i] = (bloodType && i >= 2 && i <= 7) ? (uint8)(i + bloodType) : (uint8)i;
++			bloodAmount = CLIP(bloodAmount, 1, 4);
++			_screen->drawShape(_sceneDrawPage1, _gameShapes[6], _shpDmX + dW, _shpDmY + dH, 13, 0x124, tbl, bloodType ? 1 : 0, _dmScaleW / bloodAmount, _dmScaleH / bloodAmount);
 +		}
 +	}
 +	return true;
