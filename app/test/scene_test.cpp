@@ -551,6 +551,31 @@ int main(int argc, char **argv) {
 			check(k.keyCount == 1 && k.keys[0] == 13, "clavier : Entrée");
 			k = press(1.5f, 0.5f);
 			check(k.action == kUiActionToggleDetach, "clavier : bouton des panneaux");
+			// Du bout du doigt : traverser la surface tape la touche, une seule fois tant qu'on ne ressort pas
+			{
+				Vec3 n = cross(kb.right, kb.up);
+				if (dot(in.anchorPos - kb.center, n) < 0.0f)
+					n = n * -1.0f;
+				in.aimValid = false;
+				in.pokeValid[0] = true;
+				in.poke[0] = keyPos(0.5f, 2.5f) + n * 0.05f;
+				ui.update(in, o, tmp);
+				check(o.keyCount == 0 && o.pokeHand < 0, "clavier au doigt : à 5 cm, rien");
+				in.poke[0] = keyPos(0.5f, 2.5f) - n * 0.003f;
+				ui.update(in, o, tmp);
+				check(o.keyCount == 1 && o.keys[0] == 'q' && o.pokeHand == 0, "clavier au doigt : la touche q, et la main qui vibre");
+				in.poke[0] = keyPos(0.5f, 2.5f) - n * 0.01f;
+				ui.update(in, o, tmp);
+				check(o.keyCount == 0, "clavier au doigt : pas de répétition sans ressortir");
+				in.poke[0] = keyPos(0.5f, 2.5f) + n * 0.04f;
+				ui.update(in, o, tmp);
+				in.poke[0] = keyPos(0.5f, 2.5f) - n * 0.003f;
+				ui.update(in, o, tmp);
+				check(o.keyCount == 1 && o.keys[0] == 'q', "clavier au doigt : ressorti, la touche se retape");
+				in.pokeValid[0] = false;
+				in.aimValid = true;
+				ui.update(in, o, tmp);
+			}
 			in.keyboardOpen = false;
 			// Panneau d'aide : visible, et un clic dessus le ferme
 			in.helpOpen = true;

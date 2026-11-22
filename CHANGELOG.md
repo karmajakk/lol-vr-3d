@@ -3,6 +3,11 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.31.0] — Typing with your fingers
+
+- The virtual keyboard can be typed on directly: touch a key with the tip of either index finger
+  (both hands work), a short vibration confirms it. Aiming with the trigger still works.
+
 ## [0.30.1] — Doors in their recess
 
 - Doors at the back of an opening whose frame is painted on the wall (Caves Level 1 and many

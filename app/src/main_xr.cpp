@@ -2120,6 +2120,11 @@ void updateUi(App &app, XrTime time, float dt, double now, bool pointer, bool tr
 		in.dir = rotate(aimRot, {0, 0, -1});
 	}
 	in.triggerDown = pointer && app.triggerDown[hand];
+	for (int h = 0; h < 2; h++) {
+		in.pokeValid[h] = app.aimValid[h] && app.screenPlaced;
+		if (in.pokeValid[h])
+			in.poke[h] = toVec3(app.aimPose[h].position) + rotate(toQuat(app.aimPose[h].orientation), lolvr::gloveFingertip(h == kLeft, 0.0f));
+	}
 	in.triggerPressed = pointer && triggerPressed;
 	in.holdToMove = true;
 	{
@@ -2470,6 +2475,8 @@ void updateInput(App &app, XrTime time, float dt, double now) {
 	lolvr::UiFrameOutput ui;
 	updateUi(app, time, dt, now, true, clicked[hand] && app.triggerDown[hand], right, ui);
 	bool toGame = ui.buttonsToGame && !ui.dragging;
+	if (ui.pokeHand >= 0)
+		pulse(app, ui.pokeHand, 0.35f, 0.02f); // une touche du clavier touchée du doigt
 	if (ui.gameClick && ui.pointerValid) {
 		// Un appui bref sur une fenêtre (la gâchette maintenue la déplace) : le clic, au relâcher.
 		app.synthU = ui.gu;

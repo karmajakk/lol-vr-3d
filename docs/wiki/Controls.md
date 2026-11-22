@@ -64,6 +64,8 @@ Aim at a corner of the screen or a window, just outside (on the frame, for the s
 
 The virtual keyboard opens by itself to name a save. Its top row holds Panels (detached interface or whole image; pushed in, its name in blue, when on), Reset layout and Close.
 
+Type with your fingers: touch a key with the tip of either index finger, as on a real keyboard (a short vibration confirms it); pull the finger back a little to type the next one. Aiming and squeezing the trigger works too.
+
 ## Haptics
 
 The controllers vibrate when the party hits or gets hurt, when doors open, on levers and spells.

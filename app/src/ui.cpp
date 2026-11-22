@@ -395,6 +395,7 @@ struct Ui::Impl {
 	void placeAtlas(UiPlacement *placement);
 	// Gâchette maintenue pour déplacer : l'appui en attente, et ce que vise le doigt.
 	bool pendPress = false;
+	bool pokeArmed[2] = {true, true}; // le doigt s'est écarté du clavier depuis la dernière touche
 	double pendSince = 0.0;
 	bool lastHoldable = false;
 	int lastHoldTarget = -1;
@@ -2016,6 +2017,92 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 	if (d->drag != -1)
 		handleGlow[d->drag == Impl::kScreenTarget ? kHandleScreen : d->drag] = 1.0f;
 	out.pointerLong = hitKind != kHitScreen && hitKind != kHitPanel && hitKind != kHitWrist;
+	// Une touche du clavier enfoncée (au doigt pointé ou du bout du doigt)
+	auto pressKey = [&](int idx) {
+		if (idx < 0 || idx >= (int)d->keys.size())
+			return;
+		const Key &key = d->keys[idx];
+		out.clicked = true;
+		d->pressKey = idx;
+		d->pressFlash = 0.15f;
+		if (key.action == -1) {
+			d->shift = !d->shift;
+			d->kbDirty = true;
+		} else if (key.action != kUiActionNone) {
+			out.action = key.action;
+		} else if (d->naming && key.key) {
+			// Le nom d'un nouveau profil de manettes
+			const unsigned c = key.key;
+			if (c == 13 || c == 27) {
+				if (c == 13) {
+					std::string nm = d->nameText;
+					while (!nm.empty() && nm.back() == ' ')
+						nm.pop_back();
+					if (nm.empty())
+						nm = "Profil " + std::to_string(d->profiles.size());
+					uint8_t fns[kSlotCount];
+					memcpy(fns, d->draft, kSlotCount);
+					addProfile(nm, fns);
+					selectProfile(nm.substr(0, 18));
+					out.layoutChanged = true;
+				}
+				d->naming = false;
+				out.action = kUiActionCloseKeyboard;
+			} else if (c == 8) {
+				if (!d->nameText.empty())
+					d->nameText.pop_back();
+			} else if (c >= 32 && c < 127 && d->nameText.size() < 18) {
+				const bool letter = c >= 'a' && c <= 'z';
+				d->nameText += (char)(letter && d->shift ? c - 32 : c);
+				if (d->shift) {
+					d->shift = false;
+					d->kbDirty = true;
+				}
+			}
+			d->editDirty = true;
+		} else if (key.key && out.keyCount < 4) {
+			bool letter = key.key >= 'a' && key.key <= 'z';
+			out.keys[out.keyCount] = key.key;
+			out.keyMods[out.keyCount] = (letter && d->shift) ? kUiModShift : 0;
+			out.keyCount++;
+			if (d->shift) {
+				d->shift = false;
+				d->kbDirty = true;
+			}
+		}
+	};
+	// Du bout du doigt : l'index qui traverse la surface du clavier enfonce la touche dessous ; il faut
+	// le ressortir (2 cm) pour taper la suivante.
+	for (int h = 0; h < 2; h++) {
+		bool near = false;
+		if (in.pokeValid[h] && visible[kPanelKeyboard] && d->drag == -1) {
+			const Quad &q = content[kPanelKeyboard];
+			const Vec3 n = cross(q.r, q.u);
+			const float side = dot(in.anchorPos - q.c, n) >= 0.0f ? 1.0f : -1.0f;
+			const Vec3 rel = in.poke[h] - q.c;
+			const float dist = side * dot(rel, n), x = dot(rel, q.r) / q.hw, y = dot(rel, q.u) / q.hh;
+			if (fabsf(x) <= 1.0f && fabsf(y) <= 1.0f && dist > -0.06f && dist < 0.10f) {
+				near = true;
+				if (dist > 0.02f) {
+					d->pokeArmed[h] = true;
+				} else if (dist < 0.006f && d->pokeArmed[h]) {
+					d->pokeArmed[h] = false;
+					const float u = (x + 1.0f) * 0.5f, v = (1.0f - y) * 0.5f;
+					const int col = (int)(u * (float)kCols), row = (int)(v * (float)kKbH / (float)kCellH);
+					for (size_t k = 0; k < d->keys.size(); k++) {
+						const Key &key = d->keys[k];
+						if (key.row == row && col >= key.col && col < key.col + key.span) {
+							pressKey((int)k);
+							out.pokeHand = h;
+							break;
+						}
+					}
+				}
+			}
+		}
+		if (!near)
+			d->pokeArmed[h] = true;
+	}
 	// Ce qu'une gâchette maintenue déplacerait (voir update).
 	d->lastHoldable = false;
 	if (in.aimValid && d->drag == -1 && d->resize == -1 && ((hitKind == kHitPanel && hitIndex >= 0 && hitIndex < kUiPanelCount) || (hitKind == kHitScreen && !in.screenHidden))) {
@@ -2221,57 +2308,8 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 				if (key.row == row && col >= key.col && col < key.col + key.span)
 					d->hotKey = (int)k;
 			}
-			if (d->hotKey >= 0 && in.triggerPressed) {
-				const Key &key = d->keys[d->hotKey];
-				out.clicked = true;
-				d->pressKey = d->hotKey;
-				d->pressFlash = 0.15f;
-				if (key.action == -1) {
-					d->shift = !d->shift;
-					d->kbDirty = true;
-				} else if (key.action != kUiActionNone) {
-					out.action = key.action;
-				} else if (d->naming && key.key) {
-					// Le nom d'un nouveau profil de manettes
-					const unsigned c = key.key;
-					if (c == 13 || c == 27) {
-						if (c == 13) {
-							std::string nm = d->nameText;
-							while (!nm.empty() && nm.back() == ' ')
-								nm.pop_back();
-							if (nm.empty())
-								nm = "Profil " + std::to_string(d->profiles.size());
-							uint8_t fns[kSlotCount];
-							memcpy(fns, d->draft, kSlotCount);
-							addProfile(nm, fns);
-							selectProfile(nm.substr(0, 18));
-							out.layoutChanged = true;
-						}
-						d->naming = false;
-						out.action = kUiActionCloseKeyboard;
-					} else if (c == 8) {
-						if (!d->nameText.empty())
-							d->nameText.pop_back();
-					} else if (c >= 32 && c < 127 && d->nameText.size() < 18) {
-						const bool letter = c >= 'a' && c <= 'z';
-						d->nameText += (char)(letter && d->shift ? c - 32 : c);
-						if (d->shift) {
-							d->shift = false;
-							d->kbDirty = true;
-						}
-					}
-					d->editDirty = true;
-				} else if (key.key && out.keyCount < 4) {
-					bool letter = key.key >= 'a' && key.key <= 'z';
-					out.keys[out.keyCount] = key.key;
-					out.keyMods[out.keyCount] = (letter && d->shift) ? kUiModShift : 0;
-					out.keyCount++;
-					if (d->shift) {
-						d->shift = false;
-						d->kbDirty = true;
-					}
-				}
-			}
+			if (d->hotKey >= 0 && in.triggerPressed)
+				pressKey(d->hotKey);
 		} else {
 			if (false) {
 				// Le bandeau : ouvrir ou replier le livre de sorts. Le bas de la fenêtre (les messages)

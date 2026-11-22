@@ -86,6 +86,9 @@ struct UiFrameInput {
 	// Gâchette maintenue sur une fenêtre ou l'écran : on la déplace (plus de poignées) ; un appui
 	// bref est un clic, envoyé au relâcher.
 	bool holdToMove = false;
+	// Le bout de l'index de chaque main : on tape au clavier en touchant ses touches.
+	Vec3 poke[2] = {{0, 0, 0}, {0, 0, 0}};
+	bool pokeValid[2] = {false, false};
 	bool spellsCovered = false; // une scène large couvre le parchemin des sorts : garder l'image d'avant
 	float stickX = 0.0f, stickY = 0.0f; // joystick droit
 	// Repère des panneaux : centre et largeur de l'image entière
@@ -177,6 +180,7 @@ struct UiFrameOutput {
 	bool invSort = false;  // le bouton de tri a été cliqué
 	bool gearMenuOpened = false; // le joueur a ouvert le menu du poignet (l'invitation peut disparaître)
 	bool clicked = false;
+	int pokeHand = -1;         // une touche du clavier touchée du doigt (la main, pour vibrer)
 	bool gameClick = false;    // (gâchette maintenue pour déplacer) un appui bref : un clic au jeu, ici
 	bool pressPending = false; // la gâchette vient d'être enfoncée sur une fenêtre : rien au jeu encore
 };
