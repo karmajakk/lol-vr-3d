@@ -560,6 +560,36 @@ void decodeDungeonTextures(const DungeonGfx &g, DungeonTextures &out) {
 									t1 = y;
 							out.planeColFoot[t][x] = t1 >= 0 ? (uint8_t)(t1 + 1) : 0;
 						}
+					} else if (dc1 >= dc0 && seeThrough && out.doorDepth[t] > 1.08f && out.doorDepth[t] < 3.5f) {
+						// Les autres portes au fond d'une ouverture (le cadre dessiné sur la face, des piliers
+						// jusqu'en haut, sans pied commun avec la porte : grottes...) : le même renfoncement.
+						// Le plan est à la profondeur de la porte ; la case entière y prend 128 / profondeur
+						// colonnes, au milieu ; ce qui est dessiné de part et d'autre devient les côtés du
+						// renfoncement, et chaque colonne du plan est posée au sol.
+						const float rd = out.doorDepth[t];
+						const int half = (int)lroundf(64.0f / rd);
+						const int p0 = 64 - half, p1 = 64 + half - 1;
+						int top = dtop;
+						for (int x = p0; x <= p1; x++)
+							for (int y = 0; y < top; y++)
+								if (al[y * kDunTexSize + x] || dal[y * kDunTexSize + x]) {
+									top = y;
+									break;
+								}
+						if (p0 > 2 && p1 < kDunTexSize - 3 && dc0 >= p0 - 2 && dc1 <= p1 + 2 && foot - top > 20) {
+							out.planeDepth[t] = rd;
+							out.planeU0[t] = (float)p0 / kDunTexSize;
+							out.planeU1[t] = (float)(p1 + 1) / kDunTexSize;
+							out.planeTop[t] = (float)top / kDunTexSize;
+							out.planeFoot[t] = (float)(foot + 1) / kDunTexSize;
+							for (int x = 0; x < kDunTexSize; x++) {
+								int t1 = -1;
+								for (int y = 0; y < kDunWallRows; y++)
+									if (al[y * kDunTexSize + x] || dal[y * kDunTexSize + x])
+										t1 = y;
+								out.planeColFoot[t][x] = t1 >= 0 ? (uint8_t)(t1 + 1) : 0;
+							}
+						}
 					}
 				}
 			}

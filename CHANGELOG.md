@@ -3,6 +3,12 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.30.1] — Doors in their recess
+
+- Doors at the back of an opening whose frame is painted on the wall (Caves Level 1 and many
+  more): the door and its frame now stand together at the back of a recess, both on the floor,
+  the sides of the recess drawn from the frame (as already done for Gladstone and Roland's manor).
+
 ## [0.30.0] — Lantern
 
 - **Lantern** (immersive mode): in dark places, how far you see follows the lantern's oil, with a
