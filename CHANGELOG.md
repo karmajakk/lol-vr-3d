@@ -3,6 +3,17 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.29.0] — Caves QA
+
+- **L3** (immersive mode): next spell of the spellbook.
+- **R3** (immersive mode) also puts your eyes at the party's height, seated or standing; a short
+  vibration confirms it.
+- Right stick down picks the next character in the order of the party window.
+- Greyed-out buttons (EXIT during a conversation, spell levels) are darkened instead of dotted.
+- The spellbook strip is gone; during a wide scene (an inn), the spellbook keeps its scroll.
+- **Pits** are real holes: a shaft going down into the dark.
+- A script animation outside a conversation (a wall crumbling under a hammer) shows the game's view.
+
 ## [0.28.0] — Windows held to move
 
 - **Moving windows**: hold the trigger anywhere on a window or on the screen for a moment and it

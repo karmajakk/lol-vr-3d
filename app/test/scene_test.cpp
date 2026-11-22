@@ -314,18 +314,11 @@ int main(int argc, char **argv) {
 		aimAt(panel(1).center);
 		ui.update(in, o, tmp);
 		check(near(201.5f, 189), "fenêtre de l'inventaire");
-		// À gauche, le livre de sorts toujours ouvert (236 x 277) : un mince bandeau, le parchemin, les messages.
+		// À gauche, le livre de sorts toujours ouvert (236 x 266), sans bandeau : le parchemin, les messages.
 		{
-			aimIn(2, 118, 5, 236, 277);
-			check(!o.pointerValid, "à gauche : le bandeau n'est pas un clic dans le jeu");
-			in.triggerDown = in.triggerPressed = true;
-			ui.update(in, o, tmp);
-			in.triggerDown = in.triggerPressed = false;
-			ui.update(in, o, tmp);
-			check(!ui.spellsCollapsed(), "à gauche : le livre de sorts ne se replie plus");
-			aimIn(2, 118, 111, 236, 277);
+			aimIn(2, 118, 100, 236, 266);
 			check(near(56, 50), "à gauche : le parchemin des sorts");
-			aimIn(2, 118, 266, 236, 277);
+			aimIn(2, 118, 255, 236, 266);
 			check(near(200, 131.5f), "à gauche : dessous, la ligne de messages");
 		}
 		// Gâchette maintenue pour déplacer une fenêtre (plus de poignées) ; un appui bref reste un clic.

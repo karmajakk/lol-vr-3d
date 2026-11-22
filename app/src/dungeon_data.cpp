@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <algorithm>
 
 namespace lolvr {
 
@@ -198,6 +199,7 @@ void decodeDungeonTextures(const DungeonGfx &g, DungeonTextures &out) {
 		memset(out.planeColFoot[i], 0, kDunTexSize);
 		out.picBox[i][0] = out.picBox[i][1] = out.picBox[i][2] = out.picBox[i][3] = 0;
 		out.footFit[i] = false;
+		out.holeHalf[i] = 0.0f;
 		out.scenery[i] = false;
 		out.hidden[i] = invisibleWall(g, (uint8_t)i);
 		out.doorTopV[i] = out.doorFootV[i] = out.doorLift[i] = 0.0f;
@@ -315,6 +317,21 @@ void decodeDungeonTextures(const DungeonGfx &g, DungeonTextures &out) {
 								img[j * kDunTexSize + i] = rgb(px[si]);
 						}
 					}
+					int nDark = 0;
+					for (int j = 0; j < kDunTexSize; j++)
+						for (int i = 0; i < kDunTexSize; i++) {
+							const Rgba &q = img[j * kDunTexSize + i];
+							if (q.a && (q.r * 3 + q.g * 6 + q.b) < 450) {
+								nDark++;
+							}
+						}
+					// Un trou (une fosse) : surtout une grande tache sombre. Le maillage creuse un puits au
+					// milieu de la case (le dessin du jeu, une ellipse vue en perspective, n'est pas tracé).
+					int nOp = 0;
+					for (int q = 0; q < kDunTexSize * kDunTexSize; q++)
+						nOp += img[q].a ? 1 : 0;
+					if (nDark > kDunTexSize * kDunTexSize / 16 && nDark * 10 > nOp * 3)
+						out.holeHalf[t] = 0.36f;
 					continue;
 				}
 				if (!isPictureType(g, t) || bottom >= 88) // (posé sur le sol : un objet, comme le wagonnet)
@@ -672,6 +689,7 @@ void buildDungeonMesh(const uint8_t *walls, const DungeonGfx &g, const DungeonTe
 		}
 		const uint8_t *w = walls + b * 4;
 		bool objectDone = false, decalDone = false;
+		float holeH = 0.0f; // un trou au sol : demi-côté du puits
 		for (int k = 0; k < 4; k++) {
 			uint8_t t = w[k];
 			if (!t)
@@ -712,6 +730,9 @@ void buildDungeonMesh(const uint8_t *walls, const DungeonGfx &g, const DungeonTe
 				t = w[kk];
 				if (!decalDone && tex.decalLayer[t] >= 0) {
 					decalDone = true;
+					holeH = tex.holeHalf[t] * S;
+					if (holeH > 0.0f)
+						continue; // (un trou : le puits, pas le dessin)
 					float x0 = cx - S * 0.5f, x1 = cx + S * 0.5f, z0 = cz - S * 0.5f, z1 = cz + S * 0.5f, y = 0.015f;
 					// Coins nord-ouest, nord-est, sud-est, sud-ouest ; le haut de l'image (le bord lointain)
 					// est du côté où regarde le groupe.
@@ -894,9 +915,35 @@ void buildDungeonMesh(const uint8_t *walls, const DungeonGfx &g, const DungeonTe
 		}
 		if (!solid) {
 			float x0 = cx - S * 0.5f, x1 = cx + S * 0.5f, z0 = cz - S * 0.5f, z1 = cz + S * 0.5f;
-			if (tex.floorLayer >= 0) {
+			if (tex.floorLayer >= 0 && holeH <= 0.0f) {
 				float a[5] = {x0, 0, z0, 0, 0}, bb[5] = {x0, 0, z1, 0, 1}, c[5] = {x1, 0, z1, 1, 1}, d[5] = {x1, 0, z0, 1, 0};
 				quad(a, bb, c, d, (float)tex.floorLayer, 0.9f);
+			} else if (tex.floorLayer >= 0) {
+				// Un trou : le sol autour, et un puits qui s'enfonce dans le noir.
+				const float L = (float)tex.floorLayer;
+				auto floorRect = [&](float xa, float xb, float za, float zb) {
+					const float ua = (xa - x0) / S, ub = (xb - x0) / S, va = (za - z0) / S, vb = (zb - z0) / S;
+					float a[5] = {xa, 0, za, ua, va}, bb[5] = {xa, 0, zb, ua, vb}, c[5] = {xb, 0, zb, ub, vb}, d[5] = {xb, 0, za, ub, va};
+					quad(a, bb, c, d, L, 0.9f);
+				};
+				const float hx0 = cx - holeH, hx1 = cx + holeH, hz0 = cz - holeH, hz1 = cz + holeH;
+				floorRect(x0, x1, z0, hz0);
+				floorRect(x0, x1, hz1, z1);
+				floorRect(x0, hx0, hz0, hz1);
+				floorRect(hx1, x1, hz0, hz1);
+				const float depth = 2.0f * S;
+				static const float bandShade[3] = {0.2f, 0.07f, 0.02f};
+				const float px[4] = {hx0, hx1, hx1, hx0}, pz[4] = {hz0, hz0, hz1, hz1};
+				for (int side = 0; side < 4; side++) {
+					const float ax = px[side], az = pz[side], bx = px[(side + 1) & 3], bz = pz[(side + 1) & 3];
+					for (int band = 0; band < 3; band++) {
+						const float yt = -depth * (float)band / 3.0f, yb = -depth * (float)(band + 1) / 3.0f;
+						float a[5] = {ax, yb, az, 0, 1}, bb[5] = {bx, yb, bz, 1, 1}, c[5] = {bx, yt, bz, 1, 0}, d[5] = {ax, yt, az, 0, 0};
+						quad(a, bb, c, d, L, bandShade[band], true);
+					}
+				}
+				float a[5] = {hx0, -depth, hz0, 0, 0}, bb[5] = {hx0, -depth, hz1, 0, 1}, c[5] = {hx1, -depth, hz1, 1, 1}, d[5] = {hx1, -depth, hz0, 1, 0};
+				quad(a, bb, c, d, L, 0.0f, true);
 			}
 			if (tex.ceilingLayer >= 0 && !sky) {
 				float a[5] = {x0, H, z0, 0, 0}, d[5] = {x1, H, z0, 1, 0}, c[5] = {x1, H, z1, 1, 1}, bb[5] = {x0, H, z1, 0, 1};

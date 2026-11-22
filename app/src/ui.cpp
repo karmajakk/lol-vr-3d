@@ -74,7 +74,7 @@ struct Composite {
 };
 const int kCompParty = 0, kCompSpells = 1, kCompAtlas = 2, kCompInv = 3;
 const int kCompTexW[4] = {104, 240, kAtlasW, 240}, kCompTexH[4] = {200, 288, kAtlasH, 132};
-const int kSpellTabH = 11; // bandeau du haut de la fenêtre de gauche : ouvrir ou replier le livre de sorts
+const int kSpellTabH = 0; // (plus de bandeau au-dessus du livre de sorts) // bandeau du haut de la fenêtre de gauche : ouvrir ou replier le livre de sorts
 
 // Les pixels du jeu sont 1,2 fois plus hauts que larges ; ceux du clavier sont carrés.
 float pixelAspect(int id) {
@@ -619,7 +619,7 @@ void Ui::Impl::compose(int which, const UiFrameInput &in) {
 	Composite &c = comp[which];
 	const int n = in.characters < 0 ? 0 : in.characters > 4 ? 4 : in.characters;
 	const bool blank = in.compassBlank;
-	const int key = (which == kCompInv ? 1 : which == kCompParty ? n * 2 + (blank ? 1 : 0) : (spellsCollapsed ? 1 : 0) + language * 2 + (spellTabHot ? 4 : 0)) + (in.textBoxActive ? 64 : 0);
+	const int key = (which == kCompInv ? 1 : which == kCompParty ? n * 2 + (blank ? 1 : 0) : (spellsCollapsed ? 1 : 0) + language * 2 + (spellTabHot ? 4 : 0)) + (in.textBoxActive ? 64 : 0) + (in.spellsCovered ? 128 : 0);
 	if (c.tex && in.gameSerial == c.serial && key == c.key)
 		return;
 	// Pendant une boîte de texte, les morceaux viennent de l'image d'avant ; sinon on la garde à jour.
@@ -706,14 +706,14 @@ void Ui::Impl::compose(int which, const UiFrameInput &in) {
 					int sx = gx * in.gameW / 320, sy = gy * in.gameH / 200;
 					// Le parchemin des sorts (au-dessus de la boîte de texte) reste à jour : un sort
 					// appris pendant une conversation s'y écrit.
-					const uint8_t *from = which == kCompSpells && pc.sy + pc.sh <= 122 ? in.gameRgba : game;
+					const uint8_t *from = which == kCompSpells && pc.sy + pc.sh <= 122 && !in.spellsCovered ? in.gameRgba : game;
 					const uint8_t *src = from + ((size_t)sy * in.gameW + sx) * 4;
 					p[0] = src[0]; p[1] = src[1]; p[2] = src[2];
 				}
 		}
 	}
 	// Le bandeau du livre de sorts : un clic l'ouvre ou le replie.
-	if (which == kCompSpells) {
+	if (which == kCompSpells && kSpellTabH > 0) {
 		// Un bouton du jeu, à la taille de ses pixels (doublés ici comme le parchemin).
 		Canvas cv{c.w, kSpellTabH, std::vector<uint8_t>((size_t)c.w * kSpellTabH * 4)};
 		cv.bevel(0, 0, c.w, kSpellTabH, 2, true, spellTabHot ? kLight : kFace);

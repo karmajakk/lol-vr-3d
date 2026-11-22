@@ -123,6 +123,7 @@ struct LolvrLevelData {
 	const uint8_t *mapRgb;
 	uint32_t invSerial;
 	const uint8_t *invRgb;
+	uint32_t animBusy;
 };
 const LolvrLevelData *retro_lolvr_level(void);
 }
@@ -449,6 +450,7 @@ void copyLevel() {
 			m.legend.push_back(e);
 		}
 	}
+	l.animBusy = s->animBusy != 0;
 	if (s->invRgb && l.invSerial != s->invSerial) {
 		l.invSerial = s->invSerial;
 		l.invRgb.assign(s->invRgb, s->invRgb + 176 * 132 * 3);
@@ -643,6 +645,7 @@ void CoreHost::setGameLanguage(int language) { retro_lolvr_set_lang(language); }
 void CoreHost::inventoryEnable() { retro_lolvr_inventory(0, 0); }
 void CoreHost::inventoryClick(int slot) { retro_lolvr_inventory(1, slot); }
 void CoreHost::inventorySort() { retro_lolvr_inventory(2, 0); }
+void CoreHost::nextSpell() { retro_lolvr_inventory(3, 0); }
 void CoreHost::setOwnCursor(bool own) { retro_lolvr_hide_cursor(own ? 1 : 0); }
 bool CoreHost::cursorShown() const { return retro_lolvr_cursor_shown() != 0; }
 
@@ -790,6 +793,7 @@ bool CoreHost::levelSnapshot(LevelSnapshot &out) const {
 	out.spellCount = l.spellCount;
 	if (out.map.serial != l.map.serial)
 		out.map = l.map;
+	out.animBusy = l.animBusy;
 	if (out.invSerial != l.invSerial) {
 		out.invSerial = l.invSerial;
 		out.invRgb = l.invRgb;

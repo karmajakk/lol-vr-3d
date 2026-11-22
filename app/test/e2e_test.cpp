@@ -530,6 +530,11 @@ int main(int argc, char **argv) {
 				dun.setMesh(verts);
 				builtWalls = lvl.wallsSerial;
 			}
+			if (getenv("LOLVR_PORTES"))
+				for (int b = 0; b < 1024; b++)
+					for (int k = 0; k < 4; k++)
+						if (lvl.walls[b * 4 + k] && tex.doorLayer[lvl.walls[b * 4 + k]] >= 0)
+							printf("    porte : bloc %d (%d,%d) côté %d type %d\n", b, b & 31, b >> 5, k, lvl.walls[b * 4 + k]);
 			if (!getenv("LOLVR_NOIR"))
 			for (int b : {lvl.block - 33, lvl.block - 32, lvl.block - 31, lvl.block - 1, lvl.block, lvl.block + 1})
 				if (b >= 0 && b < 1024)

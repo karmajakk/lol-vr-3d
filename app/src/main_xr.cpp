@@ -1308,6 +1308,12 @@ void updateHead(App &app, XrTime time) {
 
 // Hauteur du sol : donnée par le casque si possible, sinon on suppose un joueur assis.
 void updateFloor(App &app, XrTime time) {
+	if (app.dungeonMode) {
+		// Le donjon 3D : les yeux du joueur, assis ou debout, à la hauteur de ceux du jeu (l'horizon
+		// à mi-hauteur des murs, un peu au-dessus) ; R3 le refait.
+		app.floorY = app.headPos.y - lolvr::kWallHeight * 0.55f;
+		return;
+	}
 	float y = app.headPos.y - 1.25f;
 	if (app.stageSpace != XR_NULL_HANDLE) {
 		XrSpaceLocation loc{XR_TYPE_SPACE_LOCATION};
@@ -2115,6 +2121,10 @@ void updateUi(App &app, XrTime time, float dt, double now, bool pointer, bool tr
 	in.triggerDown = pointer && app.triggerDown[hand];
 	in.triggerPressed = pointer && triggerPressed;
 	in.holdToMove = true;
+	{
+		const uint32_t sr = app.level.sceneRect;
+		in.spellsCovered = app.dungeonMode && app.level.scenePicture && app.level.sceneBusy && sr != 0 && (int)(sr & 511) < 112;
+	}
 	in.stickX = rightStick.x;
 	in.stickY = rightStick.y;
 	in.screenPos = viewCenter(app);
@@ -2420,6 +2430,7 @@ void updateInput(App &app, XrTime time, float dt, double now) {
 		updateFloor(app, time);
 		placeScreen(app, true);
 		app.dunYaw = app.anchorYaw; // le groupe regarde de nouveau droit devant
+		pulse(app, kRight, 0.3f, 0.03f);
 	}
 	app.recenterDown = r3Raw;
 
@@ -2622,6 +2633,9 @@ void updateInput(App &app, XrTime time, float dt, double now) {
 		if (!app.zoomUsed && now - app.zoomSince < 0.6 && !app.dungeonMode) { // le mode immersif n'a qu'une vue
 			setClassic(app, vrModeOf(app), (classicViewOf(app) + 1) % 3, time); // la vue suivante
 			pulse(app, kLeft, 0.3f, 0.03f);
+		} else if (!app.zoomUsed && now - app.zoomSince < 0.6 && app.dungeonMode && app.inDungeon) {
+			CoreHost::get().nextSpell(); // en immersif, L3 : le sort suivant
+			pulse(app, kLeft, 0.25f, 0.02f);
 		}
 		app.settingsDirty = true;
 	}
@@ -2666,7 +2680,7 @@ void updateInput(App &app, XrTime time, float dt, double now) {
 		app.r3Down = r3;
 		bool flick = !stickBusy && fabsf(right.y) > 0.75f && fabsf(right.x) < 0.40f;
 		if ((flick && !app.charFlick) || fnPressed[lolvr::kFnNextChar]) {
-			int step = !flick || right.y > 0 ? 1 : app.characters - 1;
+			int step = !flick || right.y < 0 ? 1 : app.characters - 1; // vers le bas : le suivant
 			app.selectedChar = (app.selectedChar + step) % app.characters;
 			pulse(app, kRight, 0.30f, 0.02f);
 		}
@@ -3245,7 +3259,9 @@ void updateScreenShown(App &app, double now) {
 	// du jeu : seule la boîte de texte apparaît, le donjon en 3D le montre déjà.
 	// Devant la porte d'un lieu (l'auberge, la hutte de Buck) : la vue du jeu montre le lieu, où l'on
 	// clique la porte ; elle apparaît aussi.
-	const bool scene = (app.level.scenePicture || (app.atHold && app.level.sceneBusy && app.dungeonMode)) && (app.level.sceneBusy || app.cutscene);
+	// (une animation d'un script hors conversation, un mur qui s'écroule sous le marteau : la vue du
+	// jeu apparaît le temps qu'elle se joue)
+	const bool scene = (app.level.scenePicture || (app.atHold && app.level.sceneBusy && app.dungeonMode)) && (app.level.sceneBusy || app.cutscene || (app.dungeonMode && app.level.animBusy));
 	if (scene)
 		app.screenNeededAt = now;
 	bool show = need || scene || now - app.screenNeededAt < 0.1;

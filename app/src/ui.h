@@ -86,6 +86,7 @@ struct UiFrameInput {
 	// Gâchette maintenue sur une fenêtre ou l'écran : on la déplace (plus de poignées) ; un appui
 	// bref est un clic, envoyé au relâcher.
 	bool holdToMove = false;
+	bool spellsCovered = false; // une scène large couvre le parchemin des sorts : garder l'image d'avant
 	float stickX = 0.0f, stickY = 0.0f; // joystick droit
 	// Repère des panneaux : centre et largeur de l'image entière
 	Vec3 basePos = {0, 0, -2.2f};
