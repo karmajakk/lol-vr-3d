@@ -517,6 +517,7 @@ struct App {
 	bool cutscene = false;       // une scène a pris la main (mode de contrôle du jeu non nul)
 	bool gameMenuOpen = false;   // un menu du jeu est affiché
 	bool menuAlone = false;
+	bool atlasLive = false;      // l'atlas du jeu, ouvert par une flèche de la fenêtre d'atlas, y est montré
 	int atlasBrowse = 0;         // flèche de la fenêtre d'atlas : l'atlas du jeu s'ouvre, puis tourne d'une page
 	double atlasBrowseSince = 0.0;      // mode immersif : ce menu seul à l'écran, sans cadre
 	int langRequested = -1;      // langue choisie dans le casque, en attente que le jeu la prenne
@@ -1540,6 +1541,7 @@ void updateGameEvents(App &app, double now) {
 	if (gs.automapOpen && !app.automapOpen)
 		app.automapSince = now;
 	app.automapOpen = gs.automapOpen;
+	app.atlasLive = app.dungeonMode && gs.automapOpen && (app.atlasLive || app.atlasBrowse != 0);
 	app.gameMenuOpen = gs.menuOpen;
 	// La langue de l'application suit celle du jeu (son menu des options).
 	if (gs.gameLang >= 0) {
@@ -1577,7 +1579,7 @@ void updateGameEvents(App &app, double now) {
 	app.inDungeon = wanted && !gs.charSheet;
 	// Mode immersif : le menu du jeu (la disquette) se montre seul, sans le reste de l'image ni le cadre.
 	app.menuAlone = app.dungeonMode && gs.menuOpen && app.level.menuRect != 0 && !gs.automapOpen;
-	wanted = wanted || app.menuAlone;
+	wanted = wanted || app.menuAlone || app.atlasLive;
 	// Une scène qui prend la main (rencontre, cinématique) : en mode immersif, elle reste dans le
 	// cadre de la vue, avec sa zone de texte dessous et la fenêtre des personnages à côté (leurs
 	// portraits d'avant la scène : le jeu les cache sous sa grande zone de texte).
@@ -2214,7 +2216,8 @@ void updateUi(App &app, XrTime time, float dt, double now, bool pointer, bool tr
 				m.legend.push_back(k);
 			}
 		}
-		in.atlasOn = app.atlasOn && app.inDungeon;
+		in.atlasOn = app.atlasOn && (app.inDungeon || app.atlasLive);
+		in.atlasLive = app.atlasLive;
 		in.map = &app.atlasMap;
 	}
 	app.ui.setVrState(vrModeOf(app), classicViewOf(app));
@@ -2229,7 +2232,7 @@ void updateUi(App &app, XrTime time, float dt, double now, bool pointer, bool tr
 	in.headDir = rotate(app.headRot, {0, 0, -1});
 	in.helpOpen = app.helpOpen;
 	in.compassBlank = app.split && app.charSheet;
-	in.textBoxActive = (app.bandShown && app.level.textRect != 0) || app.cutscene || (app.dungeonMode && app.level.sceneBusy && !app.charSheet);
+	in.textBoxActive = (app.bandShown && app.level.textRect != 0) || app.cutscene || (app.dungeonMode && app.level.sceneBusy && !app.charSheet) || app.atlasLive;
 	if (!app.frame.rgba.empty()) {
 		in.gameRgba = app.frame.rgba.data();
 		in.gameW = app.frame.width;
@@ -2322,6 +2325,8 @@ void updateUi(App &app, XrTime time, float dt, double now, bool pointer, bool tr
 		break;
 	case lolvr::kUiActionToggleAtlas:
 		app.atlasOn = !app.atlasOn;
+		if (!app.atlasOn && app.atlasLive)
+			typeKey(app, RETROK_ESCAPE, 0, now); // (l'atlas du jeu ouvert dans la fenêtre : il se ferme aussi)
 		break;
 	case lolvr::kUiActionAtlasPrev:
 	case lolvr::kUiActionAtlasNext:
@@ -2598,10 +2603,10 @@ void updateInput(App &app, XrTime time, float dt, double now) {
 		const bool gaze3d = app.dungeonVisible && app.headValid;
 		const int pdir = app.level.direction & 3;
 		float gaze = 0.0f;
-		if (gaze3d) {
-			Vec3 f = rotate(app.headRot, {0, 0, -1});
-			gaze = atan2f(-f.x, -f.z);
-		}
+		// (le joystick suit la direction du groupe, pas la tête ; le groupe ne se tourne plus de
+		// lui-même vers le regard)
+		if (gaze3d)
+			gaze = app.dunYaw;
 		if (!pushed) {
 			app.moveAbs = -1;
 		} else if (gaze3d) {
@@ -2745,6 +2750,8 @@ void updateInput(App &app, XrTime time, float dt, double now) {
 			app.atlasOn = !app.atlasOn;
 		else
 			app.atlasOn = false;
+	if (!app.atlasOn && app.atlasLive)
+			typeKey(app, RETROK_ESCAPE, 0, now);
 	}
 	setKey(app.kMap, false, RETROK_m);
 	if (fnPressed[lolvr::kFnKeyboard]) {
@@ -3311,7 +3318,7 @@ void updateDungeon(App &app, float dt) {
 void updateScreenShown(App &app, double now) {
 	// La carte, une fiche, un menu : l'écran disparaît dès qu'ils se ferment. Une scène (boutique,
 	// rencontre) : un court instant de grâce, le temps qu'une scène suivante enchaîne.
-	bool need = !app.dungeonVisible || !app.splitWanted || app.charSheet || app.automapOpen || app.menuAlone;
+	bool need = !app.dungeonVisible || !app.splitWanted || app.charSheet || (app.automapOpen && !app.atlasLive) || app.menuAlone;
 	// Une scène qui montre sa propre image (une boutique, un personnage, une cinématique). Une
 	// remarque ou un monstre qui parle (les chandeliers, le gros orc) laisse le donjon dans la fenêtre
 	// du jeu : seule la boîte de texte apparaît, le donjon en 3D le montre déjà.

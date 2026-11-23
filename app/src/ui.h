@@ -131,6 +131,9 @@ struct UiFrameInput {
 	bool textBoxActive = false;
 	// L'image du jeu (RGBA, première ligne en haut) et son numéro : la colonne du groupe en est
 	// recomposée (portraits empilés sous la colonne de la boussole).
+	// L'atlas du jeu ouvert depuis la fenêtre d'atlas (ses flèches) : la fenêtre montre l'écran du jeu
+	// (sa page, 320 x 200 agrandie deux fois) et lui passe les clics.
+	bool atlasLive = false;
 	const uint8_t *gameRgba = nullptr;
 	int gameW = 0, gameH = 0;
 	uint32_t gameSerial = 0;

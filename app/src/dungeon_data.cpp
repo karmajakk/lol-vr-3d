@@ -639,9 +639,18 @@ void decodeDungeonTextures(const DungeonGfx &g, DungeonTextures &out) {
 			for (uint8_t pt : pendingBase)
 				out.typeLayer[pt] = baseLayer;
 		// Deux dalles qui se suivent, la seconde dessinée plus bas : c'est la même, enfoncée.
+		// (les dalles vont par deux : levée et enfoncée ; un dessin seul, une flaque d'eau, reste à plat)
+		bool pairOk[256] = {false};
 		for (int t = 2; t < 256; t++)
-			if (out.plateR[t] > 0.0f && out.plateR[t - 1] > 0.0f && out.plateFoot[t] > out.plateFoot[t - 1])
+			if (out.plateR[t] > 0.0f && out.plateR[t - 1] > 0.0f && out.plateFoot[t] == out.plateFoot[t - 1] + 1) {
 				out.platePressed[t] = true;
+				pairOk[t] = pairOk[t - 1] = true;
+			}
+		for (int t = 1; t < 256; t++)
+			if (out.plateR[t] > 0.0f && !pairOk[t]) {
+				out.plateR[t] = 0.0f;
+				out.plateLayer[t] = -1;
+			}
 	}
 
 	// Le fond (plafond et sol), comme le jeu le dessine quand aucun mur ne cache la vue.
@@ -1028,14 +1037,14 @@ void buildDungeonMesh(const uint8_t *walls, const DungeonGfx &g, const DungeonTe
 			if (plateT && tex.floorLayer >= 0) {
 				// La dalle à presser : ronde, en relief (enfoncée : presque au ras du sol), cernée d'une rainure
 				// sombre ; son dessus est le dessin du jeu.
-				const float rr = tex.plateR[plateT] * S, top = tex.platePressed[plateT] ? 0.012f : 0.045f;
+				const float rr = tex.plateR[plateT] * S * 0.62f, top = tex.platePressed[plateT] ? 0.005f : 0.022f;
 				const float L = (float)tex.floorLayer, P = (float)tex.plateLayer[plateT];
 				const int N = 32;
 				for (int i = 0; i < N; i++) {
 					const float a0 = 6.2831853f * (float)i / N, a1 = 6.2831853f * (float)(i + 1) / N;
 					const float c0 = cosf(a0), s0 = sinf(a0), c1 = cosf(a1), s1 = sinf(a1);
 					// la rainure, un anneau sombre au ras du sol
-					const float g = rr + 0.04f, yg = 0.003f;
+					const float g = rr + 0.022f, yg = 0.003f;
 					float ga[5] = {cx + c0 * rr, yg, cz + s0 * rr, 0.5f, 0.5f}, gb[5] = {cx + c0 * g, yg, cz + s0 * g, 0.5f, 0.5f};
 					float gc[5] = {cx + c1 * g, yg, cz + s1 * g, 0.5f, 0.5f}, gd[5] = {cx + c1 * rr, yg, cz + s1 * rr, 0.5f, 0.5f};
 					quad(ga, gb, gc, gd, L, 0.12f, true);
@@ -1047,7 +1056,7 @@ void buildDungeonMesh(const uint8_t *walls, const DungeonGfx &g, const DungeonTe
 					// (une dalle que l'on comprend faite pour être pressée)
 					static const float ring[6] = {0.0f, 0.52f, 0.60f, 0.86f, 1.0f, 1.0f};
 					const float dim = tex.platePressed[plateT] ? 0.8f : 1.0f;
-					const float shadeOf[4] = {1.12f * dim, 0.5f * dim, 1.12f * dim, 1.4f * dim};
+					const float shadeOf[4] = {0.72f * dim, 0.72f * dim, 0.72f * dim, 1.05f * dim}; // (plus sombre que le sol, comme dans le jeu)
 					for (int k = 0; k < 4; k++) {
 						const float ra = ring[k] * rr, rb = ring[k + 1] * rr;
 						const float ya = k == 3 ? top : top, yb = k == 3 ? top - 0.008f : top;
@@ -1131,7 +1140,8 @@ bool floorGamePoint(int block, int direction, float x, float z, float &px, float
 		y = 104.0f - 24.0f * k;
 		w = 128.0f - 48.0f * k;
 	} else {
-		y = 120.0f - 32.0f * fw;
+		// (la case du groupe : le jeu dessine ses objets tout en bas de sa vue)
+		y = 128.0f - 48.0f * fw;
 		w = 176.0f - 96.0f * fw;
 	}
 	px = 112.0f + 88.0f + clampf(lat, -0.5f, 0.5f) * w;

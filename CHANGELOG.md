@@ -3,6 +3,16 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.34.0] — Fixes from the caves
+
+- Items lying at your feet (the party's own block) can be picked by clicking on them.
+- Pressure plates are smaller and flatter, darker like in the game; forest puddles are flat again.
+- Greyed-out buttons are back to the game's own look (the darkening broke colors in shops and inns).
+- The arrows of the atlas window browse the other levels' maps right in the window: the game's
+  atlas shows inside it (its arrows and EXIT work there), no big screen.
+- Immersive mode: the party no longer turns by itself toward where you look, and the left stick
+  moves relative to the party's facing, not your head.
+
 ## [0.33.0] — Pressure plates
 
 - **Pressure plates** are round slabs in relief: an engraved circle, a lighter bevelled edge and a

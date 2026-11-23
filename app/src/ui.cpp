@@ -732,10 +732,12 @@ void Ui::Impl::compose(int which, const UiFrameInput &in) {
 void Ui::Impl::composeAtlas(const UiFrameInput &in) {
 	const UiMap &m = *in.map;
 	Composite &c = comp[kCompAtlas];
-	const int key = (atlasTabHot ? 2 : 0) + language * 4;
-	if (c.tex && atlasSerial == m.serial && atlasKey == key)
+	const bool live = in.atlasLive && in.gameRgba && in.gameW == 320 && in.gameH == 200;
+	const int key = (atlasTabHot ? 2 : 0) + language * 4 + (live ? 1 : 0);
+	const uint32_t serial = live ? in.gameSerial : m.serial;
+	if (c.tex && atlasSerial == serial && atlasKey == key)
 		return;
-	atlasSerial = m.serial;
+	atlasSerial = serial;
 	atlasKey = key;
 	c.texW = kAtlasW;
 	c.texH = kAtlasH;
@@ -743,6 +745,19 @@ void Ui::Impl::composeAtlas(const UiFrameInput &in) {
 	c.w = kAtlasW;
 	c.h = kAtlasH;
 	Canvas cv{kAtlasW, kAtlasH, std::vector<uint8_t>((size_t)kAtlasW * kAtlasH * 4)};
+	if (live) {
+		for (int y = 0; y < 400; y++)
+			for (int x = 0; x < 640; x++) {
+				const uint8_t *src = in.gameRgba + ((size_t)(y >> 1) * 320 + (x >> 1)) * 4;
+				uint8_t *p = &cv.px[((size_t)y * kAtlasW + x) * 4];
+				p[0] = src[0];
+				p[1] = src[1];
+				p[2] = src[2];
+				p[3] = 255;
+			}
+		upload(c.tex, cv.px, kAtlasW, kAtlasH, "atlas");
+		return;
+	}
 	if (m.rgb)
 		for (int y = 0; y < 400; y++)
 			for (int x = 0; x < 640; x++) {
@@ -2330,7 +2345,14 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 			} else if (hitIndex == kPanelAtlas) {
 				// La case « Fermer » de la page de l'atlas.
 				const float ax = u * (float)kAtlasW, ay = v * (float)kAtlasH;
-				if (ax >= kAtlasCloseX0 && ax < kAtlasCloseX1 && ay >= kAtlasCloseY0 && ay < kAtlasCloseY1) {
+				if (in.atlasLive) {
+					// L'atlas du jeu dans la fenêtre : ses flèches et EXIT, cliqués comme dans le jeu.
+					out.pointerValid = true;
+					out.buttonsToGame = true;
+					out.gu = clampf(ax / (float)kAtlasW, 0.0f, 0.999f);
+					out.gv = clampf(ay / (float)kAtlasH, 0.0f, 0.999f);
+					out.hitPixel = 2.0f * q.hw / 320.0f;
+				} else if (ax >= kAtlasCloseX0 && ax < kAtlasCloseX1 && ay >= kAtlasCloseY0 && ay < kAtlasCloseY1) {
 					atlasHot = true;
 					if (in.triggerPressed) {
 						out.action = kUiActionToggleAtlas;
