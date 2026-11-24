@@ -5,14 +5,13 @@
 | Controller | Action |
 |---|---|
 | Aim + trigger | Left click (the hand that clicks becomes the pointer) |
-| Aim + grip (right hand) | Right click |
 | Left stick | Walk forward, back, strafe (one direction at a time). In immersive mode, relative to where you look |
 | Right stick (left/right) | Turn |
-| **Left grip** | In the dungeon: **next character** (when the right hand aims; if the left hand is your pointer, its grip stays a right click) |
+| **Grips** | In the dungeon: **left grip** the character above (previous), **right grip** the one below (next) |
 | A | In the dungeon: **attack** with the selected character. Elsewhere: Enter |
 | B | In the dungeon: open the selected character's **spell levels**, then press B again to **cast** the highlighted level. Elsewhere: Escape (skip a cutscene) |
 | Y | Map |
-| **X** | **Right click** where you aim: drink a potion, use an item (same as the grip) |
+| **X** | **Right click** where you aim: drink a potion, use an item |
 | Menu button (left controller) | ScummVM menu: save, load, quit |
 | **Floppy on the left wrist** | The game menu (load, save, language...), and in it "VR controls": VR mode, view, controller mapping |
 | Right stick click | Recenter the screen, the room and the windows in front of you; in immersive mode it also puts your eyes at the party's height, seated or standing. With the spell levels open (classic and mixed reality): next level |
@@ -29,9 +28,9 @@ At the bottom of that menu, left of "Resume game", **VR controls** opens the hea
 - In Classic and Mixed reality, **View (L3)**: **Big screen** (the whole game image, like the original game), **Windows** (the interface windows float on their own) or **486 PC** (the game on a curved 90s monitor standing on a 486 PC). A short click of the left stick does the same.
 - **Controller mapping**: a panel summing up every button for the profile in use. **Customize** opens the button editor:
   - **Profile** `<` `>`: choose a profile (it is used at once). **Classic**, the default, is always there and cannot be changed or deleted.
-  - A, B, X, Y, the grip and the two stick clicks: click an action to switch to the next one (the left arrow goes back): attack, magic, right click, map, recenter, view, Enter, Escape, atlas window, next character, keyboard or nothing. The buttons work that way right away.
+  - A, B, X, Y, the grips (Classic: change character) and the two stick clicks: click an action to switch to the next one (the left arrow goes back): attack, magic, right click, map, recenter, view, Enter, Escape, atlas window, next character, keyboard or nothing. The buttons work that way right away.
   - **Save** (your own profiles), **Save as new** (type a name on the keyboard, Enter saves), **Delete**, **Back**. Changes not saved are dropped when the panel closes.
-  - The trigger, the sticks (walk, turn), the left grip (next character), the menu button and the floppy always stay the same.
+  - The trigger, the sticks (walk, turn), the menu button and the floppy always stay the same.
 - **Credits & Requirements**: a short note on what the mod runs on and who made it possible (also on the first-launch window).
 - **Close**.
 
@@ -45,7 +44,7 @@ The keyboard opens by itself when the game asks for a save description, and clos
 
 In the dungeon, one character is "selected": they are framed in yellow in the party column. **A** makes them attack, **B** opens the levels of the spell chosen in the spellbook, level 1 framed; the **left stick click** (immersive mode; right stick click in the other modes) frames the next level the character can cast (1, 2, 3, 4, back to 1), and **B** again casts it. Clicking a level with the trigger works too. Flick the right stick down or up to pick the next or previous character (in the order of the party window). In menus, cutscenes, the map and a character sheet, A and B go back to Enter and Escape; the Escape key is also on the keyboard.
 
-To **drink a potion** or use an item: aim at it in the inventory and press **X** (a right click, like in the original game). The grip of the aiming hand does the same.
+To **drink a potion** or use an item: aim at it in the inventory and press **X** (a right click, like in the original game).
 
 ## Moving the screen and windows
 

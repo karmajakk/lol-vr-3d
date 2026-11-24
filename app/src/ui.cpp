@@ -967,7 +967,7 @@ void Ui::Impl::renderChooser() {
 
 // --- Profils de manettes --------------------------------------------------------------------------
 
-const uint8_t kClassicMap[kSlotCount] = {kFnAttack, kFnMagic, kFnRightClick, kFnMap, kFnRightClick, kFnView, kFnRecenter};
+const uint8_t kClassicMap[kSlotCount] = {kFnAttack, kFnMagic, kFnRightClick, kFnMap, kFnNextChar, kFnView, kFnRecenter};
 
 static const char *slotName(int lang, int s) {
 	switch (s) {
@@ -975,7 +975,7 @@ static const char *slotName(int lang, int s) {
 	case kSlotB: return "B";
 	case kSlotX: return "X";
 	case kSlotY: return "Y";
-	case kSlotGrip: return tr(lang, "Grip (aiming hand)", "Poignée (main qui vise)", "Griff (zielende Hand)");
+	case kSlotGrip: return tr(lang, "Grips (left, right)", "Poignées (gauche, droite)", "Griffe (links, rechts)");
 	case kSlotL3: return tr(lang, "Left stick click", "Clic joystick gauche", "Linker Stick-Klick");
 	default: return tr(lang, "Right stick click", "Clic joystick droit", "Rechter Stick-Klick");
 	}
@@ -992,7 +992,7 @@ static const char *fnName(int lang, int f) {
 	case kFnEnter: return tr(lang, "Enter", "Entrée", "Eingabe");
 	case kFnEscape: return tr(lang, "Escape (skip)", "Échap (passer)", "Esc (überspringen)");
 	case kFnAtlas: return tr(lang, "Atlas window", "Fenêtre de l'atlas", "Atlas-Fenster");
-	case kFnNextChar: return tr(lang, "Next character", "Personnage suivant", "Nächste Figur");
+	case kFnNextChar: return tr(lang, "Change character", "Changer de personnage", "Figur wechseln");
 	case kFnKeyboard: return tr(lang, "Keyboard", "Clavier", "Tastatur");
 	default: return tr(lang, "Nothing", "Rien", "Nichts");
 	}
@@ -1040,7 +1040,6 @@ void Ui::Impl::renderHelp() {
 		line(tr(L, "Aim + trigger", "Viser + gâchette", "Zielen + Abzug"), tr(L, "left click", "clic gauche", "Linksklick")),
 		line(tr(L, "Left stick", "Joystick gauche", "Linker Stick"), tr(L, "walk where you look", "marcher là où l'on regarde", "dorthin gehen, wohin du schaust")),
 		line(tr(L, "Right stick (sideways)", "Joystick droit (côtés)", "Rechter Stick (seitlich)"), tr(L, "turn", "tourner", "drehen")),
-		line(tr(L, "Left grip", "Poignée gauche", "Linker Griff"), tr(L, "next character", "personnage suivant", "nächste Figur")),
 		line(tr(L, "Menu button (left)", "Bouton menu (gauche)", "Menütaste (links)"), tr(L, "save, load, quit", "sauver, charger, quitter", "speichern, laden, beenden")),
 		line(tr(L, "Floppy on the back of the left hand", "Disquette (dessus de la main gauche)", "Diskette (linker Handrücken)"), tr(L, "game menu, VR controls", "menu du jeu, réglages VR", "Spielmenü, VR-Optionen")),
 		line(tr(L, "Brass bar + hold trigger", "Barrette + gâchette tenue", "Messingleiste + Abzug halten"), tr(L, "move a window", "déplacer une fenêtre", "Fenster verschieben")),

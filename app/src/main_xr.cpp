@@ -2474,11 +2474,12 @@ void updateInput(App &app, XrTime time, float dt, double now) {
 	bool fnDown[lolvr::kFnCount] = {false};
 	{
 		const uint8_t *map = app.ui.buttonMap();
+		// (les poignées, des deux mains ; « personnage suivant » : voir plus bas, gauche et droite)
 		const bool slot[lolvr::kSlotCount] = {getBool(app, app.aAction, -1), getBool(app, app.bAction, -1), getBool(app, app.xAction, -1),
-		                                      getBool(app, app.yAction, -1), app.squeezeDown[app.activeHand],
+		                                      getBool(app, app.yAction, -1), app.squeezeDown[kLeft] || app.squeezeDown[kRight],
 		                                      getBool(app, app.stickClickAction, kLeft), getBool(app, app.stickClickAction, kRight)};
 		for (int i = 0; i < lolvr::kSlotCount; i++)
-			if (slot[i] && map[i] < lolvr::kFnCount)
+			if (slot[i] && map[i] < lolvr::kFnCount && !(i == lolvr::kSlotGrip && map[i] == lolvr::kFnNextChar))
 				fnDown[map[i]] = true;
 	}
 	bool fnPressed[lolvr::kFnCount];
@@ -2507,19 +2508,17 @@ void updateInput(App &app, XrTime time, float dt, double now) {
 			app.aimPose[h] = loc.pose;
 	}
 
-	// Gâchette = clic gauche, poignée = clic droit. La main qui clique devient le pointeur. La
-	// poignée gauche, quand la main droite vise : le personnage suivant (pas un clic).
+	// Gâchette = clic gauche ; la main qui clique devient le pointeur. Les poignées : ce que dit le
+	// profil (« Classique » : le personnage d'avant à gauche, le suivant à droite).
 	bool clicked[2] = {false, false};
-	bool leftGripChar = false;
+	bool gripPressed[2] = {false, false};
 	for (int h = 0; h < 2; h++) {
 		app.triggerValue[h] = getFloat(app, app.triggerAction, h);
 		app.squeezeValue[h] = getFloat(app, app.squeezeAction, h);
 		bool trigger = threshold(app.triggerDown[h], app.triggerValue[h]);
 		bool squeeze = threshold(app.squeezeDown[h], app.squeezeValue[h]);
-		const bool gripChar = h == kLeft && app.activeHand != kLeft;
-		if (gripChar && squeeze && !app.squeezeDown[h])
-			leftGripChar = true;
-		bool pressedNow = (trigger && !app.triggerDown[h]) || (squeeze && !app.squeezeDown[h] && !gripChar);
+		gripPressed[h] = squeeze && !app.squeezeDown[h];
+		bool pressedNow = trigger && !app.triggerDown[h];
 		int other = 1 - h;
 		if (pressedNow && app.aimValid[h] && !app.triggerDown[other] && !app.squeezeDown[other])
 			app.activeHand = h;
@@ -2602,7 +2601,7 @@ void updateInput(App &app, XrTime time, float dt, double now) {
 		if (ui.pointerValid)
 			CoreHost::get().setPointer(ui.gu, ui.gv);
 		// Clic droit (boire une potion, utiliser un objet) : les boutons du profil qui le font
-		// (dans « Classique », X et la poignée de la main qui vise).
+		// (dans « Classique », X).
 		bool xRight = fnDown[lolvr::kFnRightClick] && ui.pointerValid && !ui.dragging;
 		CoreHost::get().setMouseButtons(app.triggerDown[hand] && toGame && !ui.pressPending, xRight);
 		if (xRight && !app.keyboardButtonDown) {
@@ -2760,11 +2759,14 @@ void updateInput(App &app, XrTime time, float dt, double now) {
 			pulse(app, kRight, 0.20f, 0.02f);
 		}
 		app.r3Down = r3;
-		// Le personnage suivant : la poignée gauche (ou un bouton qui le fait dans le profil). Le
-		// joystick droit vers le haut ou le bas ne le fait plus (il partait en plein combat).
-		if (leftGripChar || fnPressed[lolvr::kFnNextChar]) {
-			app.selectedChar = (app.selectedChar + 1) % app.characters;
-			pulse(app, leftGripChar ? kLeft : kRight, 0.30f, 0.02f);
+		// Changer de personnage : poignée gauche, celui d'avant (vers le haut) ; poignée droite, le
+		// suivant (vers le bas) ; ou un bouton qui le fait dans le profil. Le joystick droit vers le
+		// haut ou le bas ne le fait plus (il partait en plein combat).
+		const bool gripsChar = app.ui.buttonMap()[lolvr::kSlotGrip] == lolvr::kFnNextChar;
+		const bool prev = gripsChar && gripPressed[kLeft], next = (gripsChar && gripPressed[kRight]) || fnPressed[lolvr::kFnNextChar];
+		if (prev != next) {
+			app.selectedChar = (app.selectedChar + (next ? 1 : app.characters - 1)) % app.characters;
+			pulse(app, prev ? kLeft : kRight, 0.30f, 0.02f);
 		}
 		app.charFlick = false;
 	} else {

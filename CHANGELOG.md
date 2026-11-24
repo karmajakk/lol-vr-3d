@@ -3,10 +3,16 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.37.0] — Grips change character
+
+- The **grips** change character: left grip the one above (previous), right grip the one below
+  (next). The right stick up/down no longer does it (it went off by itself in the middle of a
+  fight). Right click (drink, use an item) is on X. In the button editor, the grips can still be
+  given another action.
+
 ## [0.36.0] — Left grip for the next character
 
-- The **left grip** selects the next character (when the right hand aims). The right stick up/down
-  no longer changes character: it went off by itself in the middle of a fight.
+- The left grip selects the next character (when the right hand aims).
 
 ## [0.35.0] — Classic interface in immersive mode
 

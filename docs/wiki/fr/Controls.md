@@ -5,14 +5,13 @@
 | Manette | Action |
 |---|---|
 | Viser + gâchette | Clic gauche (la main qui clique devient le pointeur) |
-| Viser + poignée (main droite) | Clic droit |
 | Joystick gauche | Avancer, reculer, pas de côté (une direction à la fois). En mode immersif, par rapport à ton regard |
 | Joystick droit (gauche/droite) | Tourner |
-| **Poignée gauche** | Dans le donjon : **personnage suivant** (quand la main droite vise ; si la main gauche est ton pointeur, sa poignée reste un clic droit) |
+| **Poignées** | Dans le donjon : **poignée gauche** le personnage d'au-dessus (précédent), **poignée droite** celui d'en dessous (suivant) |
 | A | Dans le donjon : **attaquer** avec le personnage choisi. Ailleurs : Entrée |
 | B | Dans le donjon : ouvrir les **niveaux du sort** du personnage choisi, puis B à nouveau **lance** le niveau en surbrillance. Ailleurs : Échap (passer une cinématique) |
 | Y | Carte |
-| **X** | **Clic droit** là où tu vises : boire une potion, utiliser un objet (comme la poignée) |
+| **X** | **Clic droit** là où tu vises : boire une potion, utiliser un objet |
 | Bouton menu (manette gauche) | Menu de ScummVM : sauvegarder, charger, quitter |
 | **Disquette au poignet gauche** | Le menu du jeu (charger, sauvegarder, langue…), et dedans « Réglages VR » : mode VR, vue, atlas, manettes et boutons |
 | Clic du joystick droit | Recentrer l'écran, la pièce et les fenêtres devant toi. Niveaux de sort ouverts : niveau suivant |
@@ -30,9 +29,9 @@ En bas de ce menu, à gauche de « Resume game », **Réglages VR** ouvre devant
 - **Atlas** : **Oui** ou **Non**, la fenêtre de la carte en direct (voir [Interface détachée](Detached-interface.md)).
 - **Manettes et boutons** : un panneau qui résume tous les boutons du profil utilisé. **Modifier** ouvre la fenêtre des boutons :
   - **Profil** `<` `>` : choisis un profil (il sert aussitôt). **Classique**, celui par défaut, est toujours là et ne peut être ni changé ni supprimé.
-  - A, B, X, Y, la poignée et les deux clics des joysticks : clique sur une action pour passer à la suivante (la flèche de gauche revient en arrière) : attaquer, magie, clic droit, carte, recentrer, vue, Entrée, Échap, fenêtre de l'atlas, personnage suivant, clavier ou rien. Les boutons marchent ainsi tout de suite.
+  - A, B, X, Y, les poignées (« Classique » : changer de personnage) et les deux clics des joysticks : clique sur une action pour passer à la suivante (la flèche de gauche revient en arrière) : attaquer, magie, clic droit, carte, recentrer, vue, Entrée, Échap, fenêtre de l'atlas, personnage suivant, clavier ou rien. Les boutons marchent ainsi tout de suite.
   - **Enregistrer** (tes profils), **Nouveau profil** (tape un nom au clavier, Entrée enregistre), **Supprimer**, **Retour**. Ce qui n'est pas enregistré est oublié quand le panneau se ferme.
-  - La gâchette, les joysticks (marcher, tourner), la poignée gauche (personnage suivant), le bouton menu et la disquette ne changent jamais.
+  - La gâchette, les joysticks (marcher, tourner), le bouton menu et la disquette ne changent jamais.
 - **Crédits et prérequis** : un petit mot sur ce qui fait tourner le mod et sur qui l'a rendu possible (aussi dans la fenêtre du premier lancement).
 - **Fermer**.
 
@@ -46,7 +45,7 @@ Le clavier s'ouvre tout seul quand le jeu demande le nom d'une sauvegarde, et se
 
 Dans le donjon, un personnage est « choisi » : il est encadré de jaune dans la colonne du groupe. **A** le fait attaquer, **B** ouvre les niveaux du sort choisi dans le livre de sorts, le niveau 1 encadré ; le **clic du joystick droit** encadre le niveau suivant que le personnage peut lancer (1, 2, 3, 4, puis 1), et **B** à nouveau le lance. Cliquer un niveau avec la gâchette marche aussi. Pousse le joystick droit vers le haut ou le bas pour choisir le personnage suivant ou précédent. Dans les menus, les cinématiques, la carte et une fiche de personnage, A et B redeviennent Entrée et Échap ; la touche Échap est aussi sur le clavier.
 
-Pour **boire une potion** ou utiliser un objet : vise-le dans l'inventaire et appuie sur **X** (un clic droit, comme dans le jeu original). La poignée de la main qui vise fait la même chose.
+Pour **boire une potion** ou utiliser un objet : vise-le dans l'inventaire et appuie sur **X** (un clic droit, comme dans le jeu original).
 
 ## Déplacer l'écran et les fenêtres
 
