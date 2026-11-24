@@ -389,6 +389,73 @@ int main(int argc, char **argv) {
 			for (int i = 0; i < SceneState::kMaxHandles; i++)
 				handles += tmp.handles[i].visible ? 1 : 0;
 			check(handles == 0, "plus de poignées sous les fenêtres");
+			// Détacher l'inventaire (son bouton, au survol), puis le recoller en le reposant contre le
+			// bas des personnages.
+			{
+				static std::vector<uint8_t> invPix((size_t)176 * 132 * 3, 90);
+				in.invRgb = invPix.data();
+				in.invSerial = 1;
+				ui.resetLayout(in);
+				in.holdToMove = false;
+				const SceneState::Panel inv0 = panel(1);
+				aimIn(1, 213, 11, 235, 22);
+				ui.update(in, o, tmp);
+				in.triggerDown = in.triggerPressed = true;
+				ui.update(in, o, tmp);
+				in.triggerDown = in.triggerPressed = false;
+				ui.update(in, o, tmp);
+				const SceneState::Panel inv1 = panel(1);
+				check(!ui.inventoryGrouped() && inv1.center.y < inv0.center.y - 0.03f, "inventaire : son bouton le détache (il descend un peu)");
+				in.holdToMove = true;
+				in.time += 2.0;
+				aimAt(inv1.center);
+				ui.update(in, o, tmp);
+				in.triggerDown = in.triggerPressed = true;
+				ui.update(in, o, tmp);
+				in.triggerPressed = false;
+				in.time += 0.5;
+				ui.update(in, o, tmp);
+				aimAt(inv0.center);
+				for (int k = 0; k < 3; k++) { in.time += 0.05; ui.update(in, o, tmp); }
+				in.triggerDown = false;
+				ui.update(in, o, tmp);
+				ui.update(in, o, tmp);
+				check(ui.inventoryGrouped(), "inventaire reposé contre les personnages : recollé");
+				// La colonne de la boussole : son bouton (au survol) la détache du livre de sorts.
+				in.holdToMove = false;
+				in.time += 2.0;
+				aimIn(2, 264, 174, 296, 244);
+				ui.update(in, o, tmp);
+				in.triggerDown = in.triggerPressed = true;
+				ui.update(in, o, tmp);
+				in.triggerDown = in.triggerPressed = false;
+				ui.update(in, o, tmp);
+				int col = -1;
+				for (int k = 0; k < SceneState::kMaxPanels; k++)
+					if (tmp.panels[k].visible && tmp.panels[k].texW == 32 && tmp.panels[k].texH == 124)
+						col = k;
+				check(!ui.columnGrouped() && col >= 0 && fabsf(panel(2).halfH / panel(2).halfW - 244.0f * 1.2f / 236.0f) < 0.01f,
+				      "colonne de la boussole : son bouton la détache (le livre de sorts rétrécit)");
+				if (col >= 0) {
+					const SceneState::Panel cp = tmp.panels[col], sp = panel(2);
+					in.holdToMove = true;
+					in.time += 2.0;
+					aimAt(cp.center);
+					ui.update(in, o, tmp);
+					in.triggerDown = in.triggerPressed = true;
+					ui.update(in, o, tmp);
+					in.triggerPressed = false;
+					in.time += 0.5;
+					ui.update(in, o, tmp);
+					aimAt(sp.center + sp.right * (sp.halfW + cp.halfW + 0.01f));
+					for (int k = 0; k < 3; k++) { in.time += 0.05; ui.update(in, o, tmp); }
+					in.triggerDown = false;
+					ui.update(in, o, tmp);
+					ui.update(in, o, tmp);
+					check(ui.columnGrouped(), "colonne reposée contre le livre de sorts : recollée");
+				}
+				in.invRgb = nullptr;
+			}
 			in.holdToMove = false;
 			ui.resetLayout(in);
 		}
@@ -397,7 +464,8 @@ int main(int argc, char **argv) {
 			bool planar = true, above = true;
 			for (int i = 0; i < 3; i++) {
 				SceneState::Panel p = panel(i);
-				planar = planar && fabsf(p.center.z - in.basePos.z) < 0.02f;
+				// (l'inventaire, collé sous les personnages, est dans leur plan à eux)
+				planar = planar && fabsf(p.center.z - in.basePos.z) < (i == 1 ? 0.10f : 0.02f);
 				above = above && p.center.y - p.halfH > 0.02f;
 			}
 			SceneState::Panel inv = panel(1);
@@ -513,8 +581,9 @@ int main(int argc, char **argv) {
 			}
 			float grown = ui.placement[kPanelInventory].scale / scale0;
 			check(grown > 1.4f && grown < 1.6f, "coin écarté de moitié : la fenêtre grandit d'autant");
-			SceneState::Panel inv2 = panel(1);
-			check(length(inv2.center - inv.center) < 1e-3f, "… autour de son centre");
+			SceneState::Panel inv2 = panel(1), party2 = panel(0);
+			const float gap = length((party2.center - party2.up * party2.halfH) - (inv2.center + inv2.up * inv2.halfH));
+			check(gap < 0.02f && fabsf(party2.halfW / inv2.halfW - 1.0f) < 0.01f, "… tout le bloc grandit, l'inventaire reste collé sous les personnages");
 			for (int k = 0; k < 40; k++) {
 				aimAt(inv.center + (corner - inv.center) * 0.7f);
 				ui.update(in, o, tmp);
@@ -697,8 +766,8 @@ int main(int argc, char **argv) {
 				pi.wristValid = false;
 				pi.palmValid = true;
 				pi.palmPos = {0.20f, 0.90f, -0.30f};
-				pi.palmRot = {0.0f, 0.0f, -0.70710678f, 0.70710678f}; // la paume vers le haut
-				const Vec3 zc = pi.palmPos + rotate(pi.palmRot, kWristFloppy);
+				pi.palmRot = {0.0f, 0.0f, 0.70710678f, 0.70710678f}; // le dessus de la main vers le haut
+				const Vec3 zc = pi.palmPos + rotate(pi.palmRot, Vec3{-kWristFloppy.x, kWristFloppy.y, kWristFloppy.z});
 				pi.headDir = normalize(zc - pi.headPos);
 				ui.update(pi, o, tmp);
 				int withPalm = 0;
@@ -709,15 +778,15 @@ int main(int argc, char **argv) {
 				ui.update(pi, o, tmp);
 				int restingPalm = 0;
 				for (int i = 0; i < SceneState::kMaxPanels; i++) restingPalm += tmp.panels[i].visible ? 1 : 0;
-				check(withPalm == restingPalm + 1, "paume droite tournée vers soi : le repos (ZZZ) apparaît ; main au repos, non");
-				pi.palmRot = {0.0f, 0.0f, -0.70710678f, 0.70710678f};
+				check(withPalm == restingPalm + 1, "dessus de la main droite tourné vers soi : le repos (ZZZ) apparaît ; main au repos, non");
+				pi.palmRot = {0.0f, 0.0f, 0.70710678f, 0.70710678f};
 				pi.headDir = normalize(zc - pi.headPos);
 				ui.update(pi, o, tmp);
 				pi.tip = {-0.20f, 0.95f, -0.30f};
 				pi.dir = normalize(zc - pi.tip);
 				pi.triggerDown = pi.triggerPressed = true;
 				ui.update(pi, o, tmp);
-				check(o.restClick && !o.buttonsToGame, "paume droite : un clic sur le ZZZ, le repos du jeu");
+				check(o.restClick && !o.buttonsToGame, "dessus de la main droite : un clic sur le ZZZ, le repos du jeu");
 				pi.triggerDown = pi.triggerPressed = false;
 				pi.palmValid = false;
 				ui.update(pi, o, tmp);

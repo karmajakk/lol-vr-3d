@@ -1169,7 +1169,7 @@ void loadSettings(App &app, int &environment) {
 	std::string activeProfile;
 	// La disposition (écran, fenêtres) n'est reprise que si elle a été enregistrée avec la disposition
 	// d'origine actuelle (« disposition 2 » : écran plus petit et plus proche, pour le donjon en 3D).
-	bool layoutCurrent = false, panelsCurrent = false;
+	bool layoutCurrent = false, panelsCurrent = false, colGrouped = true;
 	while (fgets(line, sizeof(line), f)) {
 		if (!strncmp(line, "disposition 2", 13))
 			layoutCurrent = true;
@@ -1240,6 +1240,12 @@ void loadSettings(App &app, int &environment) {
 		} else if (!strcmp(name, "engrenage")) {
 			if (sscanf(rest, "%d", &iv) == 1)
 				app.gearKnown = iv != 0;
+		} else if (!strcmp(name, "colonne_collee")) {
+			if (sscanf(rest, "%d", &iv) == 1 && panelsCurrent)
+				colGrouped = iv != 0;
+		} else if (!strcmp(name, "inventaire_colle")) {
+			if (sscanf(rest, "%d", &iv) == 1 && panelsCurrent)
+				app.ui.setInventoryGrouped(iv != 0);
 		} else if (!strcmp(name, "interface")) {
 			if (sscanf(rest, "%d", &iv) == 1)
 				app.hudClassic = iv != 0;
@@ -1271,12 +1277,14 @@ void loadSettings(App &app, int &environment) {
 	app.ui.selectProfile(activeProfile);
 	// La disposition n'est reprise que si elle est complète (sinon : disposition d'origine).
 	// (l'atlas, venu plus tard, se place à côté des personnages s'il manque)
-	const int needed = (1 << lolvr::kUiPanelCount) - 1 - (1 << lolvr::kPanelHelp) - (1 << lolvr::kPanelAtlas);
+	const int needed = (1 << lolvr::kUiPanelCount) - 1 - (1 << lolvr::kPanelHelp) - (1 << lolvr::kPanelAtlas) - (1 << lolvr::kPanelColumn);
 	if (!(loadedPanels & (1 << lolvr::kPanelHelp)))
 		app.ui.placement[lolvr::kPanelHelp] = lolvr::Ui::defaultHelpPlacement(0.0f);
 	app.layoutLoaded = (loadedPanels & needed) == needed;
-	if (app.layoutLoaded)
+	if (app.layoutLoaded) {
 		app.ui.setHasLayout(true);
+		app.ui.setColumnGrouped(colGrouped || !(loadedPanels & (1 << lolvr::kPanelColumn)));
+	}
 }
 
 void saveSettings(App &app) {
@@ -1292,6 +1300,8 @@ void saveSettings(App &app) {
 	fprintf(f, "feu %d\n", app.fireOn ? 1 : 0);
 	fprintf(f, "panneaux %d\n", app.detached ? 1 : 0);
 	fprintf(f, "interface %d\n", app.hudClassic ? 1 : 0);
+	fprintf(f, "inventaire_colle %d\n", app.ui.inventoryGrouped() ? 1 : 0);
+	fprintf(f, "colonne_collee %d\n", app.ui.columnGrouped() ? 1 : 0);
 	fprintf(f, "langue %d\n", app.language);
 	fprintf(f, "engrenage %d\n", app.gearKnown ? 1 : 0);
 	fprintf(f, "donjon3d %d\n", app.dungeonMode);
@@ -1737,10 +1747,25 @@ void placeBand(App &app, const lolvr::UiFrameInput &in, lolvr::UiFrameOutput &ou
 	const float viewPx = app.dispW / (app.cropW > 0.0f ? app.cropW : 176.0f);
 	const float px = fminf(viewPx, app.dispW * 1.25f / bw); // mètres par pixel du jeu
 	const Quat rot = screenRot(app);
-	const Vec3 r = rotate(rot, {1, 0, 0}), u = rotate(rot, {0, 1, 0}), n = rotate(rot, {0, 0, 1});
-	const float halfW = bw * px * 0.5f, halfH = bh * px * 1.2f * 0.5f;
+	Vec3 r = rotate(rot, {1, 0, 0}), u = rotate(rot, {0, 1, 0}), n = rotate(rot, {0, 0, 1});
+	float halfW = bw * px * 0.5f, halfH = bh * px * 1.2f * 0.5f;
 	// Sous le cadre doré (il déborde de 9 % de la largeur sous l'image), un peu en avant.
-	const Vec3 c = viewCenter(app) - u * (app.dispH * 0.5f + app.dispW * 0.105f + halfH + 0.012f) + n * 0.03f;
+	Vec3 c = viewCenter(app) - u * (app.dispH * 0.5f + app.dispW * 0.105f + halfH + 0.012f) + n * 0.03f;
+	float pxUsed = px;
+	if (out.partyBlockValid && out.partyBlockPixel > 0.0f) {
+		// Le bloc des personnages (la ligne de messages, les portraits) est là : la bande s'y pose,
+		// comme dans le jeu, où la zone de texte agrandie couvre les portraits. Sinon elle passait
+		// devant ou derrière lui (deux textes l'un sur l'autre).
+		const float pxb = out.partyBlockPixel;
+		pxUsed = pxb;
+		r = out.partyBlockRight;
+		u = out.partyBlockUp;
+		n = cross(r, u);
+		halfW = bw * pxb * 0.5f;
+		halfH = bh * pxb * 1.2f * 0.5f;
+		c = out.partyBlockTopLeft + r * ((app.bandRect[0] + bw * 0.5f - out.partyBlockGameX) * pxb) -
+		    u * ((app.bandRect[1] + bh * 0.5f - out.partyBlockGameY) * pxb * 1.2f) + n * 0.006f;
+	}
 	lolvr::SceneState::Panel &p = app.ss.panels[lolvr::SceneState::kMaxPanels - 2];
 	p = lolvr::SceneState::Panel();
 	p.visible = true;
@@ -1754,14 +1779,17 @@ void placeBand(App &app, const lolvr::UiFrameInput &in, lolvr::UiFrameOutput &ou
 	p.u1 = (app.bandRect[0] + bw) / 320.0f;
 	p.v1 = (app.bandRect[1] + bh) / 200.0f;
 	p.border = 0.010f;
-	// Le pointeur sur la bande (si rien d'autre n'est visé)
-	if (!in.aimValid || out.hitValid || out.dragging)
+	// Le pointeur sur la bande (si rien d'autre n'est visé devant elle ; posée sur le bloc des
+	// personnages, elle passe devant lui)
+	if (!in.aimValid || out.dragging)
 		return;
 	const float den = dot(in.dir, n);
 	if (fabsf(den) < 1e-4f)
 		return;
 	const float t = dot(c - in.tip, n) / den;
 	if (t <= 0.0f)
+		return;
+	if (out.hitValid && length(out.hit - in.tip) < t - 0.002f)
 		return;
 	const Vec3 h = in.tip + in.dir * t;
 	const float hx = dot(h - c, r) / halfW, hy = dot(h - c, u) / halfH;
@@ -1774,7 +1802,7 @@ void placeBand(App &app, const lolvr::UiFrameInput &in, lolvr::UiFrameOutput &ou
 	out.hitRight = r;
 	out.hitUp = u;
 	out.hitRadius = 0.010f * t;
-	out.hitPixel = px;
+	out.hitPixel = pxUsed;
 	out.pointerLong = false;
 	out.gu = (app.bandRect[0] + (hx + 1.0f) * 0.5f * bw) / 320.0f;
 	out.gv = (app.bandRect[1] + (1.0f - hy) * 0.5f * bh) / 200.0f;

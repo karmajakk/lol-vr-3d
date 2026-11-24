@@ -17,6 +17,7 @@ enum UiPanelId {
 	kPanelInventory, // rangée d'objets
 	kPanelSpells,    // à gauche : parchemin des sorts, et dessous les lignes de messages
 	kPanelAtlas,     // l'atlas : la carte du niveau, à jour à chaque pas (repliable)
+	kPanelColumn,    // la colonne de la boussole détachée du livre de sorts (atlas, lampe, bourse)
 	kPanelKeyboard,  // clavier et options
 	kPanelHelp,      // aide : les manettes et les boutons
 	kUiPanelCount
@@ -121,7 +122,7 @@ struct UiFrameInput {
 	bool wristValid = false;
 	Vec3 wristPos = {0, 0, 0};
 	Quat wristRot = {0, 0, 0, 1};
-	// Paume droite (manette droite, visée) : le repos (ZZZ) y apparaît quand on la tourne vers soi.
+	// Main droite (manette droite, visée) : le repos (ZZZ) apparaît sur son dessus tourné vers soi.
 	bool palmValid = false;
 	Vec3 palmPos = {0, 0, 0};
 	Quat palmRot = {0, 0, 0, 1};
@@ -188,7 +189,13 @@ struct UiFrameOutput {
 	int action = kUiActionNone;
 	int invSlot = -1;      // la case d'inventaire cliquée (0..47)
 	bool invSort = false;  // le bouton de tri a été cliqué
-	bool restClick = false;      // le repos (ZZZ) de la paume droite cliqué : un clic sur le bouton du jeu
+	// Le bloc des personnages (la ligne de messages au-dessus) tel qu'il est posé : la bande de texte
+	// du jeu (une conversation) vient s'y poser, à l'endroit où le jeu la dessine.
+	bool partyBlockValid = false;
+	Vec3 partyBlockTopLeft = {0, 0, 0}, partyBlockRight = {1, 0, 0}, partyBlockUp = {0, 1, 0};
+	float partyBlockPixel = 0.0f;                // mètres par pixel du jeu (en largeur)
+	float partyBlockGameX = 0.0f, partyBlockGameY = 0.0f; // le coin haut gauche, dans l'image du jeu
+	bool restClick = false;      // le repos (ZZZ) du dessus de la main droite cliqué : un clic sur le bouton du jeu
 	bool gearMenuOpened = false; // le joueur a ouvert le menu du poignet (l'invitation peut disparaître)
 	bool clicked = false;
 	int pokeHand = -1;         // une touche du clavier touchée du doigt (la main, pour vibrer)
@@ -211,6 +218,13 @@ public:
 	// personnages, les flèches et la ligne d'objets d'origine), montrée dans les réglages VR.
 	void setHudClassic(bool classic);
 	bool hudClassic() const;
+	// L'inventaire collé sous les personnages (fenêtres) ; détaché par son bouton, recollé en le
+	// reposant contre eux. Enregistré avec les fenêtres.
+	void setInventoryGrouped(bool grouped);
+	bool inventoryGrouped() const;
+	// Pareil pour la colonne de la boussole, collée à droite du livre de sorts.
+	void setColumnGrouped(bool grouped);
+	bool columnGrouped() const;
 	// Langue des textes (UiLanguage).
 	void setLanguage(int language);
 	// Deux lignes d'information affichées sous le clavier (Latin-1).

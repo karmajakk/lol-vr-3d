@@ -3,6 +3,19 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.39.0] — Attached and detachable windows
+
+- Conversations: the game's text box now lands on the characters' block, where the game draws it
+  (over the portraits), instead of floating in front of or behind it (two texts on top of each
+  other, e.g. the guard's welcome, Scotia).
+- The inventory is **attached** right under the characters (same plane, same scale, one frame);
+  resizing it resizes the whole block. A chain button (shown when you point at the inventory)
+  **detaches** it; putting it back against the bottom of the characters attaches it again.
+- Same for the **compass column**: a chain button on it (between the lamp and the purse) detaches
+  it from the spellbook into a window of its own; put it back against the spellbook's right edge
+  to attach it again.
+- The rest button (ZZZ) is on the **back** of the right hand, like the floppy on the left one.
+
 ## [0.38.0] — Like the original game's bottom bar
 
 - **Windows interface**: the message line and the characters **side by side** (as in the game: one

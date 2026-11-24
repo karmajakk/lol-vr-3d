@@ -4,9 +4,9 @@
 
 While exploring, the game interface is spread over windows you place wherever you like (always in immersive mode; in Classic and Mixed reality with the "Windows" view):
 
-- on the left, the spell scroll, with the compass column (compass, atlas, lamp, purse) to its right;
-- below the view, as in the original game, one block: the message line, the characters side by side under it (one in the middle, two or three spread out evenly), and the inventory right under them. The block moves as one piece;
-- the rest button (ZZZ) is on your right palm (turn it towards you), the options button (the floppy) on the back of your left hand;
+- on the left, the spell scroll, with the compass column (compass, atlas, lamp, purse) to its right. When you point at the column, a small chain button appears on it (between the lamp and the purse): it detaches the column into a window of its own; put it back against the right edge of the spellbook and it joins it again;
+- below the view, as in the original game, one block: the message line, the characters side by side under it (one in the middle, two or three spread out evenly), and the inventory attached right under them. The block moves and resizes as one piece. When you point at the inventory, a small chain button appears at its right: it detaches the inventory; put it back against the bottom of the characters and it joins them again. During a conversation, the game's text box lands on this block, where the game draws it (over the portraits);
+- the rest button (ZZZ) is on the back of your right hand, the options button (the floppy) on the back of your left hand (turn the hand towards you, as if reading a watch);
 - on the right, once the party has the map, the **Atlas**: the game's own atlas page (same parchment, symbols, font and legend), updated at every step as you explore. It is closed by default: the atlas icon of the game (open book, in the compass column) or the map button opens it, and the "Close" box on the page closes it. Its arrows open the game's own atlas on the screen, one page turned, to browse the maps of the other levels. You can move it like the other windows.
 
 At first they sit around the screen: the pointer moves from one to the other with no offset, so you can pick up an item on the floor and drop it into the inventory. If you aim just beside a window, the pointer snaps to the nearest one.

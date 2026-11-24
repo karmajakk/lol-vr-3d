@@ -53,6 +53,7 @@ const Source kSources[kUiPanelCount] = {
 	{83, 178, 237, 22},  // inventaire
 	{0, 0, 236, 40},     // à gauche : recomposé, bandeau, (parchemin des sorts,) messages
 	{0, 0, (float)kAtlasW, (float)kAtlasH}, // l'atlas, dessiné par l'application
+	{288, 0, 32, 122},   // la colonne de la boussole, détachée (recomposée)
 	{0, 0, (float)kKbW, (float)kKbH},
 	{0, 0, (float)kHelpW, (float)kHelpH},
 };
@@ -72,8 +73,8 @@ struct Composite {
 	uint32_t serial = 0;
 	int key = -1;          // nombre de personnages, fenêtre éteinte... : refaire si cela change
 };
-const int kCompParty = 0, kCompSpells = 1, kCompAtlas = 2, kCompInv = 3;
-const int kCompTexW[4] = {240, 300, kAtlasW, 240}, kCompTexH[4] = {64, 288, kAtlasH, 132};
+const int kCompParty = 0, kCompSpells = 1, kCompAtlas = 2, kCompInv = 3, kCompColumn = 4;
+const int kCompTexW[5] = {240, 300, kAtlasW, 240, 32}, kCompTexH[5] = {64, 288, kAtlasH, 132, 124};
 const int kSpellTabH = 0; // (plus de bandeau au-dessus du livre de sorts) // bandeau du haut de la fenêtre de gauche : ouvrir ou replier le livre de sorts
 
 // Les pixels du jeu sont 1,2 fois plus hauts que larges ; ceux du clavier sont carrés.
@@ -366,6 +367,11 @@ struct Ui::Impl {
 	bool classicBar() const { return hudClassic && dungeonMode; } // la barre du bas, comme dans le jeu
 	bool gearShown = false; // la disquette du poignet (un peu de marge pour qu'elle ne clignote pas)
 	bool palmShown = false; // le repos sur la paume droite
+	// L'inventaire collé sous les personnages (un seul bloc, comme dans le jeu) ; un bouton (au
+	// survol) le détache, et le reposer contre le bloc l'y recolle.
+	bool invGrouped = true, invSnapCheck = false;
+	bool colGrouped = true, colSnapCheck = false;
+	int colHot = 0; // la colonne (collée) survolée : 1, son bouton qui la détache : 2
 	// Le rappel « L3 change la vue », devant le joueur
 	bool noticeOpen = false, noticeAhead = false, noticeDirty = true;
 	int noticeKind = 0; // 0 : « L3 change la vue », 1 : crédits et prérequis
@@ -381,11 +387,12 @@ struct Ui::Impl {
 	int menuItem(int row) const { return row; }
 	// Colonne du groupe recomposée
 	int chooserHot = -1; // bouton visé dans la fenêtre du choix de la vue
-	Composite comp[4];
+	Composite comp[5];
 	bool atlasCollapsed = false, atlasTabHot = false, atlasOn = true;
 	bool invExpanded = false;
 	int invHot = -1; // case visée : 0..47, 100 le bouton qui déplie, 101 le tri
 	void composeInv(const UiFrameInput &in);
+	void placeColumnBeside(UiPlacement *placement);
 	uint32_t atlasSerial = 0;
 	int atlasKey = -1;
 	void composeAtlas(const UiFrameInput &in);
@@ -394,7 +401,7 @@ struct Ui::Impl {
 	bool spellsCollapsed = false; // (le livre de sorts ne se replie plus)
 	bool spellTabHot = false;
 	void compose(int which, const UiFrameInput &in);
-	int compOf(int panel) const { return panel == kPanelParty ? kCompParty : panel == kPanelSpells ? kCompSpells : panel == kPanelAtlas ? kCompAtlas : panel == kPanelInventory ? kCompInv : -1; }
+	int compOf(int panel) const { return panel == kPanelParty ? kCompParty : panel == kPanelSpells ? kCompSpells : panel == kPanelAtlas ? kCompAtlas : panel == kPanelInventory ? kCompInv : panel == kPanelColumn ? kCompColumn : -1; }
 	// L'atlas à droite de la fenêtre des personnages, haut contre haut.
 	void placeAtlas(UiPlacement *placement);
 	// Gâchette maintenue pour déplacer : l'appui en attente, et ce que vise le doigt.
@@ -547,7 +554,7 @@ void Ui::Impl::upload(GLuint &tex, const std::vector<uint8_t> &px, int w, int h,
 // autres rangées (40 cases, triables). Les cases sont celles que dessine le jeu.
 void Ui::Impl::composeInv(const UiFrameInput &in) {
 	Composite &c = comp[kCompInv];
-	const int key = 1000 + (invExpanded ? 1 : 0) + (invHot + 1) * 2;
+	const int key = 1000 + (invExpanded ? 1 : 0) + (invHot + 1) * 2 + (invGrouped ? 512 : 0);
 	if (c.tex && c.serial == in.invSerial && c.key == key)
 		return;
 	c.serial = in.invSerial;
@@ -555,7 +562,7 @@ void Ui::Impl::composeInv(const UiFrameInput &in) {
 	c.texW = kCompTexW[kCompInv];
 	c.texH = kCompTexH[kCompInv];
 	c.pieces.clear();
-	c.w = 200;
+	c.w = 235; // (la largeur du bloc des personnages, qu'il prolonge)
 	c.h = invExpanded ? 132 : 22;
 	c.px.assign((size_t)c.texW * c.texH * 4, 0);
 	auto put = [&](int x, int y, uint8_t r, uint8_t g, uint8_t b) {
@@ -600,6 +607,24 @@ void Ui::Impl::composeInv(const UiFrameInput &in) {
 		box(178, y0, 200, y0 + 22, hot);
 	};
 	button(0, invHot == 100);
+	// Le bouton qui détache l'inventaire du bloc des personnages : seulement au survol (et collé).
+	if (invGrouped && invHot >= 0) {
+		const bool hot = invHot == 102;
+		for (int y = 1; y < 21; y++)
+			for (int x = 203; x < 223; x++)
+				put(x, y, hot ? 110 : 80, hot ? 80 : 58, hot ? 52 : 40);
+		box(202, 0, 224, 22, hot);
+		const uint8_t lr = hot ? 255 : 230, lg = hot ? 235 : 190, lb = hot ? 170 : 90;
+		// deux maillons écartés : la chaîne ouverte
+		auto link = [&](int x0, int y0) {
+			for (int x = x0; x < x0 + 7; x++) { put(x, y0, lr, lg, lb); put(x, y0 + 4, lr, lg, lb); }
+			for (int y = y0; y <= y0 + 4; y++) { put(x0, y, lr, lg, lb); put(x0 + 6, y, lr, lg, lb); }
+		};
+		link(205, 5);
+		link(213, 12);
+		put(213, 9, lr, lg, lb);
+		put(214, 8, lr, lg, lb);
+	}
 	const uint8_t gr = invHot == 100 ? 255 : 230, gg = invHot == 100 ? 235 : 190, gb = invHot == 100 ? 170 : 90;
 	for (int i = 0; i < 6; i++) { // un triangle : vers le bas = déplier, vers le haut = replier
 		const int w = invExpanded ? i : 5 - i;
@@ -624,7 +649,8 @@ void Ui::Impl::compose(int which, const UiFrameInput &in) {
 	Composite &c = comp[which];
 	const int n = in.characters < 0 ? 0 : in.characters > 4 ? 4 : in.characters;
 	const bool blank = in.compassBlank;
-	const int key = (which == kCompInv ? 1 : which == kCompParty ? n * 2 + (blank ? 1 : 0) : (spellsCollapsed ? 1 : 0) + language * 2 + (spellTabHot ? 4 : 0) + (blank ? 8 : 0)) + (in.textBoxActive ? 64 : 0) + (in.spellsCovered ? 128 : 0) + (classicBar() ? 256 : 0);
+	const int key = (which == kCompInv ? 1 : which == kCompParty ? n * 2 + (blank ? 1 : 0) : (spellsCollapsed ? 1 : 0) + language * 2 + (spellTabHot ? 4 : 0) + (blank ? 8 : 0)) + (in.textBoxActive ? 64 : 0) + (in.spellsCovered ? 128 : 0) + (classicBar() ? 256 : 0) +
+	                (which == kCompSpells ? (colGrouped ? 512 : 0) + colHot * 1024 : 0) + (which == kCompColumn ? (blank ? 4096 : 0) : 0);
 	if (c.tex && in.gameSerial == c.serial && key == c.key)
 		return;
 	// Pendant une boîte de texte, les morceaux viennent de l'image d'avant ; sinon on la garde à jour.
@@ -679,6 +705,11 @@ void Ui::Impl::compose(int which, const UiFrameInput &in) {
 		c.pieces.push_back({0, 0, 235, 57, 83, 121, 235, 57});
 		c.w = 235;
 		c.h = 57;
+	} else if (which == kCompColumn) {
+		// La colonne de la boussole détachée, telle quelle.
+		c.pieces.push_back({0, 0, 32, 122, 288, 0, 32, 122});
+		c.w = 32;
+		c.h = 122;
 	} else {
 		// Le parchemin (pixels doublés) ; à sa droite, la colonne de la boussole (l'atlas, la lampe,
 		// la bourse), à la même échelle. Les messages sont au-dessus des personnages (ou, interface
@@ -686,7 +717,7 @@ void Ui::Impl::compose(int which, const UiFrameInput &in) {
 		int y = kSpellTabH;
 		c.pieces.push_back({6, y, 224, 242, 0, 0, 112, 121});
 		c.w = 236;
-		if (!classicBar()) {
+		if (!classicBar() && colGrouped) {
 			c.pieces.push_back({232, y, 64, 244, 288, 0, 32, 122});
 			c.w = 296;
 		}
@@ -723,7 +754,7 @@ void Ui::Impl::compose(int which, const UiFrameInput &in) {
 					int sx = gx * in.gameW / 320, sy = gy * in.gameH / 200;
 					// Le parchemin des sorts (au-dessus de la boîte de texte) reste à jour : un sort
 					// appris pendant une conversation s'y écrit.
-					const uint8_t *from = which == kCompSpells && pc.sy + pc.sh <= 122 && !in.spellsCovered ? in.gameRgba : game;
+					const uint8_t *from = (which == kCompSpells || which == kCompColumn) && pc.sy + pc.sh <= 122 && !in.spellsCovered ? in.gameRgba : game;
 					const uint8_t *src = from + ((size_t)sy * in.gameW + sx) * 4;
 					p[0] = src[0]; p[1] = src[1]; p[2] = src[2];
 				}
@@ -740,7 +771,34 @@ void Ui::Impl::compose(int which, const UiFrameInput &in) {
 		for (int y = 0; y < kSpellTabH; y++)
 			memcpy(&c.px[(size_t)y * c.texW * 4], &cv.px[(size_t)y * c.w * 4], (size_t)c.w * 4);
 	}
-	upload(c.tex, c.px, c.texW, c.texH, which == kCompParty ? "groupe" : which == kCompInv ? "inventaire" : "sorts");
+	// La colonne collée, survolée : le bouton qui la détache, dans la pierre vide entre la lampe et
+	// la bourse.
+	if (which == kCompSpells && colHot && colGrouped && !classicBar()) {
+		const bool hot = colHot == 2;
+		auto put = [&](int x, int y, uint8_t r, uint8_t g, uint8_t b) {
+			if (x < 0 || y < 0 || x >= c.texW || y >= c.texH)
+				return;
+			uint8_t *p = &c.px[((size_t)y * c.texW + x) * 4];
+			p[0] = r; p[1] = g; p[2] = b; p[3] = 255;
+		};
+		const int x0 = 248, y0 = kSpellTabH + 160, x1 = 280, y1 = kSpellTabH + 188;
+		const uint8_t er = hot ? 255 : 140, eg = hot ? 230 : 108, eb = hot ? 140 : 72;
+		for (int y = y0; y < y1; y++)
+			for (int x = x0; x < x1; x++) {
+				const bool edge = x == x0 || x == x1 - 1 || y == y0 || y == y1 - 1;
+				put(x, y, edge ? er : hot ? 110 : 80, edge ? eg : hot ? 80 : 58, edge ? eb : hot ? 52 : 40);
+			}
+		const uint8_t lr = hot ? 255 : 230, lg = hot ? 235 : 190, lb = hot ? 170 : 90;
+		auto link = [&](int lx, int ly) {
+			for (int x = lx; x < lx + 9; x++) { put(x, ly, lr, lg, lb); put(x, ly + 6, lr, lg, lb); }
+			for (int y = ly; y <= ly + 6; y++) { put(lx, y, lr, lg, lb); put(lx + 8, y, lr, lg, lb); }
+		};
+		link(x0 + 4, y0 + 5);
+		link(x0 + 17, y0 + 15);
+		put(x0 + 15, y0 + 13, lr, lg, lb);
+		put(x0 + 16, y0 + 12, lr, lg, lb);
+	}
+	upload(c.tex, c.px, c.texW, c.texH, which == kCompParty ? "groupe" : which == kCompInv ? "inventaire" : which == kCompColumn ? "colonne" : "sorts");
 }
 
 // L'atlas : la page de l'atlas telle que le jeu la dessine (le moteur la refait à chaque pas),
@@ -800,7 +858,7 @@ void Ui::Impl::placeAtlas(UiPlacement *placement) {
 		const UiPlacement &p = placement[kPanelSpells];
 		UiPlacement &a = placement[kPanelAtlas];
 		const float dist = p.c >= 0.2f ? p.c : 1.0f;
-		const float pw = 296.0f * p.scale * 0.5f, ph = 244.0f * 1.2f * p.scale * 0.5f;
+		const float pw = (colGrouped ? 296.0f : 236.0f) * p.scale * 0.5f, ph = 244.0f * 1.2f * p.scale * 0.5f;
 		a.scale = clampf(p.scale * (0.0008f / 0.0018f), 0.0004f, 0.02f);
 		const float aw = kAtlasW * a.scale * 0.5f, ah = kAtlasH * 1.2f * a.scale * 0.5f;
 		const float mid = placement[kPanelParty].c >= 0.2f ? placement[kPanelParty].a : 0.0f, inner = p.a - pw / dist;
@@ -1055,7 +1113,7 @@ void Ui::Impl::renderHelp() {
 		line(tr(L, "Right stick (sideways)", "Joystick droit (côtés)", "Rechter Stick (seitlich)"), tr(L, "turn", "tourner", "drehen")),
 		line(tr(L, "Menu button (left)", "Bouton menu (gauche)", "Menütaste (links)"), tr(L, "save, load, quit", "sauver, charger, quitter", "speichern, laden, beenden")),
 		line(tr(L, "Floppy on the back of the left hand", "Disquette (dessus de la main gauche)", "Diskette (linker Handrücken)"), tr(L, "game menu, VR controls", "menu du jeu, réglages VR", "Spielmenü, VR-Optionen")),
-		line(tr(L, "ZZZ on the right palm", "ZZZ (paume droite)", "ZZZ (rechte Handfläche)"), tr(L, "rest", "se reposer", "rasten")),
+		line(tr(L, "ZZZ on the back of the right hand", "ZZZ (dessus de la main droite)", "ZZZ (rechter Handrücken)"), tr(L, "rest", "se reposer", "rasten")),
 		line(tr(L, "Brass bar + hold trigger", "Barrette + gâchette tenue", "Messingleiste + Abzug halten"), tr(L, "move a window", "déplacer une fenêtre", "Fenster verschieben")),
 		line(tr(L, "Corner + hold trigger", "Coin + gâchette tenue", "Ecke + Abzug halten"), tr(L, "resize", "agrandir, réduire", "Größe ändern")),
 		"",
@@ -1380,7 +1438,7 @@ Ui::~Ui() {
 }
 
 const char *Ui::panelKey(int id) {
-	static const char *names[kUiPanelCount] = {"groupe3", "inventaire", "sorts2", "atlas", "clavier", "aide"};
+	static const char *names[kUiPanelCount] = {"groupe3", "inventaire", "sorts2", "atlas", "colonne", "clavier", "aide"};
 	return id >= 0 && id < kUiPanelCount ? names[id] : "";
 }
 
@@ -1594,6 +1652,7 @@ void Ui::placeParty(const UiFrameInput &in) {
 		const Composite &ci = d->comp[kCompInv];
 		const float ih = (ci.h ? (float)ci.h : 22.0f) * 1.2f * s * 0.5f;
 		set(kPanelInventory, 0.0f, y - hh - 0.012f - ih, s);
+		d->invGrouped = true;
 	}
 	// À côté des personnages : l'atlas.
 	d->placeAtlas(placement);
@@ -1611,6 +1670,40 @@ void Ui::setHudClassic(bool classic) {
 }
 
 bool Ui::hudClassic() const { return d->hudClassic; }
+
+void Ui::setInventoryGrouped(bool grouped) {
+	if (grouped != d->invGrouped) {
+		d->invGrouped = grouped;
+		d->comp[kCompInv].key = -1;
+	}
+}
+
+bool Ui::inventoryGrouped() const { return d->invGrouped; }
+
+void Ui::setColumnGrouped(bool grouped) {
+	if (grouped != d->colGrouped) {
+		d->colGrouped = grouped;
+		d->comp[kCompSpells].key = -1;
+		if (!grouped && placement[kPanelColumn].c < 0.19f)
+			d->placeColumnBeside(placement);
+	}
+}
+
+bool Ui::columnGrouped() const { return d->colGrouped; }
+
+// La colonne détachée : à droite du livre de sorts (qui rétrécit), un peu à l'écart, le haut au
+// même niveau, ses pixels à la taille de ceux de la colonne collée (doublés).
+void Ui::Impl::placeColumnBeside(UiPlacement *placement) {
+	const UiPlacement &p = placement[kPanelSpells];
+	UiPlacement &k = placement[kPanelColumn];
+	const float dist = p.c >= 0.2f ? p.c : 1.0f;
+	k.scale = clampf(p.scale * 2.0f, 0.0004f, 0.02f);
+	const float pw = 236.0f * p.scale * 0.5f, ph = 244.0f * 1.2f * p.scale * 0.5f;
+	const float kw = 32.0f * k.scale * 0.5f, kh = 122.0f * 1.2f * k.scale * 0.5f;
+	k.c = dist;
+	k.a = wrapAngle(p.a - (pw + 0.06f + kw) / dist);
+	k.b = clampf(p.b + (ph - kh) / dist, -1.35f, 1.35f);
+}
 
 UiPlacement Ui::defaultHelpPlacement(float yaw) {
 	// Devant soi, à hauteur des yeux, bien lisible.
@@ -1641,8 +1734,11 @@ void Ui::resetLayout(const UiFrameInput &in) {
 
 	// À gauche : le parchemin des sorts (pixels doublés dans la fenêtre recomposée) et la colonne de
 	// la boussole, le haut à la hauteur du haut de la vue.
+	d->colGrouped = true;
+	d->comp[kCompSpells].key = -1;
 	const float sSpells = 0.0018f, spellsW = d->classicBar() ? 236.0f : 296.0f, spellsH = 244.0f * 1.2f * sSpells;
 	set(kPanelSpells, -(viewW * 0.5f + frame + 0.035f + spellsW * sSpells * 0.5f), top - spellsH * 0.5f, sSpells);
+	d->placeColumnBeside(placement); // (sa place, détachée)
 	(void)halfW; (void)halfH;
 	// Les personnages (et les messages au-dessus) sous la vue, l'inventaire juste dessous.
 	placeParty(in);
@@ -1771,6 +1867,10 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 		visible[i] = placed && in.split;
 	if (d->classicBar()) // (la ligne d'objets est dans la barre du bas)
 		visible[kPanelInventory] = false;
+	// La colonne de la boussole, détachée du livre de sorts
+	visible[kPanelColumn] = placed && in.split && !d->classicBar() && !d->colGrouped && placement[kPanelColumn].c >= 0.19f;
+	if (visible[kPanelColumn])
+		d->compose(kCompColumn, in);
 	if (visible[kPanelParty]) {
 		d->compose(kCompParty, in);
 		if (d->partyReplace) { // l'interface vient de changer : la fenêtre à sa place par défaut
@@ -1805,6 +1905,10 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 	if (d->drag != -1) {
 		bool gone = isPanel(d->drag) && !visible[d->drag];
 		if (!in.triggerDown || !in.aimValid || gone) {
+			if (d->drag == kPanelInventory && !d->invGrouped)
+				d->invSnapCheck = true; // (reposée contre les personnages : recollée, plus bas)
+			if (d->drag == kPanelColumn && !d->colGrouped)
+				d->colSnapCheck = true; // (reposée contre le livre de sorts : recollée)
 			d->drag = -1;
 			out.released = true;
 			out.layoutChanged = true;
@@ -1825,7 +1929,7 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 				pl.a = wrapAngle(atan2f(-v.x, -v.z) - in.anchorYaw);
 				pl.scale = clampf(pl.scale * expf(in.stickX * 0.9f * in.dt), 0.0004f, 0.02f);
 				// Les personnages et l'inventaire : un seul bloc, ils bougent ensemble.
-				if (!d->classicBar() && (d->drag == kPanelParty || d->drag == kPanelInventory)) {
+				if (!d->classicBar() && d->invGrouped && (d->drag == kPanelParty || d->drag == kPanelInventory)) {
 					UiPlacement &o = placement[d->drag == kPanelParty ? kPanelInventory : kPanelParty];
 					const float k = pl.scale / before.scale, r = before.c / pl.c;
 					o.a = wrapAngle(pl.a + (o.a - before.a) * r * k);
@@ -1895,6 +1999,69 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 			hq.c = q.c + q.u * (q.hh + border + hq.hh + 0.002f);
 		}
 	}
+	// L'inventaire reposé contre le bas des personnages : recollé.
+	if (d->invSnapCheck) {
+		d->invSnapCheck = false;
+		const Quad &pq = content[kPanelParty], &iq = content[kPanelInventory];
+		const Vec3 top = iq.c + iq.u * iq.hh, bottom = pq.c - pq.u * pq.hh;
+		const Vec3 n = cross(pq.r, pq.u);
+		if (!d->classicBar() && visible[kPanelParty] && fabsf(dot(bottom - top, pq.u)) < 0.10f && fabsf(dot(iq.c - pq.c, pq.r)) < pq.hw &&
+		    fabsf(dot(iq.c - pq.c, n)) < 0.30f) {
+			d->invGrouped = true;
+			out.layoutChanged = true;
+		}
+	}
+	// La colonne reposée contre le bord droit du livre de sorts : recollée.
+	if (d->colSnapCheck) {
+		d->colSnapCheck = false;
+		const Quad &sq = content[kPanelSpells], &kq = content[kPanelColumn];
+		const Vec3 edge = sq.c + sq.r * sq.hw, left = kq.c - kq.r * kq.hw;
+		const Vec3 n = cross(sq.r, sq.u);
+		if (!d->classicBar() && visible[kPanelSpells] && fabsf(dot(left - edge, sq.r)) < 0.10f && fabsf(dot(kq.c - sq.c, sq.u)) < sq.hh &&
+		    fabsf(dot(kq.c - sq.c, n)) < 0.30f) {
+			d->colGrouped = true;
+			d->comp[kCompSpells].key = -1;
+			out.layoutChanged = true;
+		}
+	}
+	// Collé : l'inventaire prolonge le bloc des personnages, juste dessous, dans le même plan et à la
+	// même échelle (les deux cadres n'en font qu'un).
+	if (d->invGrouped && !d->classicBar() && visible[kPanelParty]) {
+		const Quad &pq = content[kPanelParty];
+		Quad &iq = content[kPanelInventory];
+		const UiPlacement &pp = placement[kPanelParty];
+		const Composite &ci = d->comp[kCompInv];
+		const float sw = ci.w ? (float)ci.w : 235.0f, sh = ci.h ? (float)ci.h : 22.0f;
+		const float border = clampf(0.012f * panelDist[kPanelParty], 0.004f, 0.012f);
+		iq.r = pq.r;
+		iq.u = pq.u;
+		iq.hw = sw * pp.scale * 0.5f;
+		iq.hh = sh * pixelAspect(kPanelInventory) * pp.scale * 0.5f;
+		iq.c = pq.c - pq.u * (pq.hh + border + iq.hh);
+		panelDist[kPanelInventory] = length(iq.c - in.anchorPos);
+		Quad &hq = handle[kPanelInventory];
+		hq.r = iq.r;
+		hq.u = iq.u;
+		hq.c = iq.c - iq.u * (iq.hh + border + hq.hh + 0.002f);
+		// (sa place enregistrée suit, pour le jour où on la détache)
+		UiPlacement &ip = placement[kPanelInventory];
+		const Vec3 v = iq.c - in.anchorPos;
+		ip.c = clampf(length(v), 0.20f, 6.0f);
+		ip.b = clampf(asinf(clampf(v.y / ip.c, -1.0f, 1.0f)), -1.35f, 1.35f);
+		ip.a = wrapAngle(atan2f(-v.x, -v.z) - in.anchorYaw);
+		ip.scale = pp.scale;
+	}
+	if (visible[kPanelParty]) {
+		const Quad &pq = content[kPanelParty];
+		const Composite &cp = d->comp[kCompParty];
+		out.partyBlockValid = cp.w > 0;
+		out.partyBlockTopLeft = pq.c - pq.r * pq.hw + pq.u * pq.hh;
+		out.partyBlockRight = pq.r;
+		out.partyBlockUp = pq.u;
+		out.partyBlockPixel = cp.w > 0 ? 2.0f * pq.hw / (float)cp.w : 0.0f;
+		out.partyBlockGameX = d->classicBar() ? 0.0f : 83.0f;
+		out.partyBlockGameY = 121.0f;
+	}
 	// Poignée de l'écran : au-dessus du cadre (ou du moniteur)
 	{
 		Quad &hq = handle[kUiPanelCount];
@@ -1937,20 +2104,19 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 		}
 	}
 	d->gearShown = gearVisible;
-	// La paume droite tournée vers soi (et regardée) : le bouton du repos (ZZZ) du jeu, posé dessus.
+	// Le dessus de la main droite tourné vers soi (et regardé), comme la disquette de l'autre main :
+	// le bouton du repos (ZZZ) du jeu, posé dessus.
 	// Seulement avec les fenêtres : la barre du bas (interface classique) et le grand écran l'ont déjà.
 	bool palmVisible = false;
 	Quad palmQ;
 	if (placed && in.palmValid && in.split && !d->classicBar()) {
-		Vec3 c = in.palmPos + rotate(in.palmRot, kWristFloppy);
+		const Vec3 off = {-kWristFloppy.x, kWristFloppy.y, kWristFloppy.z}; // (+X : le dos de la main droite)
+		Vec3 c = in.palmPos + rotate(in.palmRot, off);
 		Vec3 v = c - in.headPos;
 		float dist = length(v);
 		const bool was = d->palmShown;
-		// (la paume regarde la tête, et vers le haut : tenue normalement, elle regarde de côté, vers
-		// le milieu du corps, ce qui ne compte pas)
-		const Vec3 palm = rotate(in.palmRot, {-1.0f, 0.0f, 0.0f});
-		const float facing = dist > 1e-3f ? dot(palm, v * (-1.0f / dist)) : 0.0f;
-		if (dist > 0.12f && dist < (was ? 0.80f : 0.70f) && dot(v * (1.0f / dist), in.headDir) > (was ? 0.86f : 0.90f) && facing > (was ? 0.20f : 0.40f) && palm.y > (was ? 0.25f : 0.40f)) {
+		const float facing = dist > 1e-3f ? dot(rotate(in.palmRot, {1.0f, 0.0f, 0.0f}), v * (-1.0f / dist)) : 0.0f;
+		if (dist > 0.12f && dist < (was ? 0.80f : 0.70f) && dot(v * (1.0f / dist), in.headDir) > (was ? 0.86f : 0.90f) && facing > (was ? 0.20f : 0.40f)) {
 			palmVisible = true;
 			Vec3 n = v * (-1.0f / dist);
 			Vec3 r = cross({0, 1, 0}, n);
@@ -2028,6 +2194,9 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 				} else {
 					UiPlacement &pl = placement[d->resize];
 					pl.scale = clampf(pl.scale * ratio, 0.0004f, 0.02f);
+					// (l'inventaire collé : tout le bloc grandit)
+					if (d->resize == kPanelInventory && d->invGrouped && !d->classicBar())
+						placement[kPanelParty].scale = clampf(placement[kPanelParty].scale * ratio, 0.0004f, 0.02f);
 				}
 			}
 		}
@@ -2036,6 +2205,7 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 	bool tabHot = false; // le doigt est sur le bandeau du livre de sorts
 	bool atlasHot = false; // … ou sur celui de l'atlas
 	int invHot = -1;       // … ou sur une case de la fenêtre d'inventaire
+	int colHot = 0;        // … ou sur la colonne de la boussole, collée au livre de sorts
 	// --- 3. Que vise le doigt ? ---
 	enum { kHitNone, kHitHandle, kHitPanel, kHitScreen, kHitCorner, kHitWrist };
 	int hitKind = kHitNone, hitIndex = -1;
@@ -2504,9 +2674,11 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 				out.gu = 160.0f / 320.0f;
 				out.gv = 189.0f / 200.0f;
 				out.hitPixel = c.w > 0 ? 2.0f * q.hw / (float)c.w : 0.0f;
-				if (cx >= 178.0f && cy < 22.0f)
+				if (cx >= 202.0f && cx < 224.0f && cy < 22.0f && d->invGrouped && !d->classicBar())
+					invHot = 102;
+				else if (cx >= 178.0f && cx < 200.0f && cy < 22.0f)
 					invHot = 100;
-				else if (cx >= 178.0f && cy >= 22.0f && cy < 44.0f && d->invExpanded)
+				else if (cx >= 178.0f && cx < 200.0f && cy >= 22.0f && cy < 44.0f && d->invExpanded)
 					invHot = 101;
 				else if (cx < 176.0f && cy >= 0.0f && cy < (float)c.h)
 					invHot = ((int)cy / 22) * 8 + (int)cx / 22;
@@ -2520,6 +2692,12 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 						UiPlacement &pl = placement[kPanelInventory];
 						const float dh = (float)(cc.h - oldH) * pixelAspect(kPanelInventory) * pl.scale * 0.5f;
 						pl.b -= atan2f(dh, pl.c);
+						out.layoutChanged = true;
+					} else if (invHot == 102) {
+						// Détachée : elle descend un peu, pour qu'on voie qu'elle est à part.
+						d->invGrouped = false;
+						UiPlacement &pl = placement[kPanelInventory];
+						pl.b -= atan2f(0.06f, pl.c);
 						out.layoutChanged = true;
 					} else if (invHot == 101) {
 						out.invSort = true;
@@ -2536,6 +2714,22 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 				for (const Piece &pc : c.pieces) {
 					if (!pc.contains(cx, cy))
 						continue;
+					// La colonne collée au livre de sorts : survolée, son bouton qui la détache.
+					if (hitIndex == kPanelSpells && pc.sx == 288 && d->colGrouped && !d->classicBar()) {
+						colHot = 1;
+						if (cx >= 248.0f && cx < 280.0f && cy >= kSpellTabH + 160.0f && cy < kSpellTabH + 188.0f) {
+							colHot = 2;
+							out.pointerValid = false;
+							out.buttonsToGame = false;
+							if (in.triggerPressed) {
+								d->colGrouped = false;
+								d->placeColumnBeside(placement);
+								out.layoutChanged = true;
+								out.clicked = true;
+							}
+							break;
+						}
+					}
 					if (pc.sx == 288 && in.compassBlank) // fenêtre éteinte : aucun clic
 						break;
 					out.pointerValid = true;
@@ -2568,6 +2762,10 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 		}
 	}
 
+	if (colHot != d->colHot) {
+		d->colHot = colHot;
+		d->comp[kCompSpells].key = -1;
+	}
 	if (invHot != d->invHot) {
 		d->invHot = invHot;
 		d->comp[kCompInv].key = -1;

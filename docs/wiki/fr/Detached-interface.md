@@ -4,9 +4,9 @@
 
 Pendant l'exploration, l'interface du jeu est répartie dans des fenêtres que tu places où tu veux (toujours en mode immersif ; en Classique et en Réalité mixte avec la vue « Fenêtres ») :
 
-- à gauche, le parchemin des sorts, avec la colonne de la boussole (boussole, atlas, lanterne, bourse) à sa droite ;
-- sous la vue, comme dans le jeu original, un seul bloc : la ligne de messages, les personnages côte à côte dessous (un seul au milieu, deux ou trois répartis symétriquement), et l'inventaire juste en dessous. Le bloc se déplace d'une pièce ;
-- le bouton du repos (ZZZ) est sur ta paume droite (tourne-la vers toi), le bouton des options (la disquette) sur le dessus de ta main gauche ;
+- à gauche, le parchemin des sorts, avec la colonne de la boussole (boussole, atlas, lanterne, bourse) à sa droite. Quand tu pointes la colonne, un petit bouton chaîne y apparaît (entre la lanterne et la bourse) : il la détache en une fenêtre à part ; repose-la contre le bord droit du livre de sorts et elle s'y recolle ;
+- sous la vue, comme dans le jeu original, un seul bloc : la ligne de messages, les personnages côte à côte dessous (un seul au milieu, deux ou trois répartis symétriquement), et l'inventaire collé juste en dessous. Le bloc se déplace et se redimensionne d'une pièce. Quand tu pointes l'inventaire, un petit bouton chaîne apparaît à sa droite : il le détache ; repose-le contre le bas des personnages et il s'y recolle. Pendant une conversation, la boîte de texte du jeu se pose sur ce bloc, là où le jeu la dessine (sur les portraits) ;
+- le bouton du repos (ZZZ) est sur le dessus de ta main droite, le bouton des options (la disquette) sur le dessus de ta main gauche (tourne la main vers toi, comme pour lire l'heure) ;
 - à droite, dès que le groupe a la carte, l'**Atlas** : la page de l'atlas du jeu elle-même (même parchemin, mêmes symboles, même police, même légende), à jour à chaque pas à mesure que tu explores. Son bandeau (« Atlas +/- ») la replie jusqu'au bandeau seul ; « Atlas » dans Réglages VR la masque tout à fait.
 
 Au départ, elles sont autour de l'écran : le pointeur passe de l'une à l'autre sans décalage, pour ramasser un objet au sol et le déposer dans l'inventaire. Si tu vises juste à côté d'une fenêtre, le pointeur se colle à la plus proche.
