@@ -34,7 +34,7 @@ const float kSplitViewHeight = 0.54f;
 const float kSplitViewLift = 0.16f;
 // La disquette du poignet, dans le repère de la manette gauche (visée) : sur le dessus de la main
 // (-X : le dos de la main gauche), vers le poignet (+Z).
-const Vec3 kWristFloppy = {-0.045f, 0.0f, 0.06f};
+const Vec3 kWristFloppy = {-0.054f, -0.050f, 0.142f}; // (la montre : sur le bracelet de laiton du gant, au poignet)
 
 enum UiAction { kUiActionNone = 0, kUiActionToggleFire, kUiActionToggleDetach, kUiActionResetLayout, kUiActionCloseKeyboard, kUiActionToggleHelp, kUiActionCloseHelp, kUiActionToggleLanguage, kUiActionToggleKeyboard, kUiActionToggleDungeon, kUiActionToggleScreenAlways, kUiActionChooseClassic, kUiActionChooseImmersive, kUiActionGameMenu, kUiActionCycleView, kUiActionChooseLanguage, kUiActionToggleAtlas, kUiActionOpenKeyboard, kUiActionAtlasPrev, kUiActionAtlasNext, kUiActionToggleHud };
 

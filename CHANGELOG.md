@@ -3,6 +3,15 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.41.0] — Wrist watches
+
+- The floppy and the rest button (ZZZ) are now **watches on the wrists**, always there: left
+  watch, the game menu; right watch, rest. Look at it, click it with the other hand.
+- The inventory is as wide as the characters' block (larger slots); its buttons are fully
+  outside it, on the right, and their icons show again (they were blank).
+- The chain buttons (detach the inventory, detach the compass column) appear only while the
+  finger is on them, and disappear as soon as it leaves.
+
 ## [0.40.0] — Buttons outside the windows
 
 - The inventory window holds only its slots; its buttons sit just outside, on its right, under

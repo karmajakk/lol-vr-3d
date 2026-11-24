@@ -1098,8 +1098,8 @@ void Ui::Impl::renderHelp() {
 		line(tr(L, "Left stick", "Joystick gauche", "Linker Stick"), tr(L, "walk where you look", "marcher là où l'on regarde", "dorthin gehen, wohin du schaust")),
 		line(tr(L, "Right stick (sideways)", "Joystick droit (côtés)", "Rechter Stick (seitlich)"), tr(L, "turn", "tourner", "drehen")),
 		line(tr(L, "Menu button (left)", "Bouton menu (gauche)", "Menütaste (links)"), tr(L, "save, load, quit", "sauver, charger, quitter", "speichern, laden, beenden")),
-		line(tr(L, "Floppy on the back of the left hand", "Disquette (dessus de la main gauche)", "Diskette (linker Handrücken)"), tr(L, "game menu, VR controls", "menu du jeu, réglages VR", "Spielmenü, VR-Optionen")),
-		line(tr(L, "ZZZ on the back of the right hand", "ZZZ (dessus de la main droite)", "ZZZ (rechter Handrücken)"), tr(L, "rest", "se reposer", "rasten")),
+		line(tr(L, "Left watch (floppy)", "Montre gauche (disquette)", "Linke Uhr (Diskette)"), tr(L, "game menu, VR controls", "menu du jeu, réglages VR", "Spielmenü, VR-Optionen")),
+		line(tr(L, "Right watch (ZZZ)", "Montre droite (ZZZ)", "Rechte Uhr (ZZZ)"), tr(L, "rest", "se reposer", "rasten")),
 		line(tr(L, "Brass bar + hold trigger", "Barrette + gâchette tenue", "Messingleiste + Abzug halten"), tr(L, "move a window", "déplacer une fenêtre", "Fenster verschieben")),
 		line(tr(L, "Corner + hold trigger", "Coin + gâchette tenue", "Ecke + Abzug halten"), tr(L, "resize", "agrandir, réduire", "Größe ändern")),
 		"",
@@ -1363,7 +1363,7 @@ void Ui::Impl::renderHint() {
 				const int px = 16 + x * 3 - (pass ? 0 : 2), py = (kHintH - 48) / 2 + y * 3 + (pass ? 0 : 2);
 				cv.rect(px, py, px + 3, py + 3, col);
 			}
-	const std::string l1 = latin1(tr(language, "Turn your left hand, look at its back:", "Tourne ta main gauche, regarde le dessus :", "Dreh die linke Hand, schau auf den Handrücken:"));
+	const std::string l1 = latin1(tr(language, "Look at your left watch:", "Regarde ta montre gauche :", "Schau auf deine linke Uhr:"));
 	const std::string l2 = latin1(tr(language, "the floppy opens the game menu.", "la disquette ouvre le menu du jeu.", "die Diskette öffnet das Spielmenü."));
 	cv.gtext(l1, 80, 18, Canvas::fit(l1, kHintW - 92, 2), kWhite);
 	cv.gtext(l2, 80, 46, Canvas::fit(l2, kHintW - 92, 2), kGold);
@@ -2019,12 +2019,13 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 		const Composite &ci = d->comp[kCompInv];
 		const float sw = ci.w ? (float)ci.w : 235.0f, sh = ci.h ? (float)ci.h : 22.0f;
 		const float border = clampf(0.012f * panelDist[kPanelParty], 0.004f, 0.012f);
+		// (aussi large que le bloc : les cases grandissent d'autant ; ses boutons sont dehors, à droite)
+		const float invScale = pp.scale * (d->comp[kCompParty].w ? (float)d->comp[kCompParty].w : 235.0f) / sw;
 		iq.r = pq.r;
 		iq.u = pq.u;
-		iq.hw = sw * pp.scale * 0.5f;
-		iq.hh = sh * pixelAspect(kPanelInventory) * pp.scale * 0.5f;
-		// (calée à gauche : ses boutons, à sa droite, restent sous le bloc)
-		iq.c = pq.c - pq.r * (pq.hw - iq.hw) - pq.u * (pq.hh + border + iq.hh);
+		iq.hw = sw * invScale * 0.5f;
+		iq.hh = sh * pixelAspect(kPanelInventory) * invScale * 0.5f;
+		iq.c = pq.c - pq.u * (pq.hh + border + iq.hh);
 		panelDist[kPanelInventory] = length(iq.c - in.anchorPos);
 		Quad &hq = handle[kPanelInventory];
 		hq.r = iq.r;
@@ -2036,18 +2037,17 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 		ip.c = clampf(length(v), 0.20f, 6.0f);
 		ip.b = clampf(asinf(clampf(v.y / ip.c, -1.0f, 1.0f)), -1.35f, 1.35f);
 		ip.a = wrapAngle(atan2f(-v.x, -v.z) - in.anchorYaw);
-		ip.scale = pp.scale;
+		ip.scale = invScale;
 	}
 	// Les boutons hors des fenêtres : à droite de l'inventaire, déplier (toujours), trier (déplié),
 	// détacher (au survol, à droite du dernier) ; sous la colonne collée, la détacher (au survol).
 	enum { kBtnExpand = 0, kBtnSort, kBtnInvDetach, kBtnColDetach, kBtnCount };
 	Quad btnQ[kBtnCount];
 	bool btnVis[kBtnCount] = {false, false, false, false};
-	const double hoverKeep = 0.8; // (le temps d'aller du survol au bouton)
 	if (visible[kPanelInventory] && in.invRgb) {
 		const Quad &iq = content[kPanelInventory];
-		const float sc = placement[d->invGrouped && !d->classicBar() ? kPanelParty : kPanelInventory].scale;
-		const float bs = 22.0f * sc * 1.1f, gap = clampf(0.012f * panelDist[kPanelInventory], 0.004f, 0.012f) + 0.004f;
+		const float sc = placement[kPanelInventory].scale;
+		const float bs = 22.0f * sc, gap = clampf(0.012f * panelDist[kPanelInventory], 0.004f, 0.012f) + 0.004f;
 		auto place = [&](int b, int col, int row) {
 			Quad &q = btnQ[b];
 			q.r = iq.r;
@@ -2059,10 +2059,11 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 		place(kBtnExpand, 0, 0);
 		if (d->invExpanded)
 			place(kBtnSort, 0, 1);
-		if (d->invGrouped && !d->classicBar() && in.time - d->invHoverT < hoverKeep)
+		// (la chaîne : là, mais invisible tant que le doigt n'est pas dessus)
+		if (d->invGrouped && !d->classicBar())
 			place(kBtnInvDetach, 1, d->invExpanded ? 1 : 0);
 	}
-	if (visible[kPanelSpells] && d->colGrouped && !d->classicBar() && in.time - d->colHoverT < hoverKeep) {
+	if (visible[kPanelSpells] && d->colGrouped && !d->classicBar()) {
 		const Quad &sq = content[kPanelSpells];
 		const float sc = placement[kPanelSpells].scale, bs = 22.0f * sc * 1.8f;
 		const float colHalf = 64.0f * sc * 0.5f, gap = clampf(0.012f * panelDist[kPanelSpells], 0.004f, 0.012f) + 0.004f;
@@ -2104,53 +2105,33 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 		d->resize = -1;
 	}
 
-	// Menu du poignet : la disquette apparaît sur le dessus de la main gauche, quand on la tourne vers
-	// soi (comme pour lire l'heure) et qu'on la regarde de près ; pas quand la main repose, assis.
+	// Les montres des poignets, toujours là : à gauche la disquette (le menu du jeu), à droite le repos
+	// (ZZZ). Le cadran est sur le dessus du poignet, tourné vers le dos de la main (-X à gauche, +X à
+	// droite), son haut vers les doigts ; on tourne la main pour la regarder, l'autre main clique.
+	auto watch = [&](const Vec3 &pos, const Quat &rot, float side, Quad &q, float half) {
+		const Vec3 off = {kWristFloppy.x * side, kWristFloppy.y, kWristFloppy.z};
+		q.c = pos + rotate(rot, off);
+		const Vec3 n = rotate(rot, {-side, 0.0f, 0.0f});
+		const Vec3 fwd = rotate(rot, {0.0f, 0.0f, -1.0f});
+		Vec3 r = cross(fwd, n);
+		const float rl = length(r);
+		q.r = rl > 1e-4f ? r * (1.0f / rl) : Vec3{1, 0, 0};
+		q.u = cross(n, q.r);
+		q.hw = q.hh = half;
+	};
 	bool gearVisible = false;
 	Quad gearQ, menuQ;
 	if (placed && in.wristValid) {
-		Vec3 c = in.wristPos + rotate(in.wristRot, kWristFloppy);
-		Vec3 v = c - in.headPos;
-		float dist = length(v);
-		const bool was = d->gearShown; // (déjà là : un peu de marge, qu'elle ne clignote pas)
-		const float facing = dist > 1e-3f ? dot(rotate(in.wristRot, {-1.0f, 0.0f, 0.0f}), v * (-1.0f / dist)) : 0.0f;
-		if (dist > 0.12f && dist < (was ? 0.80f : 0.70f) && dot(v * (1.0f / dist), in.headDir) > (was ? 0.86f : 0.90f) && facing > (was ? 0.20f : 0.40f)) {
-			gearVisible = true;
-			Vec3 n = v * (-1.0f / dist);
-			Vec3 r = cross({0, 1, 0}, n);
-			float rl = length(r);
-			gearQ.c = c;
-			gearQ.r = rl > 1e-4f ? r * (1.0f / rl) : Vec3{1, 0, 0};
-			gearQ.u = cross(n, gearQ.r);
-			gearQ.hw = gearQ.hh = 0.026f;
-			// Tant que le joueur ne l'a jamais ouvert, l'engrenage bat doucement pour se faire remarquer.
-			if (in.gearHint && !d->menuOpen)
-				gearQ.hw = gearQ.hh = 0.026f * (1.15f + 0.15f * sinf((float)in.time * 6.0f));
-		}
+		gearVisible = true;
+		// Tant que le joueur ne l'a jamais ouverte, la montre bat doucement pour se faire remarquer.
+		watch(in.wristPos, in.wristRot, 1.0f, gearQ, in.gearHint && !d->menuOpen ? 0.024f * (1.15f + 0.15f * sinf((float)in.time * 6.0f)) : 0.024f);
 	}
 	d->gearShown = gearVisible;
-	// Le dessus de la main droite tourné vers soi (et regardé), comme la disquette de l'autre main :
-	// le bouton du repos (ZZZ) du jeu, posé dessus.
-	// Seulement avec les fenêtres : la barre du bas (interface classique) et le grand écran l'ont déjà.
 	bool palmVisible = false;
 	Quad palmQ;
-	if (placed && in.palmValid && in.split && !d->classicBar()) {
-		const Vec3 off = {-kWristFloppy.x, kWristFloppy.y, kWristFloppy.z}; // (+X : le dos de la main droite)
-		Vec3 c = in.palmPos + rotate(in.palmRot, off);
-		Vec3 v = c - in.headPos;
-		float dist = length(v);
-		const bool was = d->palmShown;
-		const float facing = dist > 1e-3f ? dot(rotate(in.palmRot, {1.0f, 0.0f, 0.0f}), v * (-1.0f / dist)) : 0.0f;
-		if (dist > 0.12f && dist < (was ? 0.80f : 0.70f) && dot(v * (1.0f / dist), in.headDir) > (was ? 0.86f : 0.90f) && facing > (was ? 0.20f : 0.40f)) {
-			palmVisible = true;
-			Vec3 n = v * (-1.0f / dist);
-			Vec3 r = cross({0, 1, 0}, n);
-			float rl = length(r);
-			palmQ.c = c;
-			palmQ.r = rl > 1e-4f ? r * (1.0f / rl) : Vec3{1, 0, 0};
-			palmQ.u = cross(n, palmQ.r);
-			palmQ.hw = palmQ.hh = 0.028f;
-		}
+	if (placed && in.palmValid) {
+		palmVisible = true;
+		watch(in.palmPos, in.palmRot, -1.0f, palmQ, 0.024f);
 	}
 	d->palmShown = palmVisible;
 	const float kMenuScale = 0.0009f;
@@ -2922,7 +2903,9 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 	}
 	// Invitation du premier lancement : un peu sous le regard, à portée de lecture, elle suit la tête
 	// sans à-coups. Elle s'efface quand on regarde sa main (l'engrenage prend le relais).
-	if (in.gearHint && placed && !d->menuOpen && !gearVisible && d->hintTex && np < SceneState::kMaxPanels - 2) {
+	// (l'invitation s'efface dès qu'on regarde la montre)
+	const bool gearLooked = gearVisible && dot(normalize(gearQ.c - in.headPos), in.headDir) > 0.90f;
+	if (in.gearHint && placed && !d->menuOpen && !gearLooked && d->hintTex && np < SceneState::kMaxPanels - 2) {
 		Vec3 flat = {in.headDir.x, 0.0f, in.headDir.z};
 		float fl = length(flat);
 		flat = fl > 1e-3f ? flat * (1.0f / fl) : Vec3{0, 0, -1};
@@ -2956,6 +2939,8 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 	for (int b = 0; b < kBtnCount; b++) {
 		if (!btnVis[b] || np >= SceneState::kMaxPanels - 2)
 			continue;
+		if ((b == kBtnInvDetach || b == kBtnColDetach) && hotButton != b)
+			continue; // (les chaînes n'apparaissent que sous le doigt)
 		// l'icône : vers le bas (déplier) ou le haut (replier), le tri, la chaîne
 		const int icon = b == kBtnExpand ? (d->invExpanded ? 1 : 0) : b == kBtnSort ? 2 : 3;
 		const bool hot = hotButton == b;
@@ -2969,6 +2954,8 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 		p.halfH = btnQ[b].hh;
 		p.border = 0.002f;
 		p.texture = d->buttonTex;
+		p.texW = 88;
+		p.texH = 44;
 		p.u0 = icon * 22.0f / 88.0f;
 		p.u1 = (icon + 1) * 22.0f / 88.0f;
 		p.v0 = hot ? 0.5f : 0.0f;
@@ -2984,7 +2971,7 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 		p.up = palmQ.u;
 		p.halfW = palmQ.hw;
 		p.halfH = palmQ.hh;
-		p.border = 0.003f;
+		p.border = 0.004f;
 		p.texture = 0;
 		p.u0 = 33.0f / 320.0f;
 		p.u1 = 55.0f / 320.0f;

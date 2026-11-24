@@ -412,7 +412,16 @@ int main(int argc, char **argv) {
 				aimAt(inv0.center);
 				ui.update(in, o, tmp);
 				const int exp = squareRightOf(inv0);
-				check(exp >= 0 && tmp.panels[exp].center.x - (inv0.center.x + inv0.halfW) < 0.4f, "inventaire : le bouton qui le déplie est à côté, hors de la fenêtre");
+				check(exp >= 0 && tmp.panels[exp].center.x > inv0.center.x + inv0.halfW && tmp.panels[exp].center.x - (inv0.center.x + inv0.halfW) < 0.4f,
+				      "inventaire : le bouton qui le déplie est à côté, hors de la fenêtre");
+				const SceneState::Panel ex = tmp.panels[exp];
+				int squares0 = 0;
+				for (int k = 0; k < SceneState::kMaxPanels; k++) {
+					const SceneState::Panel &b = tmp.panels[k];
+					squares0 += b.visible && fabsf(b.halfW - b.halfH) < 1e-5f && b.halfW < 0.15f && b.center.x > inv0.center.x + inv0.halfW ? 1 : 0;
+				}
+				check(squares0 == 1, "inventaire survolé : la chaîne reste cachée");
+				aimAt(ex.center + ex.right * (2.0f * ex.halfW + 0.006f));
 				ui.update(in, o, tmp);
 				const int det = squareRightOf(inv0);
 				int squares = 0;
@@ -420,7 +429,7 @@ int main(int argc, char **argv) {
 					const SceneState::Panel &b = tmp.panels[k];
 					squares += b.visible && fabsf(b.halfW - b.halfH) < 1e-5f && b.halfW < 0.15f && b.center.x > inv0.center.x + inv0.halfW ? 1 : 0;
 				}
-				check(det >= 0 && squares == 2, "inventaire survolé : le bouton qui le détache apparaît, à droite de celui qui déplie");
+				check(det >= 0 && squares == 2, "la chaîne apparaît sous le doigt, à droite du bouton qui déplie");
 				if (det >= 0)
 					aimAt(tmp.panels[det].center);
 				ui.update(in, o, tmp);
@@ -448,17 +457,18 @@ int main(int argc, char **argv) {
 				// La colonne de la boussole : son bouton (au survol) la détache du livre de sorts.
 				in.holdToMove = false;
 				in.time += 2.0;
-				aimIn(2, 264, 120, 296, 244);
-				ui.update(in, o, tmp);
 				{
 					const SceneState::Panel sp0 = panel(2);
+					const float sc = sp0.halfW * 2.0f / 296.0f, gap = 0.016f;
+					aimAt(sp0.center + sp0.right * (sp0.halfW - 32.0f * sc) - sp0.up * (sp0.halfH + gap + 22.0f * sc * 0.9f));
+					ui.update(in, o, tmp);
 					int cb = -1;
 					for (int k = 0; k < SceneState::kMaxPanels; k++) {
 						const SceneState::Panel &b = tmp.panels[k];
 						if (b.visible && fabsf(b.halfW - b.halfH) < 1e-5f && b.halfW < 0.15f && b.center.y < sp0.center.y - sp0.halfH)
 							cb = k;
 					}
-					check(cb >= 0, "colonne survolée : le bouton qui la détache apparaît dessous");
+					check(cb >= 0, "sous la colonne, sous le doigt : la chaîne qui la détache apparaît");
 					if (cb >= 0)
 						aimAt(tmp.panels[cb].center);
 				}
@@ -806,6 +816,11 @@ int main(int argc, char **argv) {
 				pi.palmRot = {0.0f, 0.0f, 0.70710678f, 0.70710678f}; // le dessus de la main vers le haut
 				const Vec3 zc = pi.palmPos + rotate(pi.palmRot, Vec3{-kWristFloppy.x, kWristFloppy.y, kWristFloppy.z});
 				pi.headDir = normalize(zc - pi.headPos);
+				pi.palmValid = false;
+				ui.update(pi, o, tmp);
+				int noPalm = 0;
+				for (int i = 0; i < SceneState::kMaxPanels; i++) noPalm += tmp.panels[i].visible ? 1 : 0;
+				pi.palmValid = true;
 				ui.update(pi, o, tmp);
 				int withPalm = 0;
 				for (int i = 0; i < SceneState::kMaxPanels; i++) withPalm += tmp.panels[i].visible ? 1 : 0;
@@ -815,7 +830,7 @@ int main(int argc, char **argv) {
 				ui.update(pi, o, tmp);
 				int restingPalm = 0;
 				for (int i = 0; i < SceneState::kMaxPanels; i++) restingPalm += tmp.panels[i].visible ? 1 : 0;
-				check(withPalm == restingPalm + 1, "dessus de la main droite tourné vers soi : le repos (ZZZ) apparaît ; main au repos, non");
+				check(withPalm == noPalm + 1 && restingPalm == withPalm, "montre droite (ZZZ) : toujours au poignet, main tournée ou non");
 				pi.palmRot = {0.0f, 0.0f, 0.70710678f, 0.70710678f};
 				pi.headDir = normalize(zc - pi.headPos);
 				ui.update(pi, o, tmp);
@@ -837,14 +852,14 @@ int main(int argc, char **argv) {
 				ui.update(rest, o, tmp);
 				int restShown = 0;
 				for (int i = 0; i < SceneState::kMaxPanels; i++) restShown += tmp.panels[i].visible ? 1 : 0;
-				check(restShown == shown, "poignet : la main au repos (le dessus de côté), pas de disquette même regardée");
+				check(restShown == shown, "montre gauche : toujours au poignet, même la main au repos");
 			}
 			in.headDir = normalize(in.wristPos + rotate(in.wristRot, kWristFloppy) - in.headPos);
 			ui.update(in, o, tmp);
 			int shown2 = 0, gear = -1;
 			for (int i = 0; i < SceneState::kMaxPanels; i++)
 				if (tmp.panels[i].visible) { shown2++; gear = i; }
-			check(shown2 == shown + 1, "poignet : la disquette apparaît (et l'invitation s'efface) quand on regarde la main gauche");
+			check(shown2 == shown, "montre gauche regardée : l'invitation s'efface");
 			Vec3 gearPos = tmp.panels[gear].center;
 			in.tip = {0.25f, 0.95f, -0.30f};
 			aimAt(gearPos);
