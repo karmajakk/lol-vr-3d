@@ -1169,10 +1169,15 @@ void loadSettings(App &app, int &environment) {
 	std::string activeProfile;
 	// La disposition (écran, fenêtres) n'est reprise que si elle a été enregistrée avec la disposition
 	// d'origine actuelle (« disposition 2 » : écran plus petit et plus proche, pour le donjon en 3D).
-	bool layoutCurrent = false;
-	while (fgets(line, sizeof(line), f))
+	bool layoutCurrent = false, panelsCurrent = false;
+	while (fgets(line, sizeof(line), f)) {
 		if (!strncmp(line, "disposition 2", 13))
 			layoutCurrent = true;
+		// (« fenetres 3 » : les personnages côte à côte au-dessus de l'inventaire ; avant, les
+		// fenêtres d'alors ne sont pas reprises)
+		if (!strncmp(line, "fenetres 3", 10))
+			panelsCurrent = true;
+	}
 	rewind(f);
 	while (fgets(line, sizeof(line), f)) {
 		char name[32] = {0};
@@ -1254,7 +1259,7 @@ void loadSettings(App &app, int &environment) {
 			char key[32] = "";
 			float a = 0, b = 0, c = 0, scale = 0;
 			bool ok = sscanf(rest, "%31s %f %f %f %f", key, &a, &b, &c, &scale) == 5;
-			if (ok && scale >= 0.0004f && scale <= 0.02f && fabsf(a) <= 3.2f && fabsf(b) <= 1.4f && c >= 0.2f && c <= 6.0f)
+			if (ok && panelsCurrent && scale >= 0.0004f && scale <= 0.02f && fabsf(a) <= 3.2f && fabsf(b) <= 1.4f && c >= 0.2f && c <= 6.0f)
 				for (int i = 0; i < lolvr::kUiPanelCount; i++)
 					if (!strcmp(key, lolvr::Ui::panelKey(i))) {
 						app.ui.placement[i] = {a, b, c, scale};
@@ -1280,6 +1285,7 @@ void saveSettings(App &app) {
 	if (!f)
 		return;
 	fprintf(f, "disposition 2\n");
+	fprintf(f, "fenetres 3\n");
 	fprintf(f, "decor %d\n", app.dungeonMode ? app.classicEnv : app.environment);
 	for (int i = 0; i < kEnvCount; i++)
 		fprintf(f, "ecran %.3f %.3f\n", app.widths[i], app.distances[i]);
@@ -2236,6 +2242,11 @@ void updateUi(App &app, XrTime time, float dt, double now, bool pointer, bool tr
 	app.ui.setVrState(vrModeOf(app), classicViewOf(app));
 	app.ui.setLanguage(app.language);
 	// Menu du poignet : sur la main gauche, quand on la regarde.
+	in.palmValid = app.aimValid[kRight];
+	if (in.palmValid) {
+		in.palmPos = toVec3(app.aimPose[kRight].position);
+		in.palmRot = toQuat(app.aimPose[kRight].orientation);
+	}
 	in.wristValid = app.aimValid[kLeft];
 	if (in.wristValid) {
 		in.wristPos = toVec3(app.aimPose[kLeft].position);
@@ -2538,6 +2549,14 @@ void updateInput(App &app, XrTime time, float dt, double now) {
 	bool toGame = ui.buttonsToGame && !ui.dragging;
 	if (ui.pokeHand >= 0)
 		pulse(app, ui.pokeHand, 0.35f, 0.02f); // une touche du clavier touchée du doigt
+	if (ui.restClick) {
+		// Le repos (ZZZ) de la paume droite : un clic bref sur le bouton du jeu.
+		app.synthU = 44.0f / 320.0f;
+		app.synthV = 189.0f / 200.0f;
+		app.synthClickUntil = now + 0.16;
+		app.clickPulse = 1.0f;
+		pulse(app, kRight, 0.30f, 0.02f);
+	}
 	if (ui.gameClick && ui.pointerValid) {
 		// Un appui bref sur une fenêtre (la gâchette maintenue la déplace) : le clic, au relâcher.
 		app.synthU = ui.gu;

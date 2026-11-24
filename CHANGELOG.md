@@ -3,6 +3,18 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.38.0] — Like the original game's bottom bar
+
+- **Windows interface**: the message line and the characters **side by side** (as in the game: one
+  in the middle, two or three spread out evenly) form one block with the inventory right under
+  it, below the view; the block moves as one piece.
+- The compass column (compass, atlas, lamp, purse) is joined to the right of the spellbook.
+- The rest button (**ZZZ**) is on the **right palm**: turn it towards you, click it with the left
+  hand.
+- The beggar of the forest lies on the ground in the 3D dungeon, his picture's edges blended in,
+  no longer a dark floating rectangle.
+- Windows placed with an earlier version are laid out again once.
+
 ## [0.37.0] — Grips change character
 
 - The **grips** change character: left grip the one above (previous), right grip the one below

@@ -4,10 +4,10 @@
 
 While exploring, the game interface is spread over windows you place wherever you like (always in immersive mode; in Classic and Mixed reality with the "Windows" view):
 
-- on the left, the spell scroll, with the message line joined under it; always open;
-- on the right, the characters one under the other, the atlas column (lamp, purse) to their right, and the rest button under the purse, all in one window (the options button, the floppy, is on your left wrist);
-- below, the inventory;
-- further right, once the party has the map, the **Atlas**: the game's own atlas page (same parchment, symbols, font and legend), updated at every step as you explore. It is closed by default: the atlas icon of the game (open book, right column) or the map button opens it, and the "Close" box on the page closes it. Its arrows open the game's own atlas on the screen, one page turned, to browse the maps of the other levels. You can move it like the other windows.
+- on the left, the spell scroll, with the compass column (compass, atlas, lamp, purse) to its right;
+- below the view, as in the original game, one block: the message line, the characters side by side under it (one in the middle, two or three spread out evenly), and the inventory right under them. The block moves as one piece;
+- the rest button (ZZZ) is on your right palm (turn it towards you), the options button (the floppy) on the back of your left hand;
+- on the right, once the party has the map, the **Atlas**: the game's own atlas page (same parchment, symbols, font and legend), updated at every step as you explore. It is closed by default: the atlas icon of the game (open book, in the compass column) or the map button opens it, and the "Close" box on the page closes it. Its arrows open the game's own atlas on the screen, one page turned, to browse the maps of the other levels. You can move it like the other windows.
 
 At first they sit around the screen: the pointer moves from one to the other with no offset, so you can pick up an item on the floor and drop it into the inventory. If you aim just beside a window, the pointer snaps to the nearest one.
 

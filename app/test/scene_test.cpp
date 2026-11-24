@@ -304,22 +304,25 @@ int main(int argc, char **argv) {
 			ui.update(in, o, tmp);
 		};
 		auto near = [&](float gu, float gv) { return o.pointerValid && o.buttonsToGame && fabsf(o.gu * 320 - gu) < 1.5f && fabsf(o.gv * 200 - gv) < 1.5f; };
-		// À droite (2 personnages : 100 x 148) : portraits à gauche, atlas à droite, le repos sous la bourse.
-		aimIn(0, 16, 53, 100, 148);
-		check(near(233, 160), "à droite : le second personnage");
-		aimIn(0, 84, 100, 100, 148);
-		check(near(304, 100), "à droite : la colonne de l'atlas, à droite des personnages");
-		aimIn(0, 84, 135, 100, 148);
-		check(near(44, 189), "à droite : le repos (ZZZ), sous la bourse");
+		// Sous la vue (235 x 57), comme dans le jeu : la ligne de messages, les personnages côte à côte.
+		aimIn(0, 167, 39, 235, 57);
+		check(near(250, 160), "dessous : le second personnage, à droite");
+		aimIn(0, 117, 11, 235, 57);
+		check(near(200, 132), "dessous : la ligne de messages, au-dessus des personnages");
+		{
+			const SceneState::Panel pa = panel(0), iv = panel(1);
+			check(iv.center.y < pa.center.y - pa.halfH && iv.center.y + iv.halfH > pa.center.y - pa.halfH - 0.08f && fabsf(iv.center.x - pa.center.x) < 0.02f,
+			      "l'inventaire juste sous les personnages, centré (un seul bloc)");
+		}
 		aimAt(panel(1).center);
 		ui.update(in, o, tmp);
 		check(near(201.5f, 189), "fenêtre de l'inventaire");
-		// À gauche, le livre de sorts toujours ouvert (236 x 266), sans bandeau : le parchemin, les messages.
+		// À gauche, le livre de sorts (296 x 244) : le parchemin, et à sa droite la colonne de la boussole.
 		{
-			aimIn(2, 118, 100, 236, 266);
+			aimIn(2, 118, 100, 296, 244);
 			check(near(56, 50), "à gauche : le parchemin des sorts");
-			aimIn(2, 118, 255, 236, 266);
-			check(near(200, 131.5f), "à gauche : dessous, la ligne de messages");
+			aimIn(2, 264, 120, 296, 244);
+			check(near(304, 60), "à gauche : la colonne de la boussole, à droite du parchemin");
 		}
 		// Mode immersif, interface classique : la barre du bas du jeu (384 x 79) sous la vue, la colonne
 		// de la boussole coupée en deux à sa droite ; plus de fenêtre d'inventaire.
@@ -345,14 +348,14 @@ int main(int argc, char **argv) {
 			check(near(304, 104), "interface classique : la bourse, à droite");
 			ui.setHudClassic(false);
 			ui.update(in, o, tmp);
-			aimIn(0, 16, 53, 100, 148);
-			check(near(233, 160), "interface en fenêtres : les personnages reviennent à droite");
+			aimIn(0, 167, 39, 235, 57);
+			check(near(250, 160), "interface en fenêtres : les personnages reviennent sous la vue");
 		}
 		// Gâchette maintenue pour déplacer une fenêtre (plus de poignées) ; un appui bref reste un clic.
 		{
 			in.holdToMove = true;
 			in.time = 100.0;
-			const SceneState::Panel before = panel(1);
+			const SceneState::Panel before = panel(1), partyBefore = panel(0);
 			aimAt(before.center);
 			ui.update(in, o, tmp);
 			in.triggerDown = in.triggerPressed = true;
@@ -377,6 +380,8 @@ int main(int argc, char **argv) {
 			in.time += 0.05;
 			const SceneState::Panel moved = panel(1);
 			check(fabsf(moved.center.x - before.center.x - 0.2f) < 0.05f, "gâchette maintenue : la fenêtre suit le doigt");
+			const SceneState::Panel partyMoved = panel(0);
+			check(length((partyMoved.center - partyBefore.center) - (moved.center - before.center)) < 0.03f, "l'inventaire déplacé : les personnages suivent (un seul bloc)");
 			in.triggerDown = false;
 			ui.update(in, o, tmp);
 			check(o.released && !o.dragging && !o.gameClick, "gâchette relâchée : la fenêtre reste là, pas de clic");
@@ -493,7 +498,7 @@ int main(int argc, char **argv) {
 		// 7c. Coins : on attrape un coin, on l'écarte, la fenêtre grandit ; pareil pour l'écran
 		{
 			SceneState::Panel inv = panel(1);
-			Vec3 corner = inv.center + inv.right * (inv.halfW + 0.02f) + inv.up * (inv.halfH + 0.02f); // coin sans barrette
+			Vec3 corner = inv.center + inv.right * (inv.halfW + 0.02f) - inv.up * (inv.halfH + 0.02f); // coin bas droit (en haut : les personnages)
 			float scale0 = ui.placement[kPanelInventory].scale;
 			aimAt(corner);
 			ui.update(in, o, tmp);
@@ -685,6 +690,38 @@ int main(int argc, char **argv) {
 			int withHint = 0;
 			for (int i = 0; i < SceneState::kMaxPanels; i++) withHint += tmp.panels[i].visible ? 1 : 0;
 			check(withHint == shown + 1, "premier lancement : l'invitation à regarder la main gauche est affichée");
+			// La paume droite tournée vers soi et regardée : le repos (ZZZ) ; un clic de la main gauche
+			{
+				UiFrameInput pi = in;
+				pi.gearHint = false;
+				pi.wristValid = false;
+				pi.palmValid = true;
+				pi.palmPos = {0.20f, 0.90f, -0.30f};
+				pi.palmRot = {0.0f, 0.0f, -0.70710678f, 0.70710678f}; // la paume vers le haut
+				const Vec3 zc = pi.palmPos + rotate(pi.palmRot, kWristFloppy);
+				pi.headDir = normalize(zc - pi.headPos);
+				ui.update(pi, o, tmp);
+				int withPalm = 0;
+				for (int i = 0; i < SceneState::kMaxPanels; i++) withPalm += tmp.panels[i].visible ? 1 : 0;
+				pi.palmRot = {0, 0, 0, 1};
+				pi.headDir = normalize(pi.palmPos + rotate(pi.palmRot, kWristFloppy) - pi.headPos);
+				ui.update(pi, o, tmp);
+				ui.update(pi, o, tmp);
+				int restingPalm = 0;
+				for (int i = 0; i < SceneState::kMaxPanels; i++) restingPalm += tmp.panels[i].visible ? 1 : 0;
+				check(withPalm == restingPalm + 1, "paume droite tournée vers soi : le repos (ZZZ) apparaît ; main au repos, non");
+				pi.palmRot = {0.0f, 0.0f, -0.70710678f, 0.70710678f};
+				pi.headDir = normalize(zc - pi.headPos);
+				ui.update(pi, o, tmp);
+				pi.tip = {-0.20f, 0.95f, -0.30f};
+				pi.dir = normalize(zc - pi.tip);
+				pi.triggerDown = pi.triggerPressed = true;
+				ui.update(pi, o, tmp);
+				check(o.restClick && !o.buttonsToGame, "paume droite : un clic sur le ZZZ, le repos du jeu");
+				pi.triggerDown = pi.triggerPressed = false;
+				pi.palmValid = false;
+				ui.update(pi, o, tmp);
+			}
 			// La main posée (tenue comme au repos, assis) : regardée, pas de disquette
 			{
 				UiFrameInput rest = in;

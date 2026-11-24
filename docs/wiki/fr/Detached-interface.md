@@ -4,10 +4,10 @@
 
 Pendant l'exploration, l'interface du jeu est répartie dans des fenêtres que tu places où tu veux (toujours en mode immersif ; en Classique et en Réalité mixte avec la vue « Fenêtres ») :
 
-- à gauche, le parchemin des sorts, avec la ligne de messages collée dessous ; le bandeau en haut (« Livre de sorts +/- ») le replie, ne laissant que la ligne de messages, et le rouvre pour changer de sort ;
-- à droite, les personnages l'un sous l'autre, la colonne de l'atlas (lanterne, bourse) à leur droite et le bouton du repos sous la bourse, dans une seule fenêtre (le bouton des options, la disquette, est sur ton poignet gauche) ;
-- en bas, l'inventaire ;
-- plus à droite, dès que le groupe a la carte, l'**Atlas** : la page de l'atlas du jeu elle-même (même parchemin, mêmes symboles, même police, même légende), à jour à chaque pas à mesure que tu explores. Son bandeau (« Atlas +/- ») la replie jusqu'au bandeau seul ; « Atlas » dans Réglages VR la masque tout à fait.
+- à gauche, le parchemin des sorts, avec la colonne de la boussole (boussole, atlas, lanterne, bourse) à sa droite ;
+- sous la vue, comme dans le jeu original, un seul bloc : la ligne de messages, les personnages côte à côte dessous (un seul au milieu, deux ou trois répartis symétriquement), et l'inventaire juste en dessous. Le bloc se déplace d'une pièce ;
+- le bouton du repos (ZZZ) est sur ta paume droite (tourne-la vers toi), le bouton des options (la disquette) sur le dessus de ta main gauche ;
+- à droite, dès que le groupe a la carte, l'**Atlas** : la page de l'atlas du jeu elle-même (même parchemin, mêmes symboles, même police, même légende), à jour à chaque pas à mesure que tu explores. Son bandeau (« Atlas +/- ») la replie jusqu'au bandeau seul ; « Atlas » dans Réglages VR la masque tout à fait.
 
 Au départ, elles sont autour de l'écran : le pointeur passe de l'une à l'autre sans décalage, pour ramasser un objet au sol et le déposer dans l'inventaire. Si tu vises juste à côté d'une fenêtre, le pointeur se colle à la plus proche.
 

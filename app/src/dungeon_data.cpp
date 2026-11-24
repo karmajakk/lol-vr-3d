@@ -408,6 +408,55 @@ void decodeDungeonTextures(const DungeonGfx &g, DungeonTextures &out) {
 						}
 				}
 			}
+			// Un « objet » qui est une image rectangulaire avec son fond (le mendiant couché dans la forêt) :
+			// le jeu la pose dans le décor sombre ; ici, ses bords s'effilochent (un tramage, le très
+			// sombre qui touche le bord disparaît), et l'image descend jusqu'au sol (elle flottait).
+			if (out.kind[t] == kWallObject && !g.vmpMap[t] && !out.scenery[t]) {
+				int x0 = kDunTexSize, y0 = kDunWallRows, x1 = -1, y1 = -1, cnt = 0;
+				for (int y = 0; y < kDunWallRows; y++)
+					for (int x = 0; x < kDunTexSize; x++)
+						if (al[y * kDunTexSize + x]) {
+							cnt++;
+							x0 = x < x0 ? x : x0; x1 = x > x1 ? x : x1;
+							y0 = y < y0 ? y : y0; y1 = y > y1 ? y : y1;
+						}
+				const int bw = x1 - x0 + 1, bh = y1 - y0 + 1;
+				if (x1 >= 0 && bw >= 24 && bh >= 16 && cnt == bw * bh) {
+					auto dark = [&](int x, int y) {
+						const Rgba &q = img[y * kDunTexSize + x];
+						return q.a && q.r * 3 + q.g * 6 + q.b < 10 * 14;
+					};
+					std::vector<int> stack;
+					auto push = [&](int x, int y) {
+						if (x < x0 || x > x1 || y < y0 || y > y1 || !dark(x, y))
+							return;
+						img[y * kDunTexSize + x].a = 0;
+						stack.push_back(y * kDunTexSize + x);
+					};
+					for (int x = x0; x <= x1; x++) { push(x, y0); push(x, y1); }
+					for (int y = y0; y <= y1; y++) { push(x0, y); push(x1, y); }
+					while (!stack.empty()) {
+						const int q = stack.back();
+						stack.pop_back();
+						const int x = q % kDunTexSize, y = q / kDunTexSize;
+						push(x - 1, y); push(x + 1, y); push(x, y - 1); push(x, y + 1);
+					}
+					// Le tramage des bords : de moins en moins de pixels vers l'extérieur (8 pixels de marge ;
+					// le bas, posé au sol, garde un bord plus net).
+					static const int bayer[4][4] = {{0, 8, 2, 10}, {12, 4, 14, 6}, {3, 11, 1, 9}, {15, 7, 13, 5}};
+					for (int y = y0; y <= y1; y++)
+						for (int x = x0; x <= x1; x++) {
+							const int e = std::min(std::min(x - x0, x1 - x), std::min((y - y0), (y1 - y) * 3));
+							if (e < 8 && bayer[y & 3][x & 3] >= e * 2)
+								img[y * kDunTexSize + x].a = 0;
+						}
+					const int drop = kDunWallRows - 1 - y1;
+					if (drop > 0)
+						for (int y = kDunWallRows - 1; y >= 0; y--)
+							for (int x = 0; x < kDunTexSize; x++)
+								img[y * kDunTexSize + x] = y - drop >= 0 ? img[(y - drop) * kDunTexSize + x] : Rgba{0, 0, 0, 0};
+				}
+			}
 			// Une image (une maison au bout d'un chemin, l'entrée d'une autre région) : le jeu la montre
 			// au loin, petite au milieu du mur ; ici, de près, elle couvre tout le mur.
 			if (picture && out.kind[t] == kWallFace) {

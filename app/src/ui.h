@@ -121,6 +121,10 @@ struct UiFrameInput {
 	bool wristValid = false;
 	Vec3 wristPos = {0, 0, 0};
 	Quat wristRot = {0, 0, 0, 1};
+	// Paume droite (manette droite, visée) : le repos (ZZZ) y apparaît quand on la tourne vers soi.
+	bool palmValid = false;
+	Vec3 palmPos = {0, 0, 0};
+	Quat palmRot = {0, 0, 0, 1};
 	Vec3 headPos = {0, 0, 0}, headDir = {0, 0, -1};
 	// Zone à mettre en valeur dans la fenêtre du groupe (pixels de l'image du jeu ; largeur 0 = aucune) :
 	// le personnage choisi pour les boutons d'attaque et de magie.
@@ -184,6 +188,7 @@ struct UiFrameOutput {
 	int action = kUiActionNone;
 	int invSlot = -1;      // la case d'inventaire cliquée (0..47)
 	bool invSort = false;  // le bouton de tri a été cliqué
+	bool restClick = false;      // le repos (ZZZ) de la paume droite cliqué : un clic sur le bouton du jeu
 	bool gearMenuOpened = false; // le joueur a ouvert le menu du poignet (l'invitation peut disparaître)
 	bool clicked = false;
 	int pokeHand = -1;         // une touche du clavier touchée du doigt (la main, pour vibrer)

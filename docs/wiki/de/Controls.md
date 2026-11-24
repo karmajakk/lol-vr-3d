@@ -13,14 +13,15 @@
 | Y | Karte |
 | **X** | **Rechtsklick**, wohin du zielst: Trank trinken, Gegenstand benutzen |
 | Menütaste (linker Controller) | ScummVM-Menü: speichern, laden, beenden |
-| **Diskette am linken Handgelenk** | Das Spielmenü (laden, speichern, Sprache …), und darin „VR-Optionen“: VR-Modus, Ansicht, Atlas, Steuerung und Tasten |
+| **Diskette auf dem linken Handrücken** | Das Spielmenü (laden, speichern, Sprache …), und darin „VR-Optionen“: VR-Modus, Ansicht, Atlas, Steuerung und Tasten |
+| **ZZZ auf der rechten Handfläche** | Dreh die rechte Handfläche zu dir: Der Rast-Knopf erscheint darauf; klicke ihn mit der linken Hand an, um zu rasten (Fenster-Oberfläche) |
 | Rechten Stick klicken | Bildschirm, Raum und Fenster vor dir neu ausrichten. Bei offenen Zauberstufen: nächste Stufe |
 | Linken Stick kurz klicken (L3) | Klassisch und Mixed Reality: nächste Ansicht (Großbild → Fenster → 486er-PC) |
 | Linken Stick gedrückt halten + rechter Stick | Auf/ab: Bildschirmgröße; links/rechts: Abstand |
 
 ## Die Diskette am Handgelenk, die VR-Optionen
 
-Schau auf deine linke Hand: Eine kleine Diskette erscheint darüber, wie der Optionsknopf des Spiels (der nicht mehr im Gruppenfenster ist). Beim ersten Start weisen dich ein Hinweis unter deinem Blick und ein leichtes Vibrieren des linken Controllers darauf hin, bis du sie einmal anklickst. Klicke sie mit dem Abzug der rechten Hand an: Das Spielmenü öffnet sich (laden, speichern, ein Spiel löschen, Spiel- und Toneinstellungen, beenden). Klicke erneut auf die Diskette, um es zu schließen.
+Dreh deine linke Hand und schau auf den Handrücken, wie beim Blick auf die Uhr: Eine kleine Diskette erscheint darauf, wie der Optionsknopf des Spiels (der nicht mehr im Gruppenfenster ist). Beim ersten Start weisen dich ein Hinweis unter deinem Blick und ein leichtes Vibrieren des linken Controllers darauf hin, bis du sie einmal anklickst. Klicke sie mit dem Abzug der rechten Hand an: Das Spielmenü öffnet sich (laden, speichern, ein Spiel löschen, Spiel- und Toneinstellungen, beenden). Klicke erneut auf die Diskette, um es zu schließen.
 
 Unten in diesem Menü, links von „Resume game“, öffnet **VR-Optionen** die Einstellungen des Headsets vor dir, angeordnet wie die Optionen des Spiels (die Einstellung links, ihr Wert auf einem Knopf):
 

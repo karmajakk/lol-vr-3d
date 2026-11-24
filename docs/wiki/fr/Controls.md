@@ -13,14 +13,15 @@
 | Y | Carte |
 | **X** | **Clic droit** là où tu vises : boire une potion, utiliser un objet |
 | Bouton menu (manette gauche) | Menu de ScummVM : sauvegarder, charger, quitter |
-| **Disquette au poignet gauche** | Le menu du jeu (charger, sauvegarder, langue…), et dedans « Réglages VR » : mode VR, vue, atlas, manettes et boutons |
+| **Disquette sur le dessus de la main gauche** | Le menu du jeu (charger, sauvegarder, langue…), et dedans « Réglages VR » : mode VR, vue, atlas, manettes et boutons |
+| **ZZZ sur la paume droite** | Tourne ta paume droite vers toi : le bouton du repos y apparaît ; clique-le avec la main gauche pour te reposer (interface en fenêtres) |
 | Clic du joystick droit | Recentrer l'écran, la pièce et les fenêtres devant toi. Niveaux de sort ouverts : niveau suivant |
 | Clic court du joystick gauche (L3) | Classique et réalité mixte : vue suivante (grand écran → fenêtres → PC 486) |
 | Clic du joystick gauche tenu + joystick droit | Haut/bas : taille de l'écran ; gauche/droite : distance |
 
 ## La disquette du poignet, les réglages VR
 
-Regarde ta main gauche : une petite disquette apparaît au-dessus, comme le bouton des options du jeu (qui n'est plus dans la fenêtre du groupe). Au premier lancement, une note sous ton regard et une légère vibration de la manette gauche te la montrent, jusqu'à ce que tu cliques dessus une fois. Clique dessus avec la gâchette de la main droite : le menu du jeu s'ouvre (charger, sauvegarder, effacer une partie, options de jeu et du son, quitter). Clique de nouveau sur la disquette pour le fermer.
+Tourne ta main gauche et regarde le dessus, comme pour lire l'heure : une petite disquette y apparaît (pas quand la main repose sur tes genoux), comme le bouton des options du jeu (qui n'est plus dans la fenêtre du groupe). Au premier lancement, une note sous ton regard et une légère vibration de la manette gauche te la montrent, jusqu'à ce que tu cliques dessus une fois. Clique dessus avec la gâchette de la main droite : le menu du jeu s'ouvre (charger, sauvegarder, effacer une partie, options de jeu et du son, quitter). Clique de nouveau sur la disquette pour le fermer.
 
 En bas de ce menu, à gauche de « Resume game », **Réglages VR** ouvre devant toi les réglages du casque, disposés comme les options du jeu (le réglage à gauche, sa valeur sur un bouton) :
 
