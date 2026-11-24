@@ -5,10 +5,10 @@
 | Manette | Action |
 |---|---|
 | Viser + gâchette | Clic gauche (la main qui clique devient le pointeur) |
-| Viser + poignée | Clic droit |
+| Viser + poignée (main droite) | Clic droit |
 | Joystick gauche | Avancer, reculer, pas de côté (une direction à la fois). En mode immersif, par rapport à ton regard |
 | Joystick droit (gauche/droite) | Tourner |
-| Joystick droit (haut/bas) | Dans le donjon : personnage suivant / précédent |
+| **Poignée gauche** | Dans le donjon : **personnage suivant** (quand la main droite vise ; si la main gauche est ton pointeur, sa poignée reste un clic droit) |
 | A | Dans le donjon : **attaquer** avec le personnage choisi. Ailleurs : Entrée |
 | B | Dans le donjon : ouvrir les **niveaux du sort** du personnage choisi, puis B à nouveau **lance** le niveau en surbrillance. Ailleurs : Échap (passer une cinématique) |
 | Y | Carte |
@@ -32,7 +32,7 @@ En bas de ce menu, à gauche de « Resume game », **Réglages VR** ouvre devant
   - **Profil** `<` `>` : choisis un profil (il sert aussitôt). **Classique**, celui par défaut, est toujours là et ne peut être ni changé ni supprimé.
   - A, B, X, Y, la poignée et les deux clics des joysticks : clique sur une action pour passer à la suivante (la flèche de gauche revient en arrière) : attaquer, magie, clic droit, carte, recentrer, vue, Entrée, Échap, fenêtre de l'atlas, personnage suivant, clavier ou rien. Les boutons marchent ainsi tout de suite.
   - **Enregistrer** (tes profils), **Nouveau profil** (tape un nom au clavier, Entrée enregistre), **Supprimer**, **Retour**. Ce qui n'est pas enregistré est oublié quand le panneau se ferme.
-  - La gâchette, les joysticks (marcher, tourner, changer de personnage), le bouton menu et la disquette ne changent jamais.
+  - La gâchette, les joysticks (marcher, tourner), la poignée gauche (personnage suivant), le bouton menu et la disquette ne changent jamais.
 - **Crédits et prérequis** : un petit mot sur ce qui fait tourner le mod et sur qui l'a rendu possible (aussi dans la fenêtre du premier lancement).
 - **Fermer**.
 

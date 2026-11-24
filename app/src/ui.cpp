@@ -1040,7 +1040,7 @@ void Ui::Impl::renderHelp() {
 		line(tr(L, "Aim + trigger", "Viser + gâchette", "Zielen + Abzug"), tr(L, "left click", "clic gauche", "Linksklick")),
 		line(tr(L, "Left stick", "Joystick gauche", "Linker Stick"), tr(L, "walk where you look", "marcher là où l'on regarde", "dorthin gehen, wohin du schaust")),
 		line(tr(L, "Right stick (sideways)", "Joystick droit (côtés)", "Rechter Stick (seitlich)"), tr(L, "turn", "tourner", "drehen")),
-		line(tr(L, "Right stick (up/down)", "Joystick droit (haut/bas)", "Rechter Stick (hoch/runter)"), tr(L, "change character", "changer de personnage", "Figur wechseln")),
+		line(tr(L, "Left grip", "Poignée gauche", "Linker Griff"), tr(L, "next character", "personnage suivant", "nächste Figur")),
 		line(tr(L, "Menu button (left)", "Bouton menu (gauche)", "Menütaste (links)"), tr(L, "save, load, quit", "sauver, charger, quitter", "speichern, laden, beenden")),
 		line(tr(L, "Floppy on the back of the left hand", "Disquette (dessus de la main gauche)", "Diskette (linker Handrücken)"), tr(L, "game menu, VR controls", "menu du jeu, réglages VR", "Spielmenü, VR-Optionen")),
 		line(tr(L, "Brass bar + hold trigger", "Barrette + gâchette tenue", "Messingleiste + Abzug halten"), tr(L, "move a window", "déplacer une fenêtre", "Fenster verschieben")),

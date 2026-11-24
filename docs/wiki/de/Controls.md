@@ -5,10 +5,10 @@
 | Controller | Aktion |
 |---|---|
 | Zielen + Abzug | Linksklick (die Hand, die klickt, wird zum Zeiger) |
-| Zielen + Griff | Rechtsklick |
+| Zielen + Griff (rechte Hand) | Rechtsklick |
 | Linker Stick | Vorwärts, rückwärts, seitwärts (eine Richtung auf einmal). Im immersiven Modus relativ zu deinem Blick |
 | Rechter Stick (links/rechts) | Drehen |
-| Rechter Stick (auf/ab) | Im Dungeon: nächste / vorige Figur |
+| **Linker Griff** | Im Dungeon: **nächste Figur** (wenn die rechte Hand zielt; ist die linke Hand dein Zeiger, bleibt ihr Griff ein Rechtsklick) |
 | A | Im Dungeon: **angreifen** mit der gewählten Figur. Sonst: Eingabe |
 | B | Im Dungeon: die **Zauberstufen** der gewählten Figur öffnen, dann wirkt B noch einmal die hervorgehobene Stufe. Sonst: Esc (Zwischensequenz überspringen) |
 | Y | Karte |
@@ -32,7 +32,7 @@ Unten in diesem Menü, links von „Resume game“, öffnet **VR-Optionen** die 
   - **Profil** `<` `>`: wähle ein Profil (es gilt sofort). **Klassisch**, die Vorgabe, ist immer da und lässt sich weder ändern noch löschen.
   - A, B, X, Y, der Griff und die beiden Stick-Klicks: klicke auf eine Aktion, um zur nächsten zu wechseln (der linke Pfeil geht zurück): Angriff, Magie, Rechtsklick, Karte, Zentrieren, Ansicht, Eingabe, Esc, Atlas-Fenster, nächste Figur, Tastatur oder nichts. Die Tasten gehen sofort so.
   - **Speichern** (eigene Profile), **Neues Profil** (Namen tippen, Eingabe speichert), **Löschen**, **Zurück**. Nicht Gespeichertes wird beim Schließen verworfen.
-  - Abzug, Sticks (gehen, drehen, Figur wechseln), Menütaste und Diskette bleiben immer gleich.
+  - Abzug, Sticks (gehen, drehen), linker Griff (nächste Figur), Menütaste und Diskette bleiben immer gleich.
 - **Credits & Voraussetzungen**: ein kurzer Hinweis, worauf die Mod läuft und wer sie möglich gemacht hat (auch im Fenster beim ersten Start).
 - **Schließen**.
 

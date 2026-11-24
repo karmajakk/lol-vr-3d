@@ -5,10 +5,10 @@
 | Controller | Action |
 |---|---|
 | Aim + trigger | Left click (the hand that clicks becomes the pointer) |
-| Aim + grip | Right click |
+| Aim + grip (right hand) | Right click |
 | Left stick | Walk forward, back, strafe (one direction at a time). In immersive mode, relative to where you look |
 | Right stick (left/right) | Turn |
-| Right stick (up/down) | In the dungeon: next / previous character |
+| **Left grip** | In the dungeon: **next character** (when the right hand aims; if the left hand is your pointer, its grip stays a right click) |
 | A | In the dungeon: **attack** with the selected character. Elsewhere: Enter |
 | B | In the dungeon: open the selected character's **spell levels**, then press B again to **cast** the highlighted level. Elsewhere: Escape (skip a cutscene) |
 | Y | Map |
@@ -31,7 +31,7 @@ At the bottom of that menu, left of "Resume game", **VR controls** opens the hea
   - **Profile** `<` `>`: choose a profile (it is used at once). **Classic**, the default, is always there and cannot be changed or deleted.
   - A, B, X, Y, the grip and the two stick clicks: click an action to switch to the next one (the left arrow goes back): attack, magic, right click, map, recenter, view, Enter, Escape, atlas window, next character, keyboard or nothing. The buttons work that way right away.
   - **Save** (your own profiles), **Save as new** (type a name on the keyboard, Enter saves), **Delete**, **Back**. Changes not saved are dropped when the panel closes.
-  - The trigger, the sticks (walk, turn, change character), the menu button and the floppy always stay the same.
+  - The trigger, the sticks (walk, turn), the left grip (next character), the menu button and the floppy always stay the same.
 - **Credits & Requirements**: a short note on what the mod runs on and who made it possible (also on the first-launch window).
 - **Close**.
 

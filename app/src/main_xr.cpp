@@ -2507,14 +2507,19 @@ void updateInput(App &app, XrTime time, float dt, double now) {
 			app.aimPose[h] = loc.pose;
 	}
 
-	// Gâchette = clic gauche, poignée = clic droit. La main qui clique devient le pointeur.
+	// Gâchette = clic gauche, poignée = clic droit. La main qui clique devient le pointeur. La
+	// poignée gauche, quand la main droite vise : le personnage suivant (pas un clic).
 	bool clicked[2] = {false, false};
+	bool leftGripChar = false;
 	for (int h = 0; h < 2; h++) {
 		app.triggerValue[h] = getFloat(app, app.triggerAction, h);
 		app.squeezeValue[h] = getFloat(app, app.squeezeAction, h);
 		bool trigger = threshold(app.triggerDown[h], app.triggerValue[h]);
 		bool squeeze = threshold(app.squeezeDown[h], app.squeezeValue[h]);
-		bool pressedNow = (trigger && !app.triggerDown[h]) || (squeeze && !app.squeezeDown[h]);
+		const bool gripChar = h == kLeft && app.activeHand != kLeft;
+		if (gripChar && squeeze && !app.squeezeDown[h])
+			leftGripChar = true;
+		bool pressedNow = (trigger && !app.triggerDown[h]) || (squeeze && !app.squeezeDown[h] && !gripChar);
 		int other = 1 - h;
 		if (pressedNow && app.aimValid[h] && !app.triggerDown[other] && !app.squeezeDown[other])
 			app.activeHand = h;
@@ -2755,13 +2760,13 @@ void updateInput(App &app, XrTime time, float dt, double now) {
 			pulse(app, kRight, 0.20f, 0.02f);
 		}
 		app.r3Down = r3;
-		bool flick = !stickBusy && fabsf(right.y) > 0.75f && fabsf(right.x) < 0.40f;
-		if ((flick && !app.charFlick) || fnPressed[lolvr::kFnNextChar]) {
-			int step = !flick || right.y < 0 ? 1 : app.characters - 1; // vers le bas : le suivant
-			app.selectedChar = (app.selectedChar + step) % app.characters;
-			pulse(app, kRight, 0.30f, 0.02f);
+		// Le personnage suivant : la poignée gauche (ou un bouton qui le fait dans le profil). Le
+		// joystick droit vers le haut ou le bas ne le fait plus (il partait en plein combat).
+		if (leftGripChar || fnPressed[lolvr::kFnNextChar]) {
+			app.selectedChar = (app.selectedChar + 1) % app.characters;
+			pulse(app, leftGripChar ? kLeft : kRight, 0.30f, 0.02f);
 		}
-		app.charFlick = flick || (app.charFlick && fabsf(right.y) > 0.45f);
+		app.charFlick = false;
 	} else {
 		app.charFlick = false;
 	}
