@@ -121,4 +121,7 @@ publiées. Pour utiliser ce mod, tu dois fournir ta propre copie, obtenue légal
 
 ## Licence
 
-GPL-3.0, comme ScummVM (voir `COPYING`).
+GPL-3.0, comme ScummVM (voir `COPYING`). Les composants tiers (ScummVM, chargeur OpenXR, colle
+Android du NDK, stb_image, police DejaVu) et leurs licences sont listés dans
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) (en anglais) ; les textes sont aussi dans l'APK
+(`assets/licenses/`).

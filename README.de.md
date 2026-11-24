@@ -124,4 +124,7 @@ Spieldateien. Um diese Mod zu nutzen, brauchst du deine eigene, legal erworbene 
 
 ## Lizenz
 
-GPL-3.0, wie ScummVM (siehe `COPYING`).
+GPL-3.0, wie ScummVM (siehe `COPYING`). Die Fremdkomponenten (ScummVM, OpenXR-Loader,
+Android-NDK-Glue, stb_image, DejaVu-Schrift) und ihre Lizenzen stehen in
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) (auf Englisch); die Texte liegen auch im APK
+(`assets/licenses/`).

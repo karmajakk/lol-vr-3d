@@ -3,6 +3,14 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.41.1] — Licenses
+
+- Third-party components and their licenses listed in `THIRD_PARTY_NOTICES.md`; the license
+  texts (project, ScummVM, OpenXR loader, Android NDK glue, DejaVu font) are packaged in the APK
+  under `assets/licenses/`.
+- Credits: ScummVM only (no code or data from other projects is used; the format notes remain
+  cited in the README).
+
 ## [0.41.0] — Wrist watches
 
 - The floppy and the rest button (ZZZ) are now **watches on the wrists**, always there: left

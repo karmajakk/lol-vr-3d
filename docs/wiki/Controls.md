@@ -35,7 +35,7 @@ At the bottom of that menu, left of "Resume game", **VR controls** opens the hea
 - **Credits & Requirements**: a short note on what the mod runs on and who made it possible (also on the first-launch window).
 - **Close**.
 
-At the bottom: "Made possible by ScummVM & KForestland" ([lands-of-lore-1-re](https://github.com/KForestland/lands-of-lore-1-re)).
+At the bottom: "Runs on ScummVM - thanks to its team"; the licenses of the third-party components are in [THIRD_PARTY_NOTICES.md](../../THIRD_PARTY_NOTICES.md).
 
 The app speaks the language chosen in the game's own options ("Language is" in Game controls): English, French or German.
 

@@ -955,9 +955,9 @@ static const char *requirementsText(int lang) {
 	          "Inoffizielles, nicht kommerzielles Fanprojekt. Nicht mit Electronic Arts, Westwood Studios oder Virgin Interactive verbunden oder von ihnen unterstützt. Erfordert legal erworbene Originalspieldateien (z. B. die GOG-Version).");
 }
 static const char *creditsText(int lang) {
-	return tr(lang, "This VR mod runs on ScummVM and was made possible thanks to the hard work of KForestland (lands-of-lore-1-re).",
-	          "Ce mod VR fonctionne avec ScummVM et a été rendu possible grâce au travail acharné de KForestland (lands-of-lore-1-re).",
-	          "Diese VR-Mod läuft mit ScummVM und wurde dank der harten Arbeit von KForestland (lands-of-lore-1-re) möglich.");
+	return tr(lang, "This VR mod runs on ScummVM, thanks to the hard work of its team.",
+	          "Ce mod VR fonctionne avec ScummVM, grâce au travail acharné de son équipe.",
+	          "Diese VR-Mod läuft mit ScummVM, dank der harten Arbeit seines Teams.");
 }
 
 // Premier lancement : vue classique ou mode immersif.
@@ -1291,7 +1291,7 @@ void Ui::Impl::renderMenu() {
 	{
 		cv.rect(12, kMenuH - kMenuFootH + 2, kMenuW - 12, kMenuH - kMenuFootH + 3, kDark);
 		cv.rect(12, kMenuH - kMenuFootH + 3, kMenuW - 12, kMenuH - kMenuFootH + 4, kLight);
-		const std::string t = latin1(tr(L, "Made possible by ScummVM & KForestland", "Ce mod est possible grâce à ScummVM et KForestland", "Möglich gemacht durch ScummVM & KForestland"));
+		const std::string t = latin1(tr(L, "Runs on ScummVM - thanks to its team", "Fonctionne avec ScummVM - merci à son équipe", "Läuft mit ScummVM - danke an sein Team"));
 		cv.gcenter(t, 0, kMenuW, kMenuH - kMenuFootH + 9, 1, kPale);
 		const std::string u = latin1(tr(L, "Unofficial fan project, not affiliated with EA, Westwood or Virgin", "Projet de fan non officiel, non affilié à EA, Westwood ou Virgin", "Inoffizielles Fanprojekt, nicht mit EA, Westwood oder Virgin verbunden"));
 		cv.gcenter(u, 0, kMenuW, kMenuH - kMenuFootH + 22, 1, kPale);

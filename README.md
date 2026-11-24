@@ -104,11 +104,9 @@ without the headset, see [scripts/dev](scripts/dev/README.md).
 
 ## Thanks
 
-To the [ScummVM](https://www.scummvm.org/) team, whose engine runs the game, and to
-[KForestland](https://github.com/KForestland) for
-[lands-of-lore-1-re](https://github.com/KForestland/lands-of-lore-1-re), the documentation of the
-game's formats this mod relies on. Thanks for their hard work. (Also in "VR controls", under
-"Credits & Requirements", and on the first-launch window.)
+To the [ScummVM](https://www.scummvm.org/) team, whose engine runs the game. Thanks for their
+hard work. (Also in "VR controls", under "Credits & Requirements", and on the first-launch
+window.)
 
 ## Disclaimer
 
@@ -122,4 +120,7 @@ version available on GOG.com).
 
 ## License
 
-GPL-3.0, like ScummVM (see `COPYING`).
+GPL-3.0, like ScummVM (see `COPYING`). Third-party components (ScummVM, OpenXR loader, Android
+NDK glue, stb_image, DejaVu font) and their licenses are listed in
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md); the texts are also inside the APK
+(`assets/licenses/`).

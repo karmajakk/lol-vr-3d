@@ -36,7 +36,7 @@ Unten in diesem Menü, links von „Resume game“, öffnet **VR-Optionen** die 
 - **Credits & Voraussetzungen**: ein kurzer Hinweis, worauf die Mod läuft und wer sie möglich gemacht hat (auch im Fenster beim ersten Start).
 - **Schließen**.
 
-Ganz unten: „Möglich gemacht durch ScummVM & KForestland“ ([lands-of-lore-1-re](https://github.com/KForestland/lands-of-lore-1-re)).
+Ganz unten: „Läuft mit ScummVM - danke an sein Team“; die Lizenzen der Fremdkomponenten stehen in [THIRD_PARTY_NOTICES.md](../../../THIRD_PARTY_NOTICES.md).
 
 Die App spricht die Sprache, die in den Optionen des Spiels gewählt ist („Language is“ unter Game controls): Englisch, Französisch oder Deutsch.
 

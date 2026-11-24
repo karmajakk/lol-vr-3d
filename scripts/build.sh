@@ -114,6 +114,11 @@ cp "$SCUMMVM"/dists/engine-data/kyra.dat "$SCUMMVM"/dists/engine-data/fonts.dat 
 
 "$BUILD_TOOLS/aapt2" link -o "$BUILD/base.apk" --manifest "$ROOT/android/AndroidManifest.xml" -I "$PLATFORM_JAR" \
 	--version-code "$VERSION_CODE" --version-name "$VERSION_NAME"
+# Les licences : celle du projet, des composants tiers, et celles de ScummVM.
+mkdir -p "$APK_DIR/assets/licenses/scummvm"
+cp "$ROOT/COPYING" "$ROOT/THIRD_PARTY_NOTICES.md" "$ROOT"/LICENSES/*.txt "$APK_DIR/assets/licenses/"
+cp "$SCUMMVM/COPYRIGHT" "$SCUMMVM/AUTHORS" "$APK_DIR/assets/licenses/scummvm/"
+cp -r "$SCUMMVM/LICENSES" "$APK_DIR/assets/licenses/scummvm/"
 (cd "$APK_DIR" && zip -q -r "$BUILD/base.apk" lib assets)
 "$BUILD_TOOLS/zipalign" -f -p 4 "$BUILD/base.apk" "$BUILD/aligned.apk"
 "$BUILD_TOOLS/apksigner" sign --ks "$ROOT/keystore/debug.keystore" --ks-pass pass:android --key-pass pass:android \

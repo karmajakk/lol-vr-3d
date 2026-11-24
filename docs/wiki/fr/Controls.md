@@ -36,7 +36,7 @@ En bas de ce menu, à gauche de « Resume game », **Réglages VR** ouvre devant
 - **Crédits et prérequis** : un petit mot sur ce qui fait tourner le mod et sur qui l'a rendu possible (aussi dans la fenêtre du premier lancement).
 - **Fermer**.
 
-Tout en bas : « Ce mod est possible grâce à ScummVM et KForestland » ([lands-of-lore-1-re](https://github.com/KForestland/lands-of-lore-1-re)).
+Tout en bas : « Fonctionne avec ScummVM - merci à son équipe » ; les licences des composants tiers sont dans [THIRD_PARTY_NOTICES.md](../../../THIRD_PARTY_NOTICES.md).
 
 L'application parle la langue choisie dans les options du jeu (« Language is » dans Game controls) : anglais, français ou allemand.
 
