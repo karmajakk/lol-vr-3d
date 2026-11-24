@@ -59,10 +59,11 @@ void main() {
 		c *= (vShade - 2.0) * uLight;
 	} else {
 		// Comme dans le jeu : bien éclairé tout près, la pénombre gagne en trois ou quatre pas ;
-		// dans un lieu sombre, la lanterne dit jusqu'où l'on voit (éteinte : presque rien).
+		// dans un lieu sombre, la lanterne dit jusqu'où l'on voit (éteinte : une pénombre, au loin un
+		// reste de lueur, comme dans le jeu).
 		float k = clamp(1.15 - vDist / uReach, 0.0, 1.0);
 		k = k * k * (3.0 - 2.0 * k);
-		c *= vShade * uLight * mix(uReach < 4.0 ? 0.0 : 0.04, 1.0, k);
+		c *= vShade * uLight * mix(uReach < 5.5 ? 0.10 : 0.04, uReach < 5.5 ? 0.75 : 1.0, k);
 	}
 #ifdef MANUAL_SRGB
 	c = pow(c, vec3(1.0 / 2.2));

@@ -21,7 +21,7 @@
 
 ## Floppy on the wrist, VR controls
 
-Look at your left hand: a small floppy disk appears above it, like the game's options button (which is no longer in the party window). At first launch, a note under your gaze and a light buzz in the left controller point you to it, until you click it once. Click it with the right hand's trigger: the game's own menu opens (load, save, delete a game, game and audio controls, exit). Click the floppy again to close it.
+Turn your left hand to look at its back, as you would read a watch: a small floppy disk appears on it (not when the hand just rests in your lap), like the game's options button (which is no longer in the party window). At first launch, a note under your gaze and a light buzz in the left controller point you to it, until you click it once. Click it with the right hand's trigger: the game's own menu opens (load, save, delete a game, game and audio controls, exit). Click the floppy again to close it.
 
 At the bottom of that menu, left of "Resume game", **VR controls** opens the headset's settings in front of you, laid out like the game's options (setting on the left, its value on a button):
 

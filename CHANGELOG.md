@@ -3,6 +3,20 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.35.0] — Classic interface in immersive mode
+
+- **Classic interface** for the immersive mode (VR controls, "Interface": Windows or Classic): the
+  game's own bottom bar under the view, as in the original (messages, movement arrows, floppy and
+  rest, the characters, the item strip with its arrows), the compass column split in two at its
+  right (compass and atlas, lamp and purse). No inventory window in this interface.
+- The wrist floppy only appears when you turn your left hand to look at its back (like reading a
+  watch), no longer when the hand rests in your lap while seated.
+- Items lying on the floor are picked up from your block **or the one in front**, straight into the
+  hand when you aim at them (a more generous aim, no need to point at the floor), no longer by
+  looking for the game's pixels.
+- Dark places without oil in the lantern: a dim light as in the game (you still see the block in
+  front), no longer almost pitch black.
+
 ## [0.34.0] — Fixes from the caves
 
 - Items lying at your feet (the party's own block) can be picked by clicking on them.

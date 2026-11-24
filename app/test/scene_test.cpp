@@ -321,6 +321,33 @@ int main(int argc, char **argv) {
 			aimIn(2, 118, 255, 236, 266);
 			check(near(200, 131.5f), "à gauche : dessous, la ligne de messages");
 		}
+		// Mode immersif, interface classique : la barre du bas du jeu (384 x 79) sous la vue, la colonne
+		// de la boussole coupée en deux à sa droite ; plus de fenêtre d'inventaire.
+		{
+			ui.setDungeonOption(1);
+			ui.setHudClassic(true);
+			ui.update(in, o, tmp);
+			const SceneState::Panel bar = panel(0);
+			bool invShown = false;
+			for (int k = 0; k < SceneState::kMaxPanels; k++)
+				invShown |= tmp.panels[k].visible && tmp.panels[k].texW == 240 && tmp.panels[k].texH == 132;
+			check(!invShown && bar.visible && fabsf(bar.halfH / bar.halfW - 79.0f * 1.2f / 384.0f) < 0.01f && bar.center.y < in.screenPos.y - 0.2f,
+			      "interface classique : la barre du bas sous la vue, sans fenêtre d'inventaire");
+			aimIn(0, 200, 39, 384, 79);
+			check(near(200, 160), "interface classique : un personnage");
+			aimIn(0, 40, 30, 384, 79);
+			check(near(40, 151), "interface classique : les flèches de déplacement");
+			aimIn(0, 150, 68, 384, 79);
+			check(near(150, 189), "interface classique : la ligne d'objets du jeu");
+			aimIn(0, 336, 40, 384, 79);
+			check(near(304, 40), "interface classique : l'atlas, sous la boussole");
+			aimIn(0, 368, 50, 384, 79);
+			check(near(304, 104), "interface classique : la bourse, à droite");
+			ui.setHudClassic(false);
+			ui.update(in, o, tmp);
+			aimIn(0, 16, 53, 100, 148);
+			check(near(233, 160), "interface en fenêtres : les personnages reviennent à droite");
+		}
 		// Gâchette maintenue pour déplacer une fenêtre (plus de poignées) ; un appui bref reste un clic.
 		{
 			in.holdToMove = true;
@@ -645,7 +672,8 @@ int main(int argc, char **argv) {
 			in.helpOpen = false;
 			// Menu du poignet : l'engrenage n'apparaît que si l'on regarde la main gauche
 			in.wristValid = true;
-			in.wristPos = {-0.25f, 0.95f, -0.35f};
+			in.wristPos = {-0.20f, 0.90f, -0.30f};
+			in.wristRot = {0.0f, 0.0f, -0.70710678f, 0.70710678f}; // la main tournée : le dessus vers le haut
 			in.headPos = seat;
 			in.headDir = {0, 0, -1};
 			ui.update(in, o, tmp);
@@ -657,7 +685,18 @@ int main(int argc, char **argv) {
 			int withHint = 0;
 			for (int i = 0; i < SceneState::kMaxPanels; i++) withHint += tmp.panels[i].visible ? 1 : 0;
 			check(withHint == shown + 1, "premier lancement : l'invitation à regarder la main gauche est affichée");
-			in.headDir = normalize(in.wristPos + Vec3{0, 0.075f, 0.06f} - in.headPos);
+			// La main posée (tenue comme au repos, assis) : regardée, pas de disquette
+			{
+				UiFrameInput rest = in;
+				rest.wristRot = {0, 0, 0, 1};
+				rest.headDir = normalize(rest.wristPos + rotate(rest.wristRot, kWristFloppy) - rest.headPos);
+				rest.gearHint = false;
+				ui.update(rest, o, tmp);
+				int restShown = 0;
+				for (int i = 0; i < SceneState::kMaxPanels; i++) restShown += tmp.panels[i].visible ? 1 : 0;
+				check(restShown == shown, "poignet : la main au repos (le dessus de côté), pas de disquette même regardée");
+			}
+			in.headDir = normalize(in.wristPos + rotate(in.wristRot, kWristFloppy) - in.headPos);
 			ui.update(in, o, tmp);
 			int shown2 = 0, gear = -1;
 			for (int i = 0; i < SceneState::kMaxPanels; i++)
@@ -684,8 +723,8 @@ int main(int argc, char **argv) {
 				if (tmp.panels[i].visible) { shown4++; menu = i; }
 			SceneState::Panel m = tmp.panels[menu];
 			check(shown4 >= shown + 1 && m.center.z < in.headPos.z - 0.4f && fabsf(m.center.x - in.headPos.x) < 0.05f, "réglages VR : la fenêtre s'ouvre devant le joueur");
-			int rows = 5; // mode immersif : titre, mode VR, manettes, crédits, fermer
-			check(fabsf(m.halfH / m.halfW - (5.0f * 44.0f + 38.0f) / 360.0f) < 0.01f, "réglages VR : mode immersif, pas de ligne « écran du jeu »");
+			int rows = 6; // mode immersif : titre, mode VR, interface, manettes, crédits, fermer
+			check(fabsf(m.halfH / m.halfW - (6.0f * 44.0f + 38.0f) / 360.0f) < 0.01f, "réglages VR : mode immersif, six lignes (l'interface à la place de la vue)");
 			auto row = [&](int r) { return m.center + m.up * ((1.0f - 2.0f * (r + 0.5f) * 44.0f / (44.0f * rows + 38.0f)) * m.halfH); };
 			in.tip = in.headPos + Vec3{0.15f, -0.15f, 0.0f};
 			auto click = [&](int r) {
@@ -699,7 +738,10 @@ int main(int argc, char **argv) {
 			};
 			UiFrameOutput c1 = click(1);
 			check(c1.action == kUiActionToggleDungeon && !c1.buttonsToGame, "réglages VR : première ligne, le mode VR suivant");
-			check(click(2).action == kUiActionToggleHelp, "réglages VR (immersif) : deuxième ligne, les manettes");
+			check(click(2).action == kUiActionToggleHud, "réglages VR (immersif) : deuxième ligne, l'interface (fenêtres ou classique)");
+			ui.openMenu();
+			ui.update(in, o, tmp);
+			check(click(3).action == kUiActionToggleHelp, "réglages VR (immersif) : troisième ligne, les manettes");
 			ui.setDungeonOption(0);
 			ui.setVrState(1, 0);
 			ui.openMenu();
@@ -869,11 +911,12 @@ int main(int argc, char **argv) {
 		if (sh.mode == 5) {
 			// La main gauche levée devant le visage, l'engrenage puis le menu
 			st.hands[0].pos = {-0.10f, 1.08f, -0.42f};
+			st.hands[0].rot = {0.0f, 0.0f, -0.70710678f, 0.70710678f}; // le dessus de la main vers soi
 			in.wristValid = true;
 			in.wristPos = st.hands[0].pos;
 			in.wristRot = st.hands[0].rot;
 			in.headPos = sh.eye;
-			in.headDir = normalize(in.wristPos - in.headPos);
+			in.headDir = normalize(in.wristPos + rotate(in.wristRot, kWristFloppy) - in.headPos);
 		}
 		in.gearHint = sh.mode == 6;
 		if (sh.mode == 6) {
@@ -887,7 +930,7 @@ int main(int argc, char **argv) {
 		UiFrameOutput uo;
 		if (sh.mode == 5) {
 			UiFrameInput click = in;
-			click.dir = normalize(in.wristPos + rotate(in.wristRot, {0.0f, 0.075f, 0.06f}) - in.tip);
+			click.dir = normalize(in.wristPos + rotate(in.wristRot, kWristFloppy) - in.tip);
 			click.triggerDown = click.triggerPressed = true;
 			ui.update(click, uo, st);
 			if (!uo.clicked) { // refermé par une prise précédente : on rouvre

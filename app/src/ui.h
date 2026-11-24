@@ -31,8 +31,11 @@ struct UiPlacement {
 // Vue du donjon seule : hauteur et décalage vers le haut, en fractions de la largeur de l'image entière.
 const float kSplitViewHeight = 0.54f;
 const float kSplitViewLift = 0.16f;
+// La disquette du poignet, dans le repère de la manette gauche (visée) : sur le dessus de la main
+// (-X : le dos de la main gauche), vers le poignet (+Z).
+const Vec3 kWristFloppy = {-0.045f, 0.0f, 0.06f};
 
-enum UiAction { kUiActionNone = 0, kUiActionToggleFire, kUiActionToggleDetach, kUiActionResetLayout, kUiActionCloseKeyboard, kUiActionToggleHelp, kUiActionCloseHelp, kUiActionToggleLanguage, kUiActionToggleKeyboard, kUiActionToggleDungeon, kUiActionToggleScreenAlways, kUiActionChooseClassic, kUiActionChooseImmersive, kUiActionGameMenu, kUiActionCycleView, kUiActionChooseLanguage, kUiActionToggleAtlas, kUiActionOpenKeyboard, kUiActionAtlasPrev, kUiActionAtlasNext };
+enum UiAction { kUiActionNone = 0, kUiActionToggleFire, kUiActionToggleDetach, kUiActionResetLayout, kUiActionCloseKeyboard, kUiActionToggleHelp, kUiActionCloseHelp, kUiActionToggleLanguage, kUiActionToggleKeyboard, kUiActionToggleDungeon, kUiActionToggleScreenAlways, kUiActionChooseClassic, kUiActionChooseImmersive, kUiActionGameMenu, kUiActionCycleView, kUiActionChooseLanguage, kUiActionToggleAtlas, kUiActionOpenKeyboard, kUiActionAtlasPrev, kUiActionAtlasNext, kUiActionToggleHud };
 
 // Les boutons qu'on peut changer dans un profil de manettes, et ce que chacun peut faire. La gâchette,
 // les joysticks (marcher, tourner), le bouton menu et la disquette restent fixes.
@@ -199,6 +202,10 @@ public:
 	void setOptions(bool fireOn, bool detached);
 	// Le donjon en 3D (menu du poignet) : 0 non, 1 oui avec l'écran au besoin, 2 oui avec l'écran toujours.
 	void setDungeonOption(int mode);
+	// Mode immersif : l'interface en fenêtres (0) ou classique (1, la barre du bas du jeu : les
+	// personnages, les flèches et la ligne d'objets d'origine), montrée dans les réglages VR.
+	void setHudClassic(bool classic);
+	bool hudClassic() const;
 	// Langue des textes (UiLanguage).
 	void setLanguage(int language);
 	// Deux lignes d'information affichées sous le clavier (Latin-1).
@@ -208,6 +215,8 @@ public:
 	bool loadGameFont(const std::string &gameDir);
 	// Disposition par défaut : autour de l'écran tel qu'il est placé à cet instant.
 	void resetLayout(const UiFrameInput &in);
+	// La fenêtre des personnages seule, à sa place par défaut (l'interface vient de changer).
+	void placeParty(const UiFrameInput &in);
 	// Les réglages VR (choisis dans le menu du jeu) : la fenêtre s'ouvre devant le joueur.
 	void openMenu();
 	// Le mode VR (0 immersif, 1 classique, 2 réalité mixte) et, hors immersif, la vue (0 grand écran,

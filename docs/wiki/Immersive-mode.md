@@ -16,3 +16,11 @@ The dungeon is rebuilt in true 3D around you, at real size, from your own game f
 Doors rise into their frame step by step, like in the game. Thrown items and projectiles fly through the dungeon at the height the game gives them.
 
 Switch to the classic view in "VR controls" (game menu, floppy on the left wrist): "VR mode", Classic or Mixed reality.
+
+## Classic interface
+
+In "VR controls" (game menu, floppy on the back of the left hand), "Interface" switches between **Windows** (the characters, the spellbook and the inventory each in their own window) and **Classic**: the game's own bottom bar under the view, as in the original — messages, movement arrows, floppy and rest, the characters, the item strip with its arrows — and the compass column (compass, atlas, lamp, purse) at its right. The bar can be moved and resized like any window.
+
+## Picking up items
+
+Aim at an item lying on your block or on the block in front of you and press the trigger: it goes straight into your hand. Items further away can't be reached, as in the game.

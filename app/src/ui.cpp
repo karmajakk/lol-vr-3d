@@ -362,6 +362,9 @@ struct Ui::Impl {
 	bool menuOpen = false;
 	bool menuAhead = false; // à placer devant le joueur à la prochaine image
 	int vrMode = 1, classicView = 0;
+	bool hudClassic = false, partyReplace = false;
+	bool classicBar() const { return hudClassic && dungeonMode; } // la barre du bas, comme dans le jeu
+	bool gearShown = false; // la disquette du poignet (un peu de marge pour qu'elle ne clignote pas)
 	// Le rappel « L3 change la vue », devant le joueur
 	bool noticeOpen = false, noticeAhead = false, noticeDirty = true;
 	int noticeKind = 0; // 0 : « L3 change la vue », 1 : crédits et prérequis
@@ -369,12 +372,12 @@ struct Ui::Impl {
 	void renderNotice();
 	Vec3 menuPos = {0, 0, 0}, menuRight = {1, 0, 0}, menuUp = {0, 1, 0};
 	int menuHot = -1;
-	// Mode immersif : pas de ligne « vue » (l'écran du jeu n'apparaît que quand il le faut).
-	// Lignes : le titre, le mode VR, la vue, l'atlas, les manettes, crédits et prérequis, fermer.
-	int menuRows() const { return dungeonMode ? 5 : 6; }
+	// Lignes : le titre, le mode VR, la vue (en mode immersif : l'interface), les manettes, crédits
+	// et prérequis, fermer.
+	int menuRows() const { return 6; }
 	// (dessous, sans bouton, les remerciements)
 	int menuH() const { return kMenuRowH * menuRows() + kMenuFootH; }
-	int menuItem(int row) const { return menuRows() == 5 && row >= 2 ? row + 1 : row; }
+	int menuItem(int row) const { return row; }
 	// Colonne du groupe recomposée
 	int chooserHot = -1; // bouton visé dans la fenêtre du choix de la vue
 	Composite comp[4];
@@ -620,7 +623,7 @@ void Ui::Impl::compose(int which, const UiFrameInput &in) {
 	Composite &c = comp[which];
 	const int n = in.characters < 0 ? 0 : in.characters > 4 ? 4 : in.characters;
 	const bool blank = in.compassBlank;
-	const int key = (which == kCompInv ? 1 : which == kCompParty ? n * 2 + (blank ? 1 : 0) : (spellsCollapsed ? 1 : 0) + language * 2 + (spellTabHot ? 4 : 0)) + (in.textBoxActive ? 64 : 0) + (in.spellsCovered ? 128 : 0);
+	const int key = (which == kCompInv ? 1 : which == kCompParty ? n * 2 + (blank ? 1 : 0) : (spellsCollapsed ? 1 : 0) + language * 2 + (spellTabHot ? 4 : 0)) + (in.textBoxActive ? 64 : 0) + (in.spellsCovered ? 128 : 0) + (classicBar() ? 256 : 0);
 	if (c.tex && in.gameSerial == c.serial && key == c.key)
 		return;
 	// Pendant une boîte de texte, les morceaux viennent de l'image d'avant ; sinon on la garde à jour.
@@ -656,6 +659,17 @@ void Ui::Impl::compose(int which, const UiFrameInput &in) {
 		c.pieces.push_back({0, 0, 237, 22, 83, 178, 237, 22});
 		c.w = 237;
 		c.h = 22;
+	} else if (which == kCompParty && classicBar()) {
+		// La barre du bas du jeu telle quelle (la ligne de messages, les flèches, la disquette et le
+		// repos, les personnages, la ligne d'objets avec ses flèches) ; à sa droite, la colonne de la
+		// boussole coupée en deux : la boussole et l'atlas, puis la lampe et la bourse.
+		c.texW = 384;
+		c.texH = 80;
+		c.pieces.push_back({0, 0, 320, 79, 0, 121, 320, 79});
+		c.pieces.push_back({320, 0, 32, 54, 288, 0, 32, 54});
+		c.pieces.push_back({352, 0, 32, 68, 288, 54, 32, 68});
+		c.w = 384;
+		c.h = 79;
 	} else if (which == kCompParty) {
 		for (int i = 0; i < n; i++)
 			c.pieces.push_back({0, i * 36, 66, 34, in.portraitX[i], 143, 66, 34});
@@ -673,9 +687,13 @@ void Ui::Impl::compose(int which, const UiFrameInput &in) {
 		}
 		// La ligne de messages pixel pour pixel : resserrée, elle perdait une colonne sur vingt (des
 		// morceaux de lettres, comme des fautes de frappe).
-		c.pieces.push_back({0, y, 236, 22, 82, 121, 236, 22});
+		// (interface classique : les messages sont dans la barre du bas)
+		if (!classicBar() || spellsCollapsed) {
+			c.pieces.push_back({0, y, 236, 22, 82, 121, 236, 22});
+			y += 22;
+		}
 		c.w = 236;
-		c.h = y + 22;
+		c.h = y;
 	}
 	c.px.assign((size_t)c.texW * c.texH * 4, 0);
 	for (int i = 0; i < c.texW * c.texH; i++) {
@@ -1024,7 +1042,7 @@ void Ui::Impl::renderHelp() {
 		line(tr(L, "Right stick (sideways)", "Joystick droit (côtés)", "Rechter Stick (seitlich)"), tr(L, "turn", "tourner", "drehen")),
 		line(tr(L, "Right stick (up/down)", "Joystick droit (haut/bas)", "Rechter Stick (hoch/runter)"), tr(L, "change character", "changer de personnage", "Figur wechseln")),
 		line(tr(L, "Menu button (left)", "Bouton menu (gauche)", "Menütaste (links)"), tr(L, "save, load, quit", "sauver, charger, quitter", "speichern, laden, beenden")),
-		line(tr(L, "Floppy on the left wrist", "Disquette (main gauche)", "Diskette (linke Hand)"), tr(L, "game menu, VR controls", "menu du jeu, réglages VR", "Spielmenü, VR-Optionen")),
+		line(tr(L, "Floppy on the back of the left hand", "Disquette (dessus de la main gauche)", "Diskette (linker Handrücken)"), tr(L, "game menu, VR controls", "menu du jeu, réglages VR", "Spielmenü, VR-Optionen")),
 		line(tr(L, "Brass bar + hold trigger", "Barrette + gâchette tenue", "Messingleiste + Abzug halten"), tr(L, "move a window", "déplacer une fenêtre", "Fenster verschieben")),
 		line(tr(L, "Corner + hold trigger", "Coin + gâchette tenue", "Ecke + Abzug halten"), tr(L, "resize", "agrandir, réduire", "Größe ändern")),
 		"",
@@ -1192,8 +1210,10 @@ void Ui::Impl::renderMenu() {
 	static const char *const modes[3][3] = {{"Immersive", "Classic", "Mixed reality"}, {"Immersif", "Classique", "Réalité mixte"}, {"Immersiv", "Klassisch", "Mixed Reality"}};
 	static const char *const views[3][3] = {{"Big screen", "Windows", "486 PC"}, {"Grand écran", "Fenêtres", "PC 486"}, {"Großbild", "Fenster", "486er-PC"}};
 	const int L = language, lg = L == kLangFrench ? 1 : L == kLangGerman ? 2 : 0, mode = dungeonMode ? 0 : vrMode, view = classicView < 0 || classicView > 2 ? 0 : classicView;
-	const char *names[2] = {tr(L, "VR mode", "Mode VR", "VR-Modus"), tr(L, "View (L3)", "Vue (L3)", "Ansicht (L3)")};
-	const char *values[2] = {modes[lg][mode < 0 || mode > 2 ? 1 : mode], views[lg][view]};
+	static const char *const huds[3][2] = {{"Windows", "Classic"}, {"Fenêtres", "Classique"}, {"Fenster", "Klassisch"}};
+	// Mode immersif : à la place de la vue, l'interface (les fenêtres ou la barre du bas du jeu).
+	const char *names[2] = {tr(L, "VR mode", "Mode VR", "VR-Modus"), dungeonMode ? tr(L, "Interface", "Interface", "Oberfläche") : tr(L, "View (L3)", "Vue (L3)", "Ansicht (L3)")};
+	const char *values[2] = {modes[lg][mode < 0 || mode > 2 ? 1 : mode], dungeonMode ? huds[lg][hudClassic ? 1 : 0] : views[lg][view]};
 	const int split = 196, th = Canvas::textH(2);
 	cv.gcenter(latin1(tr(L, "VR controls", "Réglages VR", "VR-Optionen")), 0, kMenuW, (kMenuRowH - th) / 2 + 2, 2, kWhite);
 	for (int r = 1; r < kMenuRows; r++) {
@@ -1286,7 +1306,7 @@ void Ui::Impl::renderHint() {
 				const int px = 16 + x * 3 - (pass ? 0 : 2), py = (kHintH - 48) / 2 + y * 3 + (pass ? 0 : 2);
 				cv.rect(px, py, px + 3, py + 3, col);
 			}
-	const std::string l1 = latin1(tr(language, "Look at your left hand:", "Regarde ta main gauche :", "Schau auf deine linke Hand:"));
+	const std::string l1 = latin1(tr(language, "Turn your left hand, look at its back:", "Tourne ta main gauche, regarde le dessus :", "Dreh die linke Hand, schau auf den Handrücken:"));
 	const std::string l2 = latin1(tr(language, "the floppy opens the game menu.", "la disquette ouvre le menu du jeu.", "die Diskette öffnet das Spielmenü."));
 	cv.gtext(l1, 80, 18, Canvas::fit(l1, kHintW - 92, 2), kWhite);
 	cv.gtext(l2, 80, 46, Canvas::fit(l2, kHintW - 92, 2), kGold);
@@ -1439,6 +1459,8 @@ void Ui::setDungeonOption(int mode) {
 	if (mode != d->dungeonMode) {
 		d->dungeonMode = mode;
 		d->menuDirty = true;
+		if (d->hudClassic && placed)
+			d->partyReplace = true; // (la barre du bas n'existe qu'en mode immersif)
 	}
 }
 
@@ -1530,6 +1552,49 @@ bool Ui::loadGameFont(const std::string &gameDir) {
 	return false;
 }
 
+void Ui::placeParty(const UiFrameInput &in) {
+	// Comme resetLayout : dans le plan de l'écran, autour de la vue du donjon.
+	const float fullW = in.fullW > 0.05f ? in.fullW : 0.05f;
+	const float viewH = kSplitViewHeight, viewW = viewH * 176.0f / 144.0f, viewY = kSplitViewLift;
+	const float frame = 0.092f * viewW, top = viewY + viewH * 0.5f, bottom = viewY - viewH * 0.5f;
+	auto set = [&](float x, float y, float scale) {
+		Vec3 c = in.basePos + rotate(in.screenRot, Vec3{x, y, 0.0f} * fullW);
+		Vec3 v = c - in.anchorPos;
+		float dist = clampf(length(v), 0.20f, 6.0f);
+		UiPlacement &pl = placement[kPanelParty];
+		pl.c = dist;
+		pl.b = clampf(asinf(clampf(v.y / dist, -1.0f, 1.0f)), -1.35f, 1.35f);
+		pl.a = wrapAngle(atan2f(-v.x, -v.z) - in.anchorYaw);
+		pl.scale = clampf(scale * fullW, 0.0004f, 0.02f);
+	};
+	const Composite &c = d->comp[kCompParty];
+	if (d->classicBar()) {
+		// La barre du bas du jeu, centrée sous la vue.
+		const float s = 0.0024f, hh = 79.0f * 1.2f * s * 0.5f;
+		set(0.0f, bottom - 0.03f - hh, s);
+	} else {
+		// À droite : les personnages, l'atlas, les options et le repos.
+		const float s = 0.0034f;
+		const float w = c.w && c.w < 200 ? (float)c.w : kSources[kPanelParty].w, h = c.w && c.w < 200 && c.h ? (float)c.h : kSources[kPanelParty].h;
+		set(viewW * 0.5f + frame + 0.035f + w * s * 0.5f, top - h * 1.2f * s * 0.5f, s);
+	}
+	// À côté des personnages : l'atlas.
+	d->placeAtlas(placement);
+}
+
+void Ui::setHudClassic(bool classic) {
+	if (classic != d->hudClassic) {
+		d->hudClassic = classic;
+		d->menuDirty = true;
+		d->comp[kCompParty].key = -1;
+		d->comp[kCompSpells].key = -1;
+		if (placed && d->dungeonMode)
+			d->partyReplace = true;
+	}
+}
+
+bool Ui::hudClassic() const { return d->hudClassic; }
+
 UiPlacement Ui::defaultHelpPlacement(float yaw) {
 	// Devant soi, à hauteur des yeux, bien lisible.
 	return {yaw, 0.03f, 1.05f, 0.0013f};
@@ -1562,14 +1627,10 @@ void Ui::resetLayout(const UiFrameInput &in) {
 	// le haut de la vue : ouvert ou replié, le livre garde ses messages au même endroit.
 	const float sSpells = 0.0018f, openH = (float)(kSpellTabH + 244 + 22) * 1.2f * sSpells;
 	set(kPanelSpells, -(viewW * 0.5f + frame + 0.035f + halfW(kPanelSpells, sSpells)), top - openH + halfH(kPanelSpells, sSpells), sSpells);
-	// À droite : les personnages, l'atlas, les options et le repos.
-	const float sParty = 0.0034f;
-	set(kPanelParty, viewW * 0.5f + frame + 0.035f + halfW(kPanelParty, sParty), top - halfH(kPanelParty, sParty), sParty);
+	placeParty(in);
 	// Dessous : l'inventaire.
 	const float sRow = 0.0026f;
 	set(kPanelInventory, 0.0f, bottom - frame - 0.045f - halfH(kPanelInventory, sRow), sRow);
-	// À droite des personnages : l'atlas.
-	d->placeAtlas(placement);
 
 	// Le clavier vient se poser devant soi, par-dessus le reste.
 	Vec3 v = in.basePos - in.anchorPos;
@@ -1693,8 +1754,16 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 	bool visible[kUiPanelCount];
 	for (int i = 0; i <= kPanelSpells; i++)
 		visible[i] = placed && in.split;
-	if (visible[kPanelParty])
+	if (d->classicBar()) // (la ligne d'objets est dans la barre du bas)
+		visible[kPanelInventory] = false;
+	if (visible[kPanelParty]) {
 		d->compose(kCompParty, in);
+		if (d->partyReplace) { // l'interface vient de changer : la fenêtre à sa place par défaut
+			d->partyReplace = false;
+			placeParty(in);
+			out.layoutChanged = true;
+		}
+	}
 	if (visible[kPanelInventory])
 		d->compose(kCompInv, in);
 	if (visible[kPanelSpells])
@@ -1818,14 +1887,17 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 		d->resize = -1;
 	}
 
-	// Menu du poignet : l'engrenage apparaît sur la main gauche quand on la regarde de près.
+	// Menu du poignet : la disquette apparaît sur le dessus de la main gauche, quand on la tourne vers
+	// soi (comme pour lire l'heure) et qu'on la regarde de près ; pas quand la main repose, assis.
 	bool gearVisible = false;
 	Quad gearQ, menuQ;
 	if (placed && in.wristValid) {
-		Vec3 c = in.wristPos + rotate(in.wristRot, {0.0f, 0.075f, 0.06f});
+		Vec3 c = in.wristPos + rotate(in.wristRot, kWristFloppy);
 		Vec3 v = c - in.headPos;
 		float dist = length(v);
-		if (dist > 0.12f && dist < 0.85f && dot(v * (1.0f / dist), in.headDir) > 0.86f) {
+		const bool was = d->gearShown; // (déjà là : un peu de marge, qu'elle ne clignote pas)
+		const float facing = dist > 1e-3f ? dot(rotate(in.wristRot, {-1.0f, 0.0f, 0.0f}), v * (-1.0f / dist)) : 0.0f;
+		if (dist > 0.12f && dist < (was ? 0.80f : 0.70f) && dot(v * (1.0f / dist), in.headDir) > (was ? 0.86f : 0.90f) && facing > (was ? 0.20f : 0.40f)) {
 			gearVisible = true;
 			Vec3 n = v * (-1.0f / dist);
 			Vec3 r = cross({0, 1, 0}, n);
@@ -1839,6 +1911,7 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 				gearQ.hw = gearQ.hh = 0.026f * (1.15f + 0.15f * sinf((float)in.time * 6.0f));
 		}
 	}
+	d->gearShown = gearVisible;
 	const float kMenuScale = 0.0009f;
 	// Ouvert depuis le menu du jeu : devant le joueur, un peu sous le regard, tourné vers lui.
 	if (d->menuOpen && d->menuAhead) {
@@ -2214,7 +2287,7 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 				if (row == 1) {
 					out.action = kUiActionToggleDungeon; // le mode VR suivant
 				} else if (row == 2) {
-					out.action = kUiActionCycleView;
+					out.action = d->dungeonMode ? kUiActionToggleHud : kUiActionCycleView;
 				} else if (row == 3) {
 					out.action = kUiActionToggleHelp;
 					d->menuOpen = false;
@@ -2532,20 +2605,22 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 				// Le personnage choisi pour les boutons d'attaque et de magie : son portrait encadré.
 				if (i == kPanelParty && in.partyMark[2] > 0.0f) {
 					for (const Piece &pc : c.pieces) {
-						if (pc.sy != 143 || pc.sx != (int)in.partyMark[0])
+						const float mx = in.partyMark[0], my = in.partyMark[1];
+						if (mx < pc.sx || mx >= pc.sx + pc.sw || my < pc.sy || my >= pc.sy + pc.sh)
 							continue;
+						const float kx = (float)pc.dw / (float)pc.sw, ky = (float)pc.dh / (float)pc.sh;
 						p.hotOutline = true;
-						p.hot[0] = (float)pc.dx / (float)c.texW;
-						p.hot[1] = (float)pc.dy / (float)c.texH;
-						p.hot[2] = (float)(pc.dx + pc.dw) / (float)c.texW;
-						p.hot[3] = (float)(pc.dy + pc.dh) / (float)c.texH;
+						p.hot[0] = (pc.dx + (mx - pc.sx) * kx) / (float)c.texW;
+						p.hot[1] = (pc.dy + (my - pc.sy) * ky) / (float)c.texH;
+						p.hot[2] = (pc.dx + (mx + in.partyMark[2] - pc.sx) * kx) / (float)c.texW;
+						p.hot[3] = (pc.dy + (my + in.partyMark[3] - pc.sy) * ky) / (float)c.texH;
 					}
 				}
 				// Le menu de magie ouvert : le niveau qui partira au prochain B, encadré.
 				if (i == kPanelParty && in.magicMark[2] > 0.0f) {
 					for (const Piece &pc : c.pieces) {
 						const float mx = in.magicMark[0], my = in.magicMark[1];
-						if (pc.sy != 143 || mx < pc.sx || mx >= pc.sx + pc.sw || my < pc.sy || my >= pc.sy + pc.sh)
+						if (mx < pc.sx || mx >= pc.sx + pc.sw || my < pc.sy || my >= pc.sy + pc.sh)
 							continue;
 						const float kx = (float)pc.dw / (float)pc.sw, ky = (float)pc.dh / (float)pc.sh;
 						p.hotOutline = true;

@@ -510,6 +510,7 @@ struct App {
 	// Interface détachée : l'écran ne garde que la vue du donjon, le reste part sur des panneaux.
 	lolvr::Ui ui;
 	bool detached = true;        // choix du joueur
+	bool hudClassic = false;     // mode immersif : la barre du bas du jeu au lieu des fenêtres
 	bool split = false;          // en vigueur en ce moment
 	bool splitWanted = false;
 	double splitWantedSince = 0;
@@ -535,6 +536,7 @@ struct App {
 	// Un clic sur un mur de côté (buisson, nid, trou d'arbre) : le jeu ne clique que sur le mur
 	// d'en face. Le groupe se tourne d'abord vers ce mur, puis le clic part.
 	int pickFace = -1;            // le mur visé : 0 nord .. 3 ouest (-1 : sol, au loin)
+	int pickItem = -1;            // l'objet posé visé (sa case ou celle devant) : son numéro dans le jeu
 	int pendingFace = -1;
 	float pendingU = 0, pendingV = 0;
 	double pendingUntil = 0;
@@ -1233,6 +1235,9 @@ void loadSettings(App &app, int &environment) {
 		} else if (!strcmp(name, "engrenage")) {
 			if (sscanf(rest, "%d", &iv) == 1)
 				app.gearKnown = iv != 0;
+		} else if (!strcmp(name, "interface")) {
+			if (sscanf(rest, "%d", &iv) == 1)
+				app.hudClassic = iv != 0;
 		} else if (!strcmp(name, "panneaux")) {
 			if (sscanf(rest, "%d", &iv) == 1)
 				app.detached = iv != 0;
@@ -1280,6 +1285,7 @@ void saveSettings(App &app) {
 		fprintf(f, "ecran %.3f %.3f\n", app.widths[i], app.distances[i]);
 	fprintf(f, "feu %d\n", app.fireOn ? 1 : 0);
 	fprintf(f, "panneaux %d\n", app.detached ? 1 : 0);
+	fprintf(f, "interface %d\n", app.hudClassic ? 1 : 0);
 	fprintf(f, "langue %d\n", app.language);
 	fprintf(f, "engrenage %d\n", app.gearKnown ? 1 : 0);
 	fprintf(f, "donjon3d %d\n", app.dungeonMode);
@@ -2055,6 +2061,7 @@ int portraitX(int count, int index) {
 bool dungeonPick(App &app, Vec3 tip, Vec3 dir, float &gu, float &gv, Vec3 &hitW, Vec3 &rightW, Vec3 &upW) {
 	const lolvr::LevelSnapshot &l = app.level;
 	app.pickFace = -1;
+	app.pickItem = -1;
 	if (l.level <= 0)
 		return false;
 	Mat4 model = lolvr::dungeonModel(app.roomPos, app.dunYaw, app.partyX, app.partyZ, app.partyYaw);
@@ -2091,13 +2098,16 @@ bool dungeonPick(App &app, Vec3 tip, Vec3 dir, float &gu, float &gv, Vec3 &hitW,
 				continue;
 			const Vec3 h = o + v * t;
 			const float u = (h.x - cx) * rx + (h.z - cz) * rz;
-			const float pad = 0.03f;
-			if (fabsf(u) > d.width * 0.5f + pad || h.y < d.base - pad || h.y > d.base + d.height + pad)
+			// Une prise généreuse : un peu plus large que l'image, et plus haute (un petit objet se
+			// vise sans pointer le sol, et sans se pencher).
+			const float pad = 0.06f, top = fmaxf(d.height + pad, 0.28f);
+			if (fabsf(u) > d.width * 0.5f + pad || h.y < d.base - pad || h.y > d.base + top)
 				continue;
 			float spx, spy;
 			if (!lolvr::floorGamePoint(l.block, l.direction, d.x, d.z, spx, spy))
 				continue;
 			bestT = t;
+			app.pickItem = l.sprites[d.layer].id;
 			pk.px = spx;
 			pk.py = spy;
 			pk.face = -1;
@@ -2182,8 +2192,11 @@ void updateUi(App &app, XrTime time, float dt, double now, bool pointer, bool tr
 	}
 	app.ui.setOptions(app.fireOn, app.detached);
 	app.ui.setDungeonOption(app.dungeonMode);
+	app.ui.setHudClassic(app.hudClassic);
 	app.ui.setAtlasOption(app.atlasOn);
-	if (app.dungeonMode) {
+	if (app.dungeonMode && app.hudClassic) {
+		CoreHost::get().inventoryDisable(); // la ligne d'objets du jeu, avec ses flèches
+	} else if (app.dungeonMode) {
 		CoreHost::get().inventoryEnable();
 		if (app.level.invSerial != 0 && app.level.invRgb.size() == 176 * 132 * 3) {
 			in.invRgb = app.level.invRgb.data();
@@ -2350,6 +2363,12 @@ void updateUi(App &app, XrTime time, float dt, double now, bool pointer, bool tr
 			app.detached = !app.detached;
 		else
 			setClassic(app, vrModeOf(app), classicViewOf(app) == 1 ? 0 : 1, time);
+		app.settingsDirty = true;
+		break;
+	case lolvr::kUiActionToggleHud:
+		// Mode immersif : les fenêtres ou la barre du bas du jeu.
+		app.hudClassic = !app.hudClassic;
+		app.ui.setHudClassic(app.hudClassic);
 		app.settingsDirty = true;
 		break;
 	case lolvr::kUiActionCycleView:
@@ -2530,6 +2549,12 @@ void updateInput(App &app, XrTime time, float dt, double now) {
 		CoreHost::get().setOwnCursor(own);
 		if (own && ui.pointerValid && ui.hitPixel > 0.0f && CoreHost::get().cursorShown())
 			drawGameCursor(app, ui.hit, ui.hitRight, ui.hitUp, ui.hitPixel);
+	}
+	// Un objet posé visé (sur la case du groupe ou celle devant), la main vide : le jeu le met dans la
+	// main directement (sans chercher ses pixels dans la vue, de près comme de loin).
+	if (clicked[hand] && toGame && app.dungeonVisible && !app.aimOnUi && app.pickItem > 0 && !app.level.itemInHand && app.inDungeon) {
+		CoreHost::get().pickupItem(app.pickItem);
+		app.holdTrigger = true; // (pas de clic dans le jeu pour cette pression)
 	}
 	// Un mur de côté visé en 3D : se tourner vers lui, puis cliquer (voir pendingFace).
 	if (clicked[hand] && toGame && app.dungeonVisible && !app.aimOnUi && app.pickFace >= 0 && app.inDungeon &&
@@ -3297,10 +3322,10 @@ void updateDungeon(App &app, float dt) {
 	app.lightLevel += ((float)l.light / 256.0f - app.lightLevel) * clampf(dt * 6.0f, 0.0f, 1.0f);
 	light *= app.lightLevel;
 	app.dungeonLight = light;
-	// La lanterne dans un lieu sombre : pleine d'huile, on voit loin ; presque vide, quelques pas ;
-	// éteinte, presque rien. Sa flamme vacille un peu.
+	// La lanterne dans un lieu sombre : pleine d'huile, on voit loin ; presque vide, moins ; éteinte,
+	// comme dans le jeu : une pénombre où l'on voit encore la case devant, sans plus. Sa flamme vacille un peu.
 	{
-		static const float reachOf[9] = {10.0f, 10.0f, 8.0f, 8.0f, 6.0f, 6.0f, 4.5f, 4.5f, 2.6f};
+		static const float reachOf[9] = {10.0f, 10.0f, 8.5f, 8.5f, 7.0f, 7.0f, 6.0f, 6.0f, 4.8f};
 		float want = l.lamp < 0 || l.lamp > 8 ? 11.0f : reachOf[l.lamp];
 		if (l.lamp >= 0 && l.lamp < 8) {
 			const float t = (float)app.clock;

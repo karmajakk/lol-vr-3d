@@ -160,6 +160,9 @@ public:
 	void setGameLanguage(int language);
 	// La fenêtre d'inventaire de l'application : l'activer, cliquer une case (0..47), trier.
 	void inventoryEnable();
+	void inventoryDisable();
+	// Ramasser l'objet posé numéro item (sur la case du groupe ou celle devant).
+	void pickupItem(int item);
 	void inventoryClick(int slot);
 	void inventorySort();
 	void nextSpell(); // le sort suivant du parchemin

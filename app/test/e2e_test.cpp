@@ -303,6 +303,24 @@ int main(int argc, char **argv) {
 					seen += (m.map.flags[b] & 7) == 7;
 				printf("  atlas : carte %s, %d cases vues, %d lieux, titre \"%s\"\n", m.map.available ? "oui" : "non", seen, (int)m.map.legend.size(), m.map.title.c_str());
 			}
+		} else if (op == "ramasse") {
+			// ramasse : chaque objet posé visible tour à tour, ramassé directement (sa case ou celle
+			// devant) ; on dit ce qui est arrivé dans la main, puis on le repose (clic sur la vue)
+			LevelSnapshot m;
+			host.levelSnapshot(m);
+			for (const LevelSprite &sp : m.sprites) {
+				if (sp.kind != 1 || sp.ceiling || sp.flying)
+					continue;
+				host.pickupItem(sp.id);
+				pump(0.6);
+				GameState gs;
+				LevelSnapshot a;
+				host.gameState(gs);
+				host.levelSnapshot(a);
+				printf("  ramasse objet %d (x %d y %d ; groupe %d) : dans la main %d\n", sp.id, sp.x, sp.y, m.block, a.itemInHand);
+				if (a.itemInHand)
+					break;
+			}
 		} else if (op == "inv") {
 			// inv NOM [deplie] [tri] : la fenêtre d'inventaire (image NOM.ppm)
 			std::string name, a1, a2;
