@@ -69,7 +69,7 @@ struct SceneState {
 		bool cutout = false;                  // image détourée (alpha), sans bordure : le curseur du jeu
 		bool onTop = false;                   // dessiné par-dessus tout (sans test de profondeur)
 	};
-	static const int kMaxPanels = 14;         // 12 pour l'interface, la bande de texte, le curseur du jeu
+	static const int kMaxPanels = 18;         // 16 pour l'interface (fenêtres, boutons, poignets), la bande de texte, le curseur du jeu
 	Panel panels[kMaxPanels];
 
 	// Poignées en laiton : on les attrape pour déplacer un panneau ou l'écran.

@@ -195,6 +195,8 @@ struct UiFrameOutput {
 	Vec3 partyBlockTopLeft = {0, 0, 0}, partyBlockRight = {1, 0, 0}, partyBlockUp = {0, 1, 0};
 	float partyBlockPixel = 0.0f;                // mètres par pixel du jeu (en largeur)
 	float partyBlockGameX = 0.0f, partyBlockGameY = 0.0f; // le coin haut gauche, dans l'image du jeu
+	float partyBlockGameW = 0.0f, partyBlockGameBottom = 0.0f; // sa largeur, sa dernière ligne (+1)
+	bool partyBlockLiveLine = false;             // sa ligne de messages est celle du moment
 	bool restClick = false;      // le repos (ZZZ) du dessus de la main droite cliqué : un clic sur le bouton du jeu
 	bool gearMenuOpened = false; // le joueur a ouvert le menu du poignet (l'invitation peut disparaître)
 	bool clicked = false;

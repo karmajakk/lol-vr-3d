@@ -326,6 +326,11 @@ struct Ui::Impl {
 	// Poignée tenue : -1 aucune, 0..kUiPanelCount-1 un panneau, kScreenTarget l'écran.
 	static const int kScreenTarget = 100;
 	GLuint helpTex = 0, gearTex = 0, menuTex = 0, hintTex = 0, chooserTex = 0, noticeTex = 0;
+	// Les boutons hors des fenêtres (déplier l'inventaire, trier, détacher) : une petite image de
+	// leurs icônes (22 x 22 chacune : vers le bas, vers le haut, le tri, la chaîne ; dessous, survolées).
+	GLuint buttonTex = 0;
+	double invHoverT = -10.0, colHoverT = -10.0; // dernier survol de l'inventaire / de la colonne collée
+	void makeButtons();
 	bool helpDirty = true, menuDirty = true, hintDirty = true, chooserDirty = true;
 	bool menuKeyboard = false; // état montré dans le menu
 	int dungeonMode = 1;
@@ -371,7 +376,7 @@ struct Ui::Impl {
 	// survol) le détache, et le reposer contre le bloc l'y recolle.
 	bool invGrouped = true, invSnapCheck = false;
 	bool colGrouped = true, colSnapCheck = false;
-	int colHot = 0; // la colonne (collée) survolée : 1, son bouton qui la détache : 2
+
 	// Le rappel « L3 change la vue », devant le joueur
 	bool noticeOpen = false, noticeAhead = false, noticeDirty = true;
 	int noticeKind = 0; // 0 : « L3 change la vue », 1 : crédits et prérequis
@@ -552,9 +557,52 @@ void Ui::Impl::upload(GLuint &tex, const std::vector<uint8_t> &px, int w, int h,
 //  - à gauche, le parchemin des sorts (pixels doublés), et dessous la ligne de messages, à sa largeur.
 // La fenêtre d'inventaire : la barre rapide (les 8 premières cases) toujours, et dépliée les 5
 // autres rangées (40 cases, triables). Les cases sont celles que dessine le jeu.
+void Ui::Impl::makeButtons() {
+	const int W = 88, H = 44;
+	std::vector<uint8_t> px((size_t)W * H * 4, 255);
+	auto put = [&](int x, int y, uint8_t r, uint8_t g, uint8_t b) {
+		if (x < 0 || y < 0 || x >= W || y >= H)
+			return;
+		uint8_t *p = &px[((size_t)y * W + x) * 4];
+		p[0] = r; p[1] = g; p[2] = b; p[3] = 255;
+	};
+	for (int hot = 0; hot < 2; hot++)
+		for (int icon = 0; icon < 4; icon++) {
+			const int ox = icon * 22, oy = hot * 22;
+			const uint8_t er = hot ? 255 : 140, eg = hot ? 230 : 108, eb = hot ? 140 : 72;
+			for (int y = 0; y < 22; y++)
+				for (int x = 0; x < 22; x++) {
+					const bool edge = x == 0 || x == 21 || y == 0 || y == 21;
+					put(ox + x, oy + y, edge ? er : hot ? 110 : 80, edge ? eg : hot ? 80 : 58, edge ? eb : hot ? 52 : 40);
+				}
+			const uint8_t r = hot ? 255 : 230, g = hot ? 235 : 190, b = hot ? 170 : 90;
+			if (icon <= 1) { // un triangle : vers le bas = déplier, vers le haut = replier
+				for (int i = 0; i < 6; i++) {
+					const int w = icon == 1 ? i : 5 - i;
+					for (int x = 11 - w; x <= 11 + w; x++)
+						put(ox + x, oy + 8 + i, r, g, b);
+				}
+			} else if (icon == 2) { // trois barres de longueurs croissantes : le tri
+				for (int i = 0; i < 4; i++)
+					for (int x = 5; x < 5 + 4 + i * 3; x++)
+						put(ox + x, oy + 6 + i * 3, r, g, b);
+			} else { // deux maillons écartés : la chaîne ouverte
+				auto link = [&](int lx, int ly) {
+					for (int x = lx; x < lx + 7; x++) { put(ox + x, oy + ly, r, g, b); put(ox + x, oy + ly + 4, r, g, b); }
+					for (int y = ly; y <= ly + 4; y++) { put(ox + lx, oy + y, r, g, b); put(ox + lx + 6, oy + y, r, g, b); }
+				};
+				link(3, 5);
+				link(11, 12);
+				put(ox + 11, oy + 9, r, g, b);
+				put(ox + 12, oy + 8, r, g, b);
+			}
+		}
+	upload(buttonTex, px, W, H, "boutons");
+}
+
 void Ui::Impl::composeInv(const UiFrameInput &in) {
 	Composite &c = comp[kCompInv];
-	const int key = 1000 + (invExpanded ? 1 : 0) + (invHot + 1) * 2 + (invGrouped ? 512 : 0);
+	const int key = 1000 + (invExpanded ? 1 : 0) + (invHot + 1) * 2;
 	if (c.tex && c.serial == in.invSerial && c.key == key)
 		return;
 	c.serial = in.invSerial;
@@ -562,7 +610,7 @@ void Ui::Impl::composeInv(const UiFrameInput &in) {
 	c.texW = kCompTexW[kCompInv];
 	c.texH = kCompTexH[kCompInv];
 	c.pieces.clear();
-	c.w = 235; // (la largeur du bloc des personnages, qu'il prolonge)
+	c.w = 176; // (les cases seules : les boutons sont à côté, hors de la fenêtre)
 	c.h = invExpanded ? 132 : 22;
 	c.px.assign((size_t)c.texW * c.texH * 4, 0);
 	auto put = [&](int x, int y, uint8_t r, uint8_t g, uint8_t b) {
@@ -599,45 +647,6 @@ void Ui::Impl::composeInv(const UiFrameInput &in) {
 		box(cx, cy, cx + 22, cy + 22, true);
 		box(cx + 1, cy + 1, cx + 21, cy + 21, true);
 	}
-	// Les boutons à droite : déplier / replier, et trier.
-	auto button = [&](int y0, bool hot) {
-		for (int y = y0 + 1; y < y0 + 21; y++)
-			for (int x = 179; x < 199; x++)
-				put(x, y, hot ? 110 : 80, hot ? 80 : 58, hot ? 52 : 40);
-		box(178, y0, 200, y0 + 22, hot);
-	};
-	button(0, invHot == 100);
-	// Le bouton qui détache l'inventaire du bloc des personnages : seulement au survol (et collé).
-	if (invGrouped && invHot >= 0) {
-		const bool hot = invHot == 102;
-		for (int y = 1; y < 21; y++)
-			for (int x = 203; x < 223; x++)
-				put(x, y, hot ? 110 : 80, hot ? 80 : 58, hot ? 52 : 40);
-		box(202, 0, 224, 22, hot);
-		const uint8_t lr = hot ? 255 : 230, lg = hot ? 235 : 190, lb = hot ? 170 : 90;
-		// deux maillons écartés : la chaîne ouverte
-		auto link = [&](int x0, int y0) {
-			for (int x = x0; x < x0 + 7; x++) { put(x, y0, lr, lg, lb); put(x, y0 + 4, lr, lg, lb); }
-			for (int y = y0; y <= y0 + 4; y++) { put(x0, y, lr, lg, lb); put(x0 + 6, y, lr, lg, lb); }
-		};
-		link(205, 5);
-		link(213, 12);
-		put(213, 9, lr, lg, lb);
-		put(214, 8, lr, lg, lb);
-	}
-	const uint8_t gr = invHot == 100 ? 255 : 230, gg = invHot == 100 ? 235 : 190, gb = invHot == 100 ? 170 : 90;
-	for (int i = 0; i < 6; i++) { // un triangle : vers le bas = déplier, vers le haut = replier
-		const int w = invExpanded ? i : 5 - i;
-		for (int x = 189 - w; x <= 189 + w; x++)
-			put(x, 8 + i * 1 + (invExpanded ? 0 : 0), gr, gg, gb);
-	}
-	if (invExpanded) {
-		button(22, invHot == 101);
-		const uint8_t sr = invHot == 101 ? 255 : 230, sg = invHot == 101 ? 235 : 190, sb = invHot == 101 ? 170 : 90;
-		for (int i = 0; i < 4; i++) // trois barres de longueurs croissantes : le tri
-			for (int x = 183; x < 183 + 4 + i * 3; x++)
-				put(x, 28 + i * 3, sr, sg, sb);
-	}
 	upload(c.tex, c.px, c.texW, c.texH, "inventaire");
 }
 
@@ -650,7 +659,7 @@ void Ui::Impl::compose(int which, const UiFrameInput &in) {
 	const int n = in.characters < 0 ? 0 : in.characters > 4 ? 4 : in.characters;
 	const bool blank = in.compassBlank;
 	const int key = (which == kCompInv ? 1 : which == kCompParty ? n * 2 + (blank ? 1 : 0) : (spellsCollapsed ? 1 : 0) + language * 2 + (spellTabHot ? 4 : 0) + (blank ? 8 : 0)) + (in.textBoxActive ? 64 : 0) + (in.spellsCovered ? 128 : 0) + (classicBar() ? 256 : 0) +
-	                (which == kCompSpells ? (colGrouped ? 512 : 0) + colHot * 1024 : 0) + (which == kCompColumn ? (blank ? 4096 : 0) : 0);
+	                (which == kCompSpells ? (colGrouped ? 512 : 0) : 0) + (which == kCompColumn ? (blank ? 4096 : 0) : 0);
 	if (c.tex && in.gameSerial == c.serial && key == c.key)
 		return;
 	// Pendant une boîte de texte, les morceaux viennent de l'image d'avant ; sinon on la garde à jour.
@@ -702,7 +711,8 @@ void Ui::Impl::compose(int which, const UiFrameInput &in) {
 		// place lui-même, au milieu, symétriques). La fenêtre se pose sur l'inventaire. Le repos (ZZZ)
 		// est sur la paume droite, la disquette sur la main gauche.
 		(void)n;
-		c.pieces.push_back({0, 0, 235, 57, 83, 121, 235, 57});
+		c.pieces.push_back({0, 0, 235, 22, 83, 121, 235, 22});
+		c.pieces.push_back({0, 22, 235, 35, 83, 143, 235, 35});
 		c.w = 235;
 		c.h = 57;
 	} else if (which == kCompColumn) {
@@ -754,7 +764,10 @@ void Ui::Impl::compose(int which, const UiFrameInput &in) {
 					int sx = gx * in.gameW / 320, sy = gy * in.gameH / 200;
 					// Le parchemin des sorts (au-dessus de la boîte de texte) reste à jour : un sort
 					// appris pendant une conversation s'y écrit.
-					const uint8_t *from = (which == kCompSpells || which == kCompColumn) && pc.sy + pc.sh <= 122 && !in.spellsCovered ? in.gameRgba : game;
+					// (la ligne de messages du bloc des personnages : toujours celle du moment ; la bande de
+					// texte du jeu la recouvre quand elle s'agrandit)
+					const bool liveLine = which == kCompParty && !classicBar() && pc.sy == 121 && pc.sh == 22;
+					const uint8_t *from = ((which == kCompSpells || which == kCompColumn) && pc.sy + pc.sh <= 122 && !in.spellsCovered) || liveLine ? in.gameRgba : game;
 					const uint8_t *src = from + ((size_t)sy * in.gameW + sx) * 4;
 					p[0] = src[0]; p[1] = src[1]; p[2] = src[2];
 				}
@@ -770,33 +783,6 @@ void Ui::Impl::compose(int which, const UiFrameInput &in) {
 		cv.gcenter(label, 0, c.w, (kSpellTabH - Canvas::textH(sc)) / 2 > 0 ? (kSpellTabH - Canvas::textH(sc)) / 2 : 0, sc, spellTabHot ? kWhite : kGold);
 		for (int y = 0; y < kSpellTabH; y++)
 			memcpy(&c.px[(size_t)y * c.texW * 4], &cv.px[(size_t)y * c.w * 4], (size_t)c.w * 4);
-	}
-	// La colonne collée, survolée : le bouton qui la détache, dans la pierre vide entre la lampe et
-	// la bourse.
-	if (which == kCompSpells && colHot && colGrouped && !classicBar()) {
-		const bool hot = colHot == 2;
-		auto put = [&](int x, int y, uint8_t r, uint8_t g, uint8_t b) {
-			if (x < 0 || y < 0 || x >= c.texW || y >= c.texH)
-				return;
-			uint8_t *p = &c.px[((size_t)y * c.texW + x) * 4];
-			p[0] = r; p[1] = g; p[2] = b; p[3] = 255;
-		};
-		const int x0 = 248, y0 = kSpellTabH + 160, x1 = 280, y1 = kSpellTabH + 188;
-		const uint8_t er = hot ? 255 : 140, eg = hot ? 230 : 108, eb = hot ? 140 : 72;
-		for (int y = y0; y < y1; y++)
-			for (int x = x0; x < x1; x++) {
-				const bool edge = x == x0 || x == x1 - 1 || y == y0 || y == y1 - 1;
-				put(x, y, edge ? er : hot ? 110 : 80, edge ? eg : hot ? 80 : 58, edge ? eb : hot ? 52 : 40);
-			}
-		const uint8_t lr = hot ? 255 : 230, lg = hot ? 235 : 190, lb = hot ? 170 : 90;
-		auto link = [&](int lx, int ly) {
-			for (int x = lx; x < lx + 9; x++) { put(x, ly, lr, lg, lb); put(x, ly + 6, lr, lg, lb); }
-			for (int y = ly; y <= ly + 6; y++) { put(lx, y, lr, lg, lb); put(lx + 8, y, lr, lg, lb); }
-		};
-		link(x0 + 4, y0 + 5);
-		link(x0 + 17, y0 + 15);
-		put(x0 + 15, y0 + 13, lr, lg, lb);
-		put(x0 + 16, y0 + 12, lr, lg, lb);
 	}
 	upload(c.tex, c.px, c.texW, c.texH, which == kCompParty ? "groupe" : which == kCompInv ? "inventaire" : which == kCompColumn ? "colonne" : "sorts");
 }
@@ -2037,7 +2023,8 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 		iq.u = pq.u;
 		iq.hw = sw * pp.scale * 0.5f;
 		iq.hh = sh * pixelAspect(kPanelInventory) * pp.scale * 0.5f;
-		iq.c = pq.c - pq.u * (pq.hh + border + iq.hh);
+		// (calée à gauche : ses boutons, à sa droite, restent sous le bloc)
+		iq.c = pq.c - pq.r * (pq.hw - iq.hw) - pq.u * (pq.hh + border + iq.hh);
 		panelDist[kPanelInventory] = length(iq.c - in.anchorPos);
 		Quad &hq = handle[kPanelInventory];
 		hq.r = iq.r;
@@ -2051,6 +2038,41 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 		ip.a = wrapAngle(atan2f(-v.x, -v.z) - in.anchorYaw);
 		ip.scale = pp.scale;
 	}
+	// Les boutons hors des fenêtres : à droite de l'inventaire, déplier (toujours), trier (déplié),
+	// détacher (au survol, à droite du dernier) ; sous la colonne collée, la détacher (au survol).
+	enum { kBtnExpand = 0, kBtnSort, kBtnInvDetach, kBtnColDetach, kBtnCount };
+	Quad btnQ[kBtnCount];
+	bool btnVis[kBtnCount] = {false, false, false, false};
+	const double hoverKeep = 0.8; // (le temps d'aller du survol au bouton)
+	if (visible[kPanelInventory] && in.invRgb) {
+		const Quad &iq = content[kPanelInventory];
+		const float sc = placement[d->invGrouped && !d->classicBar() ? kPanelParty : kPanelInventory].scale;
+		const float bs = 22.0f * sc * 1.1f, gap = clampf(0.012f * panelDist[kPanelInventory], 0.004f, 0.012f) + 0.004f;
+		auto place = [&](int b, int col, int row) {
+			Quad &q = btnQ[b];
+			q.r = iq.r;
+			q.u = iq.u;
+			q.hw = q.hh = bs * 0.5f;
+			q.c = iq.c + iq.r * (iq.hw + gap + bs * 0.5f + col * (bs + 0.006f)) + iq.u * (iq.hh - bs * 0.5f - row * (bs + 0.006f));
+			btnVis[b] = true;
+		};
+		place(kBtnExpand, 0, 0);
+		if (d->invExpanded)
+			place(kBtnSort, 0, 1);
+		if (d->invGrouped && !d->classicBar() && in.time - d->invHoverT < hoverKeep)
+			place(kBtnInvDetach, 1, d->invExpanded ? 1 : 0);
+	}
+	if (visible[kPanelSpells] && d->colGrouped && !d->classicBar() && in.time - d->colHoverT < hoverKeep) {
+		const Quad &sq = content[kPanelSpells];
+		const float sc = placement[kPanelSpells].scale, bs = 22.0f * sc * 1.8f;
+		const float colHalf = 64.0f * sc * 0.5f, gap = clampf(0.012f * panelDist[kPanelSpells], 0.004f, 0.012f) + 0.004f;
+		Quad &q = btnQ[kBtnColDetach];
+		q.r = sq.r;
+		q.u = sq.u;
+		q.hw = q.hh = bs * 0.5f;
+		q.c = sq.c + sq.r * (sq.hw - colHalf) - sq.u * (sq.hh + gap + bs * 0.5f);
+		btnVis[kBtnColDetach] = true;
+	}
 	if (visible[kPanelParty]) {
 		const Quad &pq = content[kPanelParty];
 		const Composite &cp = d->comp[kCompParty];
@@ -2061,6 +2083,9 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 		out.partyBlockPixel = cp.w > 0 ? 2.0f * pq.hw / (float)cp.w : 0.0f;
 		out.partyBlockGameX = d->classicBar() ? 0.0f : 83.0f;
 		out.partyBlockGameY = 121.0f;
+		out.partyBlockGameW = d->classicBar() ? 320.0f : 235.0f;
+		out.partyBlockGameBottom = d->classicBar() ? 200.0f : 178.0f;
+		out.partyBlockLiveLine = !d->classicBar();
 	}
 	// Poignée de l'écran : au-dessus du cadre (ou du moniteur)
 	{
@@ -2205,9 +2230,9 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 	bool tabHot = false; // le doigt est sur le bandeau du livre de sorts
 	bool atlasHot = false; // … ou sur celui de l'atlas
 	int invHot = -1;       // … ou sur une case de la fenêtre d'inventaire
-	int colHot = 0;        // … ou sur la colonne de la boussole, collée au livre de sorts
+	int hotButton = -1;    // … ou sur un bouton hors des fenêtres
 	// --- 3. Que vise le doigt ? ---
-	enum { kHitNone, kHitHandle, kHitPanel, kHitScreen, kHitCorner, kHitWrist };
+	enum { kHitNone, kHitHandle, kHitPanel, kHitScreen, kHitCorner, kHitWrist, kHitButton };
 	int hitKind = kHitNone, hitIndex = -1;
 	float bestT = 1e9f, hx = 0, hy = 0;
 	// Repli : quand le doigt passe juste à côté d'une fenêtre, on prend la plus proche.
@@ -2254,6 +2279,12 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 			float t, x, y;
 			if (rayQuad(in.tip, in.dir, w == 0 ? gearQ : w == 1 ? menuQ : w == 2 ? noticeQ : palmQ, t, x, y) && fabsf(x) <= 1.0f && fabsf(y) <= 1.0f && t < bestT) {
 				bestT = t; hitKind = kHitWrist; hitIndex = w; hx = x; hy = y;
+			}
+		}
+		for (int b = 0; b < kBtnCount; b++) {
+			float t, x, y;
+			if (btnVis[b] && rayQuad(in.tip, in.dir, btnQ[b], t, x, y) && fabsf(x) <= 1.0f && fabsf(y) <= 1.0f && t < bestT) {
+				bestT = t; hitKind = kHitButton; hitIndex = b; hx = x; hy = y;
 			}
 		}
 		// L'écran principal (la dalle du moniteur cathodique est bombée : on affine le point d'impact)
@@ -2324,7 +2355,7 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 		handleGlow[i] = 0.0f;
 	if (d->drag != -1)
 		handleGlow[d->drag == Impl::kScreenTarget ? kHandleScreen : d->drag] = 1.0f;
-	out.pointerLong = hitKind != kHitScreen && hitKind != kHitPanel && hitKind != kHitWrist;
+	out.pointerLong = hitKind != kHitScreen && hitKind != kHitPanel && hitKind != kHitWrist && hitKind != kHitButton;
 	// Une touche du clavier enfoncée (au doigt pointé ou du bout du doigt)
 	auto pressKey = [&](int idx) {
 		if (idx < 0 || idx >= (int)d->keys.size())
@@ -2475,6 +2506,45 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 			d->resizeRef = clampf(cornerK, 0.3f, 3.0f);
 			out.grabbed = true;
 			out.dragging = true;
+		}
+	} else if (hitKind == kHitButton) {
+		const Quad &q = btnQ[hitIndex];
+		out.hitValid = true;
+		out.hit = q.c + q.r * (hx * q.hw) + q.u * (hy * q.hh) + cross(q.r, q.u) * 0.001f;
+		out.hitRight = q.r;
+		out.hitUp = q.u;
+		out.hitRadius = 0.010f * bestT;
+		hotButton = hitIndex;
+		if (hitIndex == kBtnColDetach)
+			d->colHoverT = in.time;
+		else
+			d->invHoverT = in.time;
+		if (in.triggerPressed) {
+			out.clicked = true;
+			if (hitIndex == kBtnExpand) {
+				Composite &cc = d->comp[kCompInv];
+				const int oldH = cc.h;
+				d->invExpanded = !d->invExpanded;
+				cc.key = -1;
+				d->composeInv(in);
+				UiPlacement &pl = placement[kPanelInventory];
+				const float dh = (float)(cc.h - oldH) * pixelAspect(kPanelInventory) * pl.scale * 0.5f;
+				pl.b -= atan2f(dh, pl.c);
+				out.layoutChanged = true;
+			} else if (hitIndex == kBtnSort) {
+				out.invSort = true;
+			} else if (hitIndex == kBtnInvDetach) {
+				// Détachée : elle descend un peu, pour qu'on voie qu'elle est à part.
+				d->invGrouped = false;
+				UiPlacement &pl = placement[kPanelInventory];
+				pl.b -= atan2f(0.06f, pl.c);
+				out.layoutChanged = true;
+			} else if (hitIndex == kBtnColDetach) {
+				d->colGrouped = false;
+				d->comp[kCompSpells].key = -1;
+				d->placeColumnBeside(placement);
+				out.layoutChanged = true;
+			}
 		}
 	} else if (hitKind == kHitWrist) {
 		const Quad &q = hitIndex == 0 ? gearQ : hitIndex == 1 ? menuQ : hitIndex == 2 ? noticeQ : palmQ;
@@ -2674,36 +2744,11 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 				out.gu = 160.0f / 320.0f;
 				out.gv = 189.0f / 200.0f;
 				out.hitPixel = c.w > 0 ? 2.0f * q.hw / (float)c.w : 0.0f;
-				if (cx >= 202.0f && cx < 224.0f && cy < 22.0f && d->invGrouped && !d->classicBar())
-					invHot = 102;
-				else if (cx >= 178.0f && cx < 200.0f && cy < 22.0f)
-					invHot = 100;
-				else if (cx >= 178.0f && cx < 200.0f && cy >= 22.0f && cy < 44.0f && d->invExpanded)
-					invHot = 101;
-				else if (cx < 176.0f && cy >= 0.0f && cy < (float)c.h)
+				if (cx < 176.0f && cy >= 0.0f && cy < (float)c.h)
 					invHot = ((int)cy / 22) * 8 + (int)cx / 22;
+				d->invHoverT = in.time;
 				if (invHot >= 0 && in.triggerPressed) {
-					if (invHot == 100) {
-						Composite &cc = d->comp[kCompInv];
-						const int oldH = cc.h;
-						d->invExpanded = !d->invExpanded;
-						cc.key = -1;
-						d->composeInv(in);
-						UiPlacement &pl = placement[kPanelInventory];
-						const float dh = (float)(cc.h - oldH) * pixelAspect(kPanelInventory) * pl.scale * 0.5f;
-						pl.b -= atan2f(dh, pl.c);
-						out.layoutChanged = true;
-					} else if (invHot == 102) {
-						// Détachée : elle descend un peu, pour qu'on voie qu'elle est à part.
-						d->invGrouped = false;
-						UiPlacement &pl = placement[kPanelInventory];
-						pl.b -= atan2f(0.06f, pl.c);
-						out.layoutChanged = true;
-					} else if (invHot == 101) {
-						out.invSort = true;
-					} else {
-						out.invSlot = invHot;
-					}
+					out.invSlot = invHot;
 					out.clicked = true;
 				}
 			} else if (d->compOf(hitIndex) >= 0) {
@@ -2714,22 +2759,9 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 				for (const Piece &pc : c.pieces) {
 					if (!pc.contains(cx, cy))
 						continue;
-					// La colonne collée au livre de sorts : survolée, son bouton qui la détache.
-					if (hitIndex == kPanelSpells && pc.sx == 288 && d->colGrouped && !d->classicBar()) {
-						colHot = 1;
-						if (cx >= 248.0f && cx < 280.0f && cy >= kSpellTabH + 160.0f && cy < kSpellTabH + 188.0f) {
-							colHot = 2;
-							out.pointerValid = false;
-							out.buttonsToGame = false;
-							if (in.triggerPressed) {
-								d->colGrouped = false;
-								d->placeColumnBeside(placement);
-								out.layoutChanged = true;
-								out.clicked = true;
-							}
-							break;
-						}
-					}
+					// La colonne collée au livre de sorts, survolée : son bouton qui la détache apparaît dessous.
+					if (hitIndex == kPanelSpells && pc.sx == 288 && d->colGrouped && !d->classicBar())
+						d->colHoverT = in.time;
 					if (pc.sx == 288 && in.compassBlank) // fenêtre éteinte : aucun clic
 						break;
 					out.pointerValid = true;
@@ -2762,10 +2794,6 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 		}
 	}
 
-	if (colHot != d->colHot) {
-		d->colHot = colHot;
-		d->comp[kCompSpells].key = -1;
-	}
 	if (invHot != d->invHot) {
 		d->invHot = invHot;
 		d->comp[kCompInv].key = -1;
@@ -2922,6 +2950,29 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 		p.texture = d->hintTex;
 		p.texW = kHintW;
 		p.texH = kHintH;
+	}
+	if (!d->buttonTex)
+		d->makeButtons();
+	for (int b = 0; b < kBtnCount; b++) {
+		if (!btnVis[b] || np >= SceneState::kMaxPanels - 2)
+			continue;
+		// l'icône : vers le bas (déplier) ou le haut (replier), le tri, la chaîne
+		const int icon = b == kBtnExpand ? (d->invExpanded ? 1 : 0) : b == kBtnSort ? 2 : 3;
+		const bool hot = hotButton == b;
+		SceneState::Panel &p = scene.panels[np++];
+		p = SceneState::Panel();
+		p.visible = true;
+		p.center = btnQ[b].c;
+		p.right = btnQ[b].r;
+		p.up = btnQ[b].u;
+		p.halfW = btnQ[b].hw;
+		p.halfH = btnQ[b].hh;
+		p.border = 0.002f;
+		p.texture = d->buttonTex;
+		p.u0 = icon * 22.0f / 88.0f;
+		p.u1 = (icon + 1) * 22.0f / 88.0f;
+		p.v0 = hot ? 0.5f : 0.0f;
+		p.v1 = hot ? 1.0f : 0.5f;
 	}
 	if (palmVisible && np < SceneState::kMaxPanels - 2) {
 		// (l'image du jeu elle-même : le bouton ZZZ)

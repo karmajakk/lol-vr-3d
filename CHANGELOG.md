@@ -3,6 +3,17 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.40.0] — Buttons outside the windows
+
+- The inventory window holds only its slots; its buttons sit just outside, on its right, under
+  the characters: unfold/fold, sort (unfolded) and, only when you point at the inventory, the
+  chain that detaches it (right of the others). The compass column's chain button appears
+  under the column, only when you point at it.
+- The game's enlarged text box stays within the characters' block (over the portraits), no
+  longer spilling onto the inventory.
+- The message line alone (arriving in front of a place, e.g. Lake Dread) is no longer laid
+  over the characters: the block's own message line shows it, always up to date.
+
 ## [0.39.0] — Attached and detachable windows
 
 - Conversations: the game's text box now lands on the characters' block, where the game draws it

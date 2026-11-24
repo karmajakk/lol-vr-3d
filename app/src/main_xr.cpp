@@ -1743,7 +1743,18 @@ Vec3 viewCenter(const App &app) {
 void placeBand(App &app, const lolvr::UiFrameInput &in, lolvr::UiFrameOutput &out) {
 	if (!app.bandShown || !app.screenPlaced)
 		return;
-	const float bw = app.bandRect[2], bh = app.bandRect[3];
+	float bx = app.bandRect[0], by = app.bandRect[1], bw = app.bandRect[2], bh = app.bandRect[3];
+	if (out.partyBlockValid && out.partyBlockPixel > 0.0f) {
+		// Sur le bloc des personnages : la ligne de messages seule, il la montre déjà (rien par-dessus) ;
+		// une zone de texte agrandie se pose sur les portraits, sans déborder sur l'inventaire.
+		if (app.level.textRect == 0 && out.partyBlockLiveLine)
+			return;
+		const float x0 = fmaxf(bx, out.partyBlockGameX), y0 = fmaxf(by, out.partyBlockGameY);
+		const float x1 = fminf(bx + bw, out.partyBlockGameX + out.partyBlockGameW), y1 = fminf(by + bh, out.partyBlockGameBottom);
+		if (x1 - x0 < 8.0f || y1 - y0 < 8.0f)
+			return;
+		bx = x0; by = y0; bw = x1 - x0; bh = y1 - y0;
+	}
 	const float viewPx = app.dispW / (app.cropW > 0.0f ? app.cropW : 176.0f);
 	const float px = fminf(viewPx, app.dispW * 1.25f / bw); // mètres par pixel du jeu
 	const Quat rot = screenRot(app);
@@ -1763,8 +1774,8 @@ void placeBand(App &app, const lolvr::UiFrameInput &in, lolvr::UiFrameOutput &ou
 		n = cross(r, u);
 		halfW = bw * pxb * 0.5f;
 		halfH = bh * pxb * 1.2f * 0.5f;
-		c = out.partyBlockTopLeft + r * ((app.bandRect[0] + bw * 0.5f - out.partyBlockGameX) * pxb) -
-		    u * ((app.bandRect[1] + bh * 0.5f - out.partyBlockGameY) * pxb * 1.2f) + n * 0.006f;
+		c = out.partyBlockTopLeft + r * ((bx + bw * 0.5f - out.partyBlockGameX) * pxb) -
+		    u * ((by + bh * 0.5f - out.partyBlockGameY) * pxb * 1.2f) + n * 0.006f;
 	}
 	lolvr::SceneState::Panel &p = app.ss.panels[lolvr::SceneState::kMaxPanels - 2];
 	p = lolvr::SceneState::Panel();
@@ -1774,11 +1785,11 @@ void placeBand(App &app, const lolvr::UiFrameInput &in, lolvr::UiFrameOutput &ou
 	p.up = u;
 	p.halfW = halfW;
 	p.halfH = halfH;
-	p.u0 = app.bandRect[0] / 320.0f;
-	p.v0 = app.bandRect[1] / 200.0f;
-	p.u1 = (app.bandRect[0] + bw) / 320.0f;
-	p.v1 = (app.bandRect[1] + bh) / 200.0f;
-	p.border = 0.010f;
+	p.u0 = bx / 320.0f;
+	p.v0 = by / 200.0f;
+	p.u1 = (bx + bw) / 320.0f;
+	p.v1 = (by + bh) / 200.0f;
+	p.border = out.partyBlockValid ? 0.003f : 0.010f; // (sur le bloc : un filet, son cadre reste le sien)
 	// Le pointeur sur la bande (si rien d'autre n'est visé devant elle ; posée sur le bloc des
 	// personnages, elle passe devant lui)
 	if (!in.aimValid || out.dragging)
@@ -1804,8 +1815,8 @@ void placeBand(App &app, const lolvr::UiFrameInput &in, lolvr::UiFrameOutput &ou
 	out.hitRadius = 0.010f * t;
 	out.hitPixel = pxUsed;
 	out.pointerLong = false;
-	out.gu = (app.bandRect[0] + (hx + 1.0f) * 0.5f * bw) / 320.0f;
-	out.gv = (app.bandRect[1] + (1.0f - hy) * 0.5f * bh) / 200.0f;
+	out.gu = (bx + (hx + 1.0f) * 0.5f * bw) / 320.0f;
+	out.gv = (by + (1.0f - hy) * 0.5f * bh) / 200.0f;
 }
 
 // ---------------------------------------------------------------------------

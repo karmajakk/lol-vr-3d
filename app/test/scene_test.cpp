@@ -398,7 +398,31 @@ int main(int argc, char **argv) {
 				ui.resetLayout(in);
 				in.holdToMove = false;
 				const SceneState::Panel inv0 = panel(1);
-				aimIn(1, 213, 11, 235, 22);
+				// Les boutons hors des fenêtres : de petits carrés ; celui de droite (au survol) détache.
+				auto squareRightOf = [&](const SceneState::Panel &w) {
+					int best = -1;
+					for (int k = 0; k < SceneState::kMaxPanels; k++) {
+						const SceneState::Panel &b = tmp.panels[k];
+						if (b.visible && fabsf(b.halfW - b.halfH) < 1e-5f && b.halfW < 0.15f && b.center.x > w.center.x + w.halfW &&
+						    (best < 0 || b.center.x > tmp.panels[best].center.x))
+							best = k;
+					}
+					return best;
+				};
+				aimAt(inv0.center);
+				ui.update(in, o, tmp);
+				const int exp = squareRightOf(inv0);
+				check(exp >= 0 && tmp.panels[exp].center.x - (inv0.center.x + inv0.halfW) < 0.4f, "inventaire : le bouton qui le déplie est à côté, hors de la fenêtre");
+				ui.update(in, o, tmp);
+				const int det = squareRightOf(inv0);
+				int squares = 0;
+				for (int k = 0; k < SceneState::kMaxPanels; k++) {
+					const SceneState::Panel &b = tmp.panels[k];
+					squares += b.visible && fabsf(b.halfW - b.halfH) < 1e-5f && b.halfW < 0.15f && b.center.x > inv0.center.x + inv0.halfW ? 1 : 0;
+				}
+				check(det >= 0 && squares == 2, "inventaire survolé : le bouton qui le détache apparaît, à droite de celui qui déplie");
+				if (det >= 0)
+					aimAt(tmp.panels[det].center);
 				ui.update(in, o, tmp);
 				in.triggerDown = in.triggerPressed = true;
 				ui.update(in, o, tmp);
@@ -424,7 +448,20 @@ int main(int argc, char **argv) {
 				// La colonne de la boussole : son bouton (au survol) la détache du livre de sorts.
 				in.holdToMove = false;
 				in.time += 2.0;
-				aimIn(2, 264, 174, 296, 244);
+				aimIn(2, 264, 120, 296, 244);
+				ui.update(in, o, tmp);
+				{
+					const SceneState::Panel sp0 = panel(2);
+					int cb = -1;
+					for (int k = 0; k < SceneState::kMaxPanels; k++) {
+						const SceneState::Panel &b = tmp.panels[k];
+						if (b.visible && fabsf(b.halfW - b.halfH) < 1e-5f && b.halfW < 0.15f && b.center.y < sp0.center.y - sp0.halfH)
+							cb = k;
+					}
+					check(cb >= 0, "colonne survolée : le bouton qui la détache apparaît dessous");
+					if (cb >= 0)
+						aimAt(tmp.panels[cb].center);
+				}
 				ui.update(in, o, tmp);
 				in.triggerDown = in.triggerPressed = true;
 				ui.update(in, o, tmp);
