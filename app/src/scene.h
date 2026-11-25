@@ -68,7 +68,7 @@ struct SceneState {
 		bool blank = false;                   // fenêtre éteinte : du noir à la place de l'image
 		bool cutout = false;                  // image détourée (alpha), sans bordure : le curseur du jeu
 		bool onTop = false;                   // dessiné par-dessus tout (sans test de profondeur)
-		int layer = 0;                        // ordre de dessin : -1 avant les autres (le cadre d'un groupe), 1 après (les onglets)
+		int layer = 0;                        // ordre de dessin : rapproché de 4 cm par cran (-1 le cadre d'un groupe, 1 l'inventaire ouvert, 2 les onglets)
 	};
 	static const int kMaxPanels = 18;         // 16 pour l'interface (fenêtres, boutons, poignets), la bande de texte, le curseur du jeu
 	Panel panels[kMaxPanels];

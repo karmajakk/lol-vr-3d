@@ -3,6 +3,20 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.47.0] — Fixes after a rest, smaller tabs and corners
+
+- After resting, the dungeon could end up a quarter turn off from the game (walking "forward"
+  went into a wall) until the game was reloaded: two turns close together (the ones queued while
+  resting) are now taken in order, and the room always follows the game's direction.
+- The floppy and ZZZ are just the icons, without frame or background, a little smaller and out of
+  the wrist's brass band. The ZZZ is taken from the game's own rest button and only shows when the
+  game has one (not during the introduction). The floppy is no longer upside down.
+- The "quit the game?" box (like the defeat box) is shown without the black around it.
+- Inventory tabs: one slot wide, above the first and last slots; their texture comes from an empty
+  slot only (an oil flask could show on them), and they no longer show through the keyboard.
+- The game's text box laid over the characters reaches the bottom of the portraits.
+- The resize corners (and their grab zones) shrink with small windows.
+
 ## [0.46.0] — Watches on the side of the wrist, game menus kept apart
 
 - The floppy and ZZZ buttons sit on the side of the wrist (thumb side), like a watch you look at

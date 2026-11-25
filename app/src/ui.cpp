@@ -330,6 +330,49 @@ struct Ui::Impl {
 	// Les boutons hors des fenêtres (déplier l'inventaire, trier, détacher) : une petite image de
 	// leurs icônes (22 x 22 chacune : vers le bas, vers le haut, le tri, la chaîne ; dessous, survolées).
 	GLuint buttonTex = 0;
+	GLuint zzzTex = 0; // le ZZZ du bouton de repos du jeu, sans son bouton (relevé dans l'image du jeu)
+	std::vector<uint8_t> zzzPx;
+	// Relève le ZZZ dans l'image du jeu ; vrai si le bouton y est (le donjon, sa barre du bas).
+	bool readZzz(const UiFrameInput &in) {
+		if (!in.gameRgba || in.gameW < 320 || in.gameH < 200)
+			return false;
+		const int W = 22, H = 22;
+		std::vector<uint8_t> rgb((size_t)W * H * 3);
+		std::vector<uint8_t> yellow((size_t)W * H, 0);
+		int n = 0;
+		for (int y = 0; y < H; y++)
+			for (int x = 0; x < W; x++) {
+				const uint8_t *q = in.gameRgba + ((size_t)((178 + y) * in.gameH / 200) * in.gameW + (size_t)((33 + x) * in.gameW / 320)) * 4;
+				memcpy(&rgb[((size_t)y * W + x) * 3], q, 3);
+				if (q[0] > 170 && q[1] > 95 && q[2] < 120 && q[0] > q[1]) {
+					yellow[(size_t)y * W + x] = 1;
+					n++;
+				}
+			}
+		if (n < 15 || n > 220)
+			return false;
+		std::vector<uint8_t> px((size_t)W * H * 4, 0);
+		for (int y = 0; y < H; y++)
+			for (int x = 0; x < W; x++) {
+				const uint8_t *c = &rgb[((size_t)y * W + x) * 3];
+				bool keep = yellow[(size_t)y * W + x] != 0;
+				if (!keep && c[0] + c[1] + c[2] < 40) // (le contour noir des lettres)
+					for (int dy = -1; dy <= 1 && !keep; dy++)
+						for (int dx = -1; dx <= 1 && !keep; dx++) {
+							const int xx = x + dx, yy = y + dy;
+							keep = xx >= 0 && yy >= 0 && xx < W && yy < H && yellow[(size_t)yy * W + xx];
+						}
+				if (keep) {
+					uint8_t *o = &px[((size_t)y * W + x) * 4];
+					o[0] = c[0]; o[1] = c[1]; o[2] = c[2]; o[3] = 255;
+				}
+			}
+		if (px != zzzPx) {
+			zzzPx = px;
+			upload(zzzTex, zzzPx, W, H, "zzz");
+		}
+		return true;
+	}
 	GLuint frameTex = 0; // (le fond du cadre du grand bloc)
 	void makeButtons();
 	// Le fond des onglets : le grain d'une case vide de l'inventaire du jeu (18 x 18, RGB), relevé
@@ -350,9 +393,23 @@ struct Ui::Impl {
 			hashes[sl] = h;
 			count[h]++;
 		}
-		int best = -1, bestN = 2;
+		// Une case vide : rien que le grain rouge brun du fond (un objet a d'autres couleurs). La plus
+		// répétée de celles-là ; trouvée une fois, on la garde (le fond ne change pas).
+		if (!tabPatch.empty())
+			return false;
+		auto plain = [&](int sl) {
+			for (int y = 2; y < 20; y++)
+				for (int x = 2; x < 20; x++) {
+					const uint8_t *q = invRgb + ((size_t)((sl / 8) * 22 + y) * 176 + (sl % 8) * 22 + x) * 3;
+					const int r = q[0], g = q[1], b = q[2];
+					if (r < 60 || r > 210 || g * 100 > r * 62 || b * 100 > r * 62 || abs(g - b) > 30)
+						return false;
+				}
+			return true;
+		};
+		int best = -1, bestN = 0;
 		for (int sl = 0; sl < 48; sl++)
-			if (count[hashes[sl]] > bestN) {
+			if (count[hashes[sl]] > bestN && plain(sl)) {
 				bestN = count[hashes[sl]];
 				best = sl;
 			}
@@ -1333,8 +1390,7 @@ static const char *const kFloppy[16] = {
 
 void Ui::Impl::renderGear() {
 	const int N = kGearSize, S = 3, ox = (N - 16 * S) / 2 + 1, oy = (N - 16 * S) / 2;
-	Canvas cv{N, N, std::vector<uint8_t>((size_t)N * N * 4)};
-	cv.bevel(0, 0, N, N, 3, true);
+	Canvas cv{N, N, std::vector<uint8_t>((size_t)N * N * 4)}; // (fond transparent : la disquette seule)
 	for (int pass = 0; pass < 2; pass++)
 		for (int y = 0; y < 16; y++)
 			for (int x = 0; x < 16; x++) {
@@ -2165,7 +2221,7 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 		const Quad &iq = content[kPanelInventory];
 		const float sc = 2.0f * iq.hw / (float)(d->comp[kCompInv].w > 0 ? d->comp[kCompInv].w : 176);
 		// Des onglets de livre (voir makeButtons) qui sortent de l'inventaire, un peu en avant de son cadre.
-		const float tw = 32.0f * sc, th = 16.0f * 1.2f * sc;
+		const float tw = 22.0f * sc, th = 11.0f * 1.2f * sc; // (la largeur d'une case)
 		const Vec3 fwd = cross(iq.r, iq.u) * 0.0015f;
 		auto tab = [&](int b, Vec3 out, Vec3 along, float pos, float edge) {
 			Quad &q = btnQ[b];
@@ -2173,7 +2229,7 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 			q.u = out;
 			q.hw = tw * 0.5f;
 			q.hh = th * 0.5f;
-			q.c = iq.c + out * (edge + th * 0.5f) + along * (pos * (iq.hw - tw * 0.5f - 4.0f * sc)) + fwd;
+			q.c = iq.c + out * (edge + th * 0.5f) + along * (pos * (iq.hw - tw * 0.5f)) + fwd; // (au-dessus de la case du bout)
 			btnVis[b] = true;
 		};
 		{
@@ -2224,11 +2280,13 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 
 	// Les boutons des poignets, toujours là : à gauche la disquette (le menu du jeu), à droite le repos
 	// (ZZZ). Ils sont sur le côté du poignet, côté pouce, comme une montre qu'on regarde de côté ; le
-	// haut de l'icône vers la paume. L'autre main clique.
+	// haut de l'icône vers -X du repère de la main (la paume à droite, le dos de la main à gauche).
+	// L'autre main clique.
 	auto watch = [&](const Vec3 &pos, const Quat &rot, float side, Quad &q, float half) {
 		q.c = pos + rotate(rot, wristButtonOffset(side > 0.0f));
 		const Vec3 n = normalize(rotate(rot, wristButtonNormal()));
-		q.u = normalize(rotate(rot, {side, 0.0f, 0.0f}));
+		(void)side;
+		q.u = normalize(rotate(rot, {-1.0f, 0.0f, 0.0f})); // (vers -X pour les deux mains : à gauche, la disquette était à l'envers)
 		q.r = normalize(cross(q.u, n));
 		q.hw = q.hh = half;
 	};
@@ -2237,14 +2295,16 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 	if (placed && in.wristValid) {
 		gearVisible = true;
 		// Tant que le joueur ne l'a jamais ouverte, la montre bat doucement pour se faire remarquer.
-		watch(in.wristPos, in.wristRot, 1.0f, gearQ, in.gearHint && !d->menuOpen ? 0.024f * (1.15f + 0.15f * sinf((float)in.time * 6.0f)) : 0.024f);
+		watch(in.wristPos, in.wristRot, 1.0f, gearQ, in.gearHint && !d->menuOpen ? 0.02f * (1.15f + 0.15f * sinf((float)in.time * 6.0f)) : 0.02f);
 	}
 	d->gearShown = gearVisible;
 	bool palmVisible = false;
 	Quad palmQ;
-	if (placed && in.palmValid) {
+	// (le ZZZ n'est là que si le jeu montre son bouton de repos : pas dans l'introduction)
+	const bool zzzLive = d->readZzz(in);
+	if (placed && in.palmValid && d->zzzTex && (zzzLive || in.textBoxActive || in.gameModal)) {
 		palmVisible = true;
-		watch(in.palmPos, in.palmRot, -1.0f, palmQ, 0.024f);
+		watch(in.palmPos, in.palmRot, -1.0f, palmQ, 0.02f);
 	}
 	d->palmShown = palmVisible;
 	const float kMenuScale = 0.0009f;
@@ -2298,7 +2358,12 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 	if (frameVis)
 		cornerMargin[kPanelParty] = clampf(0.012f * panelDist[kPanelParty], 0.004f, 0.012f) + blockThin + 0.004f;
 	auto targetQuad = [&](int target) -> const Quad & { return target == Impl::kScreenTarget ? screenQuad : target == kPanelParty && frameVis ? frameQ : content[target]; };
-	auto targetMargin = [&](int target) { return cornerMargin[target == Impl::kScreenTarget ? kUiPanelCount : target]; };
+	auto targetMargin = [&](int target) {
+		if (target == Impl::kScreenTarget)
+			return cornerMargin[kUiPanelCount];
+		const Quad &q = targetQuad(target);
+		return fminf(cornerMargin[target], fmaxf(0.12f * fminf(q.hw, q.hh), 0.002f)); // (petite fenêtre, petit coin)
+	};
 
 	// Coin tenu : la fenêtre grandit ou rapetisse autour de son centre, le coin suit le doigt.
 	if (d->resize != -1) {
@@ -2424,10 +2489,12 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 				float t, x, y;
 				if (!rayQuad(in.tip, in.dir, q, t, x, y) || (fabsf(x) <= 1.0f && fabsf(y) <= 1.0f))
 					continue; // à l'intérieur, les clics sont pour le jeu
-				float m = cornerMargin[i];
+				// (la zone de prise et l'équerre suivent la taille de la fenêtre)
+				const float small = fminf(q.hw, q.hh);
+				float m = targetMargin(i < kUiPanelCount ? i : Impl::kScreenTarget);
 				float px = fabsf(x) * q.hw - (q.hw + m), py = fabsf(y) * q.hh - (q.hh + m);
 				float e = sqrtf(px * px + py * py);
-				if (e < 0.045f * t && e < cornerBest) {
+				if (e < fminf(0.045f * t, 0.5f * small + 0.012f) && e < cornerBest) {
 					cornerBest = e; cornerT = t;
 					cornerTarget = i < kUiPanelCount ? i : Impl::kScreenTarget;
 					cornerSx = x < 0.0f ? -1.0f : 1.0f;
@@ -3090,7 +3157,7 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 		p.v1 = 1.0f;
 	}
 	if (palmVisible && np < SceneState::kMaxPanels - 2) {
-		// (l'image du jeu elle-même : le bouton ZZZ)
+		// (le ZZZ du bouton du jeu)
 		SceneState::Panel &p = scene.panels[np++];
 		p = SceneState::Panel();
 		p.visible = true;
@@ -3099,12 +3166,11 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 		p.up = palmQ.u;
 		p.halfW = palmQ.hw;
 		p.halfH = palmQ.hh;
-		p.border = 0.004f;
-		p.texture = 0;
-		p.u0 = 33.0f / 320.0f;
-		p.u1 = 55.0f / 320.0f;
-		p.v0 = 178.0f / 200.0f;
-		p.v1 = 200.0f / 200.0f;
+		p.border = 0.0f;
+		p.cutout = true; // (les lettres seules, sans le bouton)
+		p.texture = d->zzzTex;
+		p.texW = 22;
+		p.texH = 22;
 	}
 	for (int w = 0; w < 3; w++) {
 		if ((w == 0 ? !gearVisible : w == 1 ? !d->menuOpen : !d->noticeOpen) || np >= SceneState::kMaxPanels - 2)
@@ -3118,7 +3184,8 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 		p.up = q.u;
 		p.halfW = q.hw;
 		p.halfH = q.hh;
-		p.border = 0.004f;
+		p.border = w == 0 ? 0.0f : 0.004f;
+		p.cutout = w == 0; // (la disquette seule, sans cadre ni fond)
 		p.texture = w == 0 ? d->gearTex : w == 1 ? d->menuTex : d->noticeTex;
 		p.texW = w == 0 ? kGearSize : w == 1 ? kMenuW : kNoticeW;
 		p.texH = w == 0 ? kGearSize : w == 1 ? d->menuH() : (d->noticeKind == 1 ? kCreditsH : kNoticeH);
@@ -3147,11 +3214,13 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 	int shown = d->resize != -1 ? d->resize : cornerTarget;
 	if (shown != -1) {
 		const Quad &q = targetQuad(shown);
-		float m = targetMargin(shown);
+		const float m = targetMargin(shown);
 		float sx = d->resize != -1 ? d->resizeSx : cornerSx, sy = d->resize != -1 ? d->resizeSy : cornerSy;
 		float dist = length(q.c - in.anchorPos);
-		float len = clampf(0.075f * dist, 0.03f, 0.26f), th = clampf(0.008f * dist, 0.003f, 0.03f);
-		len = fminf(len, fminf(q.hw, q.hh) + m);
+		// (à la mesure de la fenêtre : petite fenêtre, petite équerre)
+		const float small = fminf(q.hw, q.hh);
+		float len = fminf(clampf(0.075f * dist, 0.03f, 0.26f), fmaxf(0.35f * small, 0.008f));
+		float th = fmaxf(fminf(clampf(0.008f * dist, 0.003f, 0.03f), len * 0.12f), 0.0012f);
 		// Devant le cadre en relief de l'écran ; à fleur des autres fenêtres.
 		float lift = shown == Impl::kScreenTarget ? 0.07f * in.dispW : 0.003f;
 		Vec3 corner = q.c + q.r * (sx * (q.hw + m)) + q.u * (sy * (q.hh + m)) + cross(q.r, q.u) * lift;

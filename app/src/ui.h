@@ -36,7 +36,7 @@ const float kSplitViewLift = 0.16f;
 // (-X : le dos de la main gauche), vers le poignet (+Z).
 // Les boutons des poignets (repère de visée de la main droite ; la gauche en miroir) : sur le côté du
 // bracelet de laiton du gant, côté pouce, tournés vers le haut et un peu vers l'avant-bras.
-const Vec3 kWristFloppy = {0.016f, -0.012f, 0.142f};
+const Vec3 kWristFloppy = {0.016f, -0.0045f, 0.1447f}; // (un peu en saillie, hors du bracelet)
 // Les boutons des poignets sont côté intérieur (paume) : +X à gauche, -X à droite.
 inline Vec3 wristButtonOffset(bool left) { return {left ? -kWristFloppy.x : kWristFloppy.x, kWristFloppy.y, kWristFloppy.z}; }
 inline Vec3 wristButtonNormal() { return {0.0f, 0.941f, 0.339f}; }

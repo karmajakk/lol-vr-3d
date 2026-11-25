@@ -834,6 +834,28 @@ int main(int argc, char **argv) {
 				UiFrameInput pi = in;
 				pi.gearHint = false;
 				pi.wristValid = false;
+				// (une image du jeu sans le bouton de repos, comme dans l'introduction : pas de ZZZ)
+				static std::vector<uint8_t> zf((size_t)320 * 200 * 4, 60);
+				pi.gameRgba = zf.data();
+				pi.gameW = 320;
+				pi.gameH = 200;
+				pi.palmValid = true;
+				pi.palmPos = {0.20f, 0.90f, -0.30f};
+				ui.update(pi, o, tmp);
+				int intro = 0;
+				for (int i = 0; i < SceneState::kMaxPanels; i++) intro += tmp.panels[i].visible ? 1 : 0;
+				pi.palmValid = false;
+				ui.update(pi, o, tmp);
+				int introNone = 0;
+				for (int i = 0; i < SceneState::kMaxPanels; i++) introNone += tmp.panels[i].visible ? 1 : 0;
+				check(intro == introNone, "pas de bouton de repos dans l'image du jeu : pas de ZZZ");
+				// (le bouton de repos du jeu : des lettres jaunes)
+				for (int y = 184; y < 196; y++)
+					for (int x = 38; x < 52; x++)
+						if ((x + y) % 3 == 0) {
+							uint8_t *q = &zf[((size_t)y * 320 + x) * 4];
+							q[0] = 230; q[1] = 160; q[2] = 50;
+						}
 				pi.palmValid = true;
 				pi.palmPos = {0.20f, 0.90f, -0.30f};
 				pi.palmRot = {0.0f, 0.0f, 0.70710678f, 0.70710678f}; // le dessus de la main vers le haut

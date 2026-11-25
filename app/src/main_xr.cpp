@@ -1750,7 +1750,11 @@ void placeBand(App &app, const lolvr::UiFrameInput &in, lolvr::UiFrameOutput &ou
 		if (app.level.textRect == 0 && out.partyBlockLiveLine)
 			return;
 		const float x0 = fmaxf(bx, out.partyBlockGameX), y0 = fmaxf(by, out.partyBlockGameY);
-		const float x1 = fminf(bx + bw, out.partyBlockGameX + out.partyBlockGameW), y1 = fminf(by + bh, out.partyBlockGameBottom);
+		float x1 = fminf(bx + bw, out.partyBlockGameX + out.partyBlockGameW), y1 = fminf(by + bh, out.partyBlockGameBottom);
+		// (presque jusqu'au bas des portraits : jusqu'au bas, sinon elle semblait flotter au-dessus
+		// d'une mince bande de portraits)
+		if (out.partyBlockGameBottom - y1 < 14.0f)
+			y1 = out.partyBlockGameBottom;
 		if (x1 - x0 < 8.0f || y1 - y0 < 8.0f)
 			return;
 		bx = x0; by = y0; bw = x1 - x0; bh = y1 - y0;
@@ -1775,7 +1779,7 @@ void placeBand(App &app, const lolvr::UiFrameInput &in, lolvr::UiFrameOutput &ou
 		halfW = bw * pxb * 0.5f;
 		halfH = bh * pxb * 1.2f * 0.5f;
 		c = out.partyBlockTopLeft + r * ((bx + bw * 0.5f - out.partyBlockGameX) * pxb) -
-		    u * ((by + bh * 0.5f - out.partyBlockGameY) * pxb * 1.2f) + n * 0.006f;
+		    u * ((by + bh * 0.5f - out.partyBlockGameY) * pxb * 1.2f) + n * 0.002f;
 	}
 	lolvr::SceneState::Panel &p = app.ss.panels[lolvr::SceneState::kMaxPanels - 2];
 	p = lolvr::SceneState::Panel();
@@ -1789,7 +1793,8 @@ void placeBand(App &app, const lolvr::UiFrameInput &in, lolvr::UiFrameOutput &ou
 	p.v0 = by / 200.0f;
 	p.u1 = (bx + bw) / 320.0f;
 	p.v1 = (by + bh) / 200.0f;
-	p.border = out.partyBlockValid ? 0.003f : 0.010f; // (sur le bloc : un filet, son cadre reste le sien)
+	p.border = out.partyBlockValid ? 0.002f : 0.004f; // (une ligne sombre, comme les fenêtres)
+	p.layer = 1; // (dessinée après le bloc qu'elle recouvre)
 	// Le pointeur sur la bande (si rien d'autre n'est visé devant elle ; posée sur le bloc des
 	// personnages, elle passe devant lui)
 	if (!in.aimValid || out.dragging)
@@ -1877,6 +1882,25 @@ void updateLayout(App &app, double now) {
 				}
 				while (mh > 16.0f && mh > mh0 * 0.6f && rowBlack((int)(my + mh) - 1))
 					mh -= 1.0f;
+				// (et à gauche et à droite : la question « quitter le jeu ? »)
+				auto colBlack = [&](int x) {
+					const int fw = app.frame.width, fh = app.frame.height;
+					if (fw < 320 || fh < 200 || app.frame.rgba.size() < (size_t)fw * fh * 4 || x < 0 || x >= 320)
+						return false;
+					for (int y = (int)my; y < (int)(my + mh); y += 2) {
+						const uint8_t *q = app.frame.rgba.data() + ((size_t)(y * fh / 200) * fw + (size_t)(x * fw / 320)) * 4;
+						if (q[0] + q[1] + q[2] > 24)
+							return false;
+					}
+					return true;
+				};
+				const float mw0 = mw;
+				while (mw > 16.0f && mw > mw0 * 0.6f && colBlack((int)mx)) {
+					mx += 1.0f;
+					mw -= 1.0f;
+				}
+				while (mw > 16.0f && mw > mw0 * 0.6f && colBlack((int)(mx + mw) - 1))
+					mw -= 1.0f;
 				cx = mx;
 				cy = my;
 				cw = mw;
@@ -3353,11 +3377,15 @@ void updateDungeon(App &app, float dt) {
 		while (a < -3.14159265f) a += 6.2831853f;
 		return a;
 	};
-	const float dyaw = wrapPi((float)dir * 1.5707963f - app.partyYaw);
+	// (pendant un fondu de virage, le lacet du groupe n'a pas encore rejoint sa cible : c'est d'elle
+	// qu'on part, sinon deux virages rapprochés — ceux mis en attente pendant un repos, par exemple —
+	// décalaient la pièce d'un quart de tour par rapport au jeu, jusqu'au rechargement)
+	const float yawBase = app.turnFade > 0.0f ? app.turnTarget : app.partyYaw;
+	const float dyaw = wrapPi((float)dir * 1.5707963f - yawBase);
 	if (snap) {
 		app.partyX = tx;
 		app.partyZ = tz;
-		app.partyYaw += dyaw;
+		app.partyYaw = yawBase + dyaw;
 		app.turnFade = 0;
 	} else {
 		float k = clampf(dt * 12.0f, 0.0f, 1.0f);
@@ -3369,9 +3397,11 @@ void updateDungeon(App &app, float dt) {
 			if (app.alignTurn != 0 && dir == app.alignExpect) {
 				app.dunYaw -= dyaw; // le monde reste immobile : c'est le groupe qui s'est tourné
 				app.partyYaw += dyaw;
+				if (app.turnFade > 0.0f)
+					app.turnTarget += dyaw;
 				app.alignTurn = 0;
 			} else {
-				app.turnTarget = app.partyYaw + dyaw;
+				app.turnTarget = yawBase + dyaw;
 				if (app.turnFade <= 0.0f)
 					app.turnFade = 0.0001f;
 			}
@@ -3380,6 +3410,12 @@ void updateDungeon(App &app, float dt) {
 	app.shownDir = dir;
 	if (app.alignTurn != 0 && nowSeconds() > app.alignUntil)
 		app.alignTurn = 0;
+	// Garde-fou : hors virage, la pièce suit toujours la direction du jeu.
+	if (app.turnFade <= 0.0f) {
+		const float drift = wrapPi((float)dir * 1.5707963f - app.partyYaw);
+		if (fabsf(drift) > 0.01f)
+			app.partyYaw += drift;
+	}
 	float light = 1.0f;
 	if (app.turnFade > 0.0f) {
 		app.turnFade += dt / 0.22f;

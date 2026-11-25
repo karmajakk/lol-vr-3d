@@ -1171,10 +1171,12 @@ void Scene::render(const Mat4 &view, const Mat4 &proj, const SceneState &s) {
 		std::sort(order.begin(), order.end(), [&](int a, int b) {
 			if (d->panelDraws[a].onTop != d->panelDraws[b].onTop)
 				return d->panelDraws[b].onTop; // par-dessus tout : en dernier
-			if (d->panelDraws[a].layer != d->panelDraws[b].layer)
-				return d->panelDraws[a].layer < d->panelDraws[b].layer; // (le cadre d'un groupe d'abord, les onglets après)
-			Vec3 da = d->panelDraws[a].center - camPos, db = d->panelDraws[b].center - camPos;
-			return dot(da, da) > dot(db, db);
+			// Du plus loin au plus proche ; « layer » rapproche (positif) ou éloigne (négatif) un panneau
+			// de quelques centimètres dans cet ordre seulement : l'onglet passe après l'inventaire, le
+			// cadre d'un groupe avant ses fenêtres, sans passer devant un clavier plus proche.
+			const float la = length(d->panelDraws[a].center - camPos) - 0.04f * (float)d->panelDraws[a].layer;
+			const float lb = length(d->panelDraws[b].center - camPos) - 0.04f * (float)d->panelDraws[b].layer;
+			return la > lb;
 		});
 		glUseProgram(d->panelProgram);
 		glUniformMatrix4fv(d->panel.viewProj, 1, GL_FALSE, viewProj.m);
