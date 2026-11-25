@@ -10,6 +10,7 @@
 #include <strings.h>
 
 #include <algorithm>
+#include <map>
 #include <string>
 #include <utility>
 #include <vector>
@@ -331,6 +332,41 @@ struct Ui::Impl {
 	GLuint buttonTex = 0;
 	GLuint frameTex = 0; // (le fond du cadre du grand bloc)
 	void makeButtons();
+	// Le fond des onglets : le grain d'une case vide de l'inventaire du jeu (18 x 18, RGB), relevé
+	// dans l'image de l'inventaire (la case la plus répétée : les cases vides sont identiques).
+	std::vector<uint8_t> tabPatch;
+	uint32_t tabPatchSerial = 0;
+	bool readTabPatch(const uint8_t *invRgb) {
+		std::map<uint64_t, int> count;
+		uint64_t hashes[48];
+		for (int sl = 0; sl < 48; sl++) {
+			uint64_t h = 1469598103934665603ull;
+			for (int y = 2; y < 20; y++)
+				for (int x = 2; x < 20; x++) {
+					const uint8_t *q = invRgb + ((size_t)((sl / 8) * 22 + y) * 176 + (sl % 8) * 22 + x) * 3;
+					for (int k = 0; k < 3; k++)
+						h = (h ^ q[k]) * 1099511628211ull;
+				}
+			hashes[sl] = h;
+			count[h]++;
+		}
+		int best = -1, bestN = 2;
+		for (int sl = 0; sl < 48; sl++)
+			if (count[hashes[sl]] > bestN) {
+				bestN = count[hashes[sl]];
+				best = sl;
+			}
+		if (best < 0)
+			return false;
+		std::vector<uint8_t> patch((size_t)18 * 18 * 3);
+		for (int y = 0; y < 18; y++)
+			for (int x = 0; x < 18; x++)
+				memcpy(&patch[((size_t)y * 18 + x) * 3], invRgb + ((size_t)((best / 8) * 22 + y + 2) * 176 + (best % 8) * 22 + x + 2) * 3, 3);
+		if (patch == tabPatch)
+			return false;
+		tabPatch = patch;
+		return true;
+	}
 	bool helpDirty = true, menuDirty = true, hintDirty = true, chooserDirty = true;
 	bool menuKeyboard = false; // état montré dans le menu
 	int dungeonMode = 1;
@@ -602,10 +638,16 @@ void Ui::Impl::makeButtons() {
 				const float d = inside(x + 0.5f, y + 0.5f);
 				if (d < 0.0f)
 					continue;
-				// (le grain des cases de l'inventaire)
-				const unsigned h = (unsigned)(x * 73856093u ^ y * 19349663u ^ 0x5bd1e995u) % 23u;
-				const int n = (int)h - 11;
-				int r = 124 + n, g = 40 + n / 2, b = 31 + n / 3;
+				// (le grain des cases de l'inventaire : celui du jeu dès qu'on l'a, sinon une imitation)
+				int r, g, b;
+				if (!tabPatch.empty()) {
+					const uint8_t *t = &tabPatch[((size_t)(y % 18) * 18 + (x % 18)) * 3];
+					r = t[0]; g = t[1]; b = t[2];
+				} else {
+					const unsigned h = (unsigned)(x * 73856093u ^ y * 19349663u ^ 0x5bd1e995u) % 23u;
+					const int n = (int)h - 11;
+					r = 124 + n; g = 40 + n / 2; b = 31 + n / 3;
+				}
 				if (hot) { r += 26; g += 12; b += 8; }
 				if (d < 2.0f) { // le laiton
 					r = hot ? 255 : 214; g = hot ? 226 : 160; b = hot ? 130 : 64;
@@ -710,16 +752,16 @@ void Ui::Impl::compose(int which, const UiFrameInput &in) {
 	Composite &c = comp[which];
 	const int n = in.characters < 0 ? 0 : in.characters > 4 ? 4 : in.characters;
 	const bool blank = in.compassBlank;
-	const int key = (which == kCompInv ? 1 : which == kCompParty ? n * 2 + (blank ? 1 : 0) : (spellsCollapsed ? 1 : 0) + language * 2 + (spellTabHot ? 4 : 0) + (blank ? 8 : 0)) + (in.textBoxActive ? 64 : 0) + (in.spellsCovered ? 128 : 0) + (classicBar() ? 256 : 0) +
+	const int key = (which == kCompInv ? 1 : which == kCompParty ? n * 2 + (blank ? 1 : 0) : (spellsCollapsed ? 1 : 0) + language * 2 + (spellTabHot ? 4 : 0) + (blank ? 8 : 0)) + (in.textBoxActive ? 64 : 0) + (in.spellsCovered ? 128 : 0) + (classicBar() ? 256 : 0) + (in.gameModal ? 512 : 0) +
 	                (which == kCompColumn ? (blank ? 4096 : 0) : 0);
 	if (c.tex && in.gameSerial == c.serial && key == c.key)
 		return;
 	// Pendant une boîte de texte, les morceaux viennent de l'image d'avant ; sinon on la garde à jour.
 	const uint8_t *game = in.gameRgba;
 	if (in.gameRgba && in.gameW > 0 && in.gameH > 0) {
-		if (in.textBoxActive && heldW == in.gameW && heldH == in.gameH) {
+		if ((in.textBoxActive || in.gameModal) && heldW == in.gameW && heldH == in.gameH) {
 			game = heldFrame.data();
-		} else if (!in.textBoxActive && which == kCompParty) {
+		} else if (!in.textBoxActive && !in.gameModal && which == kCompParty) {
 			// Pas une image assombrie (le fondu au noir qui ouvre une scène) : sinon les fenêtres
 			// resteraient noires toute la conversation.
 			uint64_t sum = 0;
@@ -819,7 +861,8 @@ void Ui::Impl::compose(int which, const UiFrameInput &in) {
 					// (la ligne de messages du bloc des personnages : toujours celle du moment ; la bande de
 					// texte du jeu la recouvre quand elle s'agrandit)
 					const bool liveLine = which == kCompParty && !classicBar() && pc.sy == 121 && pc.sh == 22;
-					const uint8_t *from = ((which == kCompSpells || which == kCompColumn) && pc.sy + pc.sh <= 122 && !in.spellsCovered) || liveLine ? in.gameRgba : game;
+					// (un menu du jeu par-dessus : tout vient de l'image d'avant)
+					const uint8_t *from = !in.gameModal && (((which == kCompSpells || which == kCompColumn) && pc.sy + pc.sh <= 122 && !in.spellsCovered) || liveLine) ? in.gameRgba : game;
 					const uint8_t *src = from + ((size_t)sy * in.gameW + sx) * 4;
 					p[0] = src[0]; p[1] = src[1]; p[2] = src[2];
 				}
@@ -2031,8 +2074,9 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 	auto popOut = [&](Quad &q, float scale) {
 		if (!d->invExpanded)
 			return scale;
-		// Assez près pour que tous ses coins (et ses onglets) soient devant le plan de l'écran.
-		float k = 0.92f;
+		// Il grandit sur place, dans le plan des autres fenêtres. Seulement s'il passe derrière l'écran
+		// (son image ou son cadre), juste assez en avant pour rester devant lui.
+		float k = 1.0f;
 		if (!in.screenHidden) {
 			const float base = dot(in.screenPos - in.anchorPos, screenN);
 			for (int cx = -1; cx <= 1; cx += 2)
@@ -2041,12 +2085,14 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 					const float along = dot(p, screenN);
 					if ((base < 0.0f) == (along < 0.0f) && fabsf(along) > 1e-4f) {
 						const float sPlane = base / along; // (le plan de l'écran, en fraction du chemin)
-						if (sPlane < 1.0f + 0.10f)
-							k = fminf(k, sPlane - 0.10f);
+						const Vec3 h = in.anchorPos + p * sPlane - in.screenPos;
+						const bool onScreen = fabsf(dot(h, screenR)) < in.dispW * 0.62f && fabsf(dot(h, screenU)) < in.dispH * 0.5f + in.dispW * 0.11f;
+						if (onScreen && sPlane < 1.0f + 0.01f)
+							k = fminf(k, sPlane - 0.01f);
 					}
 				}
 		}
-		k = clampf(k, 0.45f, 0.92f);
+		k = clampf(k, 0.45f, 1.0f);
 		q.c = in.anchorPos + (q.c - in.anchorPos) * k;
 		q.hw *= k;
 		q.hh *= k;
@@ -2177,17 +2223,13 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 	}
 
 	// Les boutons des poignets, toujours là : à gauche la disquette (le menu du jeu), à droite le repos
-	// (ZZZ). Ils sont sur l'intérieur du poignet, côté paume (+X à gauche, -X à droite), le haut vers
-	// les doigts : droits quand on regarde l'intérieur de son poignet ; l'autre main clique.
+	// (ZZZ). Ils sont sur le côté du poignet, côté pouce, comme une montre qu'on regarde de côté ; le
+	// haut de l'icône vers la paume. L'autre main clique.
 	auto watch = [&](const Vec3 &pos, const Quat &rot, float side, Quad &q, float half) {
-		const Vec3 off = wristButtonOffset(side > 0.0f);
-		q.c = pos + rotate(rot, off);
-		const Vec3 n = rotate(rot, {side, 0.0f, 0.0f});
-		const Vec3 fwd = rotate(rot, {0.0f, 0.0f, -1.0f});
-		Vec3 r = cross(fwd, n);
-		const float rl = length(r);
-		q.r = rl > 1e-4f ? r * (1.0f / rl) : Vec3{1, 0, 0};
-		q.u = cross(n, q.r);
+		q.c = pos + rotate(rot, wristButtonOffset(side > 0.0f));
+		const Vec3 n = normalize(rotate(rot, wristButtonNormal()));
+		q.u = normalize(rotate(rot, {side, 0.0f, 0.0f}));
+		q.r = normalize(cross(q.u, n));
 		q.hw = q.hh = half;
 	};
 	bool gearVisible = false;
@@ -2866,6 +2908,8 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 			// (dans le grand bloc, un filet : le cadre est celui du bloc ; l'inventaire ouvert a le sien)
 			if (frameVis && Impl::isBlock(i) && !(i == kPanelInventory && d->invExpanded))
 				p.border = blockThin;
+			if (i == kPanelInventory && d->invExpanded)
+				p.layer = 1; // (ouvert, il passe par-dessus les fenêtres voisines)
 			if (i == kPanelHelp && in.chooserOpen) {
 				p.texture = d->chooserTex;
 				p.texW = kHelpW;
@@ -3014,6 +3058,11 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 		p.texW = kHintW;
 		p.texH = kHintH;
 	}
+	if (in.invRgb && in.invSerial != d->tabPatchSerial) {
+		d->tabPatchSerial = in.invSerial;
+		if (d->readTabPatch(in.invRgb))
+			d->makeButtons();
+	}
 	if (!d->buttonTex)
 		d->makeButtons();
 	for (int b = 0; b < kBtnCount; b++) {
@@ -3031,7 +3080,7 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 		p.halfH = btnQ[b].hh;
 		p.border = 0.0f;
 		p.cutout = true;
-		p.layer = 1; // (par-dessus le cadre de l'inventaire : l'onglet en sort)
+		p.layer = 2; // (par-dessus le cadre de l'inventaire : l'onglet en sort)
 		p.texture = d->buttonTex;
 		p.texW = 64 * 6;
 		p.texH = 32;

@@ -3,6 +3,16 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.46.0] — Watches on the side of the wrist, game menus kept apart
+
+- The floppy and ZZZ buttons sit on the side of the wrist (thumb side), like a watch you look at
+  from the side, turned a quarter to read upright.
+- The inventory grows in place when opened, in the plane of the other windows (it only moves
+  forward when it would go behind the screen).
+- The inventory tabs use the game's own inventory slot texture and colour.
+- Game menus and the "You have been defeated" box no longer show through the interface windows,
+  which keep the image from before; the defeat box is shown without its black bands.
+
 ## [0.45.0] — Grouped or separate windows, sober edges
 
 - **LOL2 UI removed**: it did not fit the game.

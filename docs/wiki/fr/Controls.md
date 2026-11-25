@@ -13,8 +13,8 @@
 | Y | Carte |
 | **X** | **Clic droit** là où tu vises : boire une potion, utiliser un objet |
 | Bouton menu (manette gauche) | Menu de ScummVM : sauvegarder, charger, quitter |
-| **Disquette, intérieur du poignet gauche** | Le menu du jeu (charger, sauvegarder, langue…), et dedans « Réglages VR » : mode VR, vue, atlas, manettes et boutons |
-| **ZZZ, intérieur du poignet droit** | Toujours là : regarde l'intérieur de ton poignet et clique-le avec la main gauche pour te reposer |
+| **Disquette, côté du poignet gauche** | Le menu du jeu (charger, sauvegarder, langue…), et dedans « Réglages VR » : mode VR, vue, atlas, manettes et boutons |
+| **ZZZ, côté du poignet droit** | Toujours là : regarde le côté de ton poignet (côté pouce) et clique-le avec la main gauche pour te reposer |
 | Clic du joystick droit | Recentrer l'écran, la pièce et les fenêtres devant toi. Niveaux de sort ouverts : niveau suivant |
 | Clic court du joystick gauche (L3) | Classique et réalité mixte : vue suivante (grand écran → fenêtres → PC 486) |
 | Clic du joystick gauche tenu + joystick droit | Haut/bas : taille de l'écran ; gauche/droite : distance |

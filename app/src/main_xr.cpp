@@ -1855,8 +1855,28 @@ void updateLayout(App &app, double now) {
 		float cy = kViewY;
 		if (app.menuAlone) {
 			const uint32_t mr = app.level.menuRect;
-			const float mx = (float)(mr & 511), my = (float)((mr >> 9) & 127), mw = (float)((mr >> 16) & 511), mh = (float)((mr >> 25) & 127) * 2.0f;
+			float mx = (float)(mr & 511), my = (float)((mr >> 9) & 127), mw = (float)((mr >> 16) & 511), mh = (float)((mr >> 25) & 127) * 2.0f;
 			if (mw >= 16.0f && mh >= 16.0f && mx + mw <= 320.0f && my + mh <= 200.0f) {
+				// (la boîte de la défaite laisse des bandes noires dessus et dessous : on ne les montre pas)
+				auto rowBlack = [&](int y) {
+					const int fw = app.frame.width, fh = app.frame.height;
+					if (fw < 320 || fh < 200 || app.frame.rgba.size() < (size_t)fw * fh * 4 || y < 0 || y >= 200)
+						return false;
+					const uint8_t *row = app.frame.rgba.data() + (size_t)(y * fh / 200) * fw * 4;
+					for (int x = (int)mx; x < (int)(mx + mw); x += 2) {
+						const uint8_t *q = row + (size_t)(x * fw / 320) * 4;
+						if (q[0] + q[1] + q[2] > 24)
+							return false;
+					}
+					return true;
+				};
+				const float mh0 = mh;
+				while (mh > 16.0f && mh > mh0 * 0.6f && rowBlack((int)my)) {
+					my += 1.0f;
+					mh -= 1.0f;
+				}
+				while (mh > 16.0f && mh > mh0 * 0.6f && rowBlack((int)(my + mh) - 1))
+					mh -= 1.0f;
 				cx = mx;
 				cy = my;
 				cw = mw;
@@ -2297,6 +2317,7 @@ void updateUi(App &app, XrTime time, float dt, double now, bool pointer, bool tr
 	in.compassBlank = app.split && app.charSheet;
 	in.textBoxActive = (app.bandShown && app.level.textRect != 0) || app.cutscene || (app.dungeonMode && app.level.sceneBusy && !app.charSheet) || app.atlasLive;
 	in.partyMarkOff = app.level.textRect != 0 || in.textBoxActive;
+	in.gameModal = app.gameMenuOpen; // (le menu du jeu, la défaite : les fenêtres gardent l'image d'avant)
 	if (!app.frame.rgba.empty()) {
 		in.gameRgba = app.frame.rgba.data();
 		in.gameW = app.frame.width;

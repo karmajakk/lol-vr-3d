@@ -13,8 +13,8 @@
 | Y | Map |
 | **X** | **Right click** where you aim: drink a potion, use an item |
 | Menu button (left controller) | ScummVM menu: save, load, quit |
-| **Floppy, inside of the left wrist** | The game menu (load, save, language...), and in it "VR controls": VR mode, view, controller mapping |
-| **ZZZ, inside of the right wrist** | Always there: look at the inside of your wrist and click it with the left hand to rest |
+| **Floppy, side of the left wrist** | The game menu (load, save, language...), and in it "VR controls": VR mode, view, controller mapping |
+| **ZZZ, side of the right wrist** | Always there: look at the side of your wrist (thumb side) and click it with the left hand to rest |
 | Right stick click | Recenter the screen, the room and the windows in front of you; in immersive mode it also puts your eyes at the party's height, seated or standing. With the spell levels open (classic and mixed reality): next level |
 | Short left stick click (L3) | Immersive mode: next spell of the spellbook; with the spell levels open, next level. Classic and mixed reality: next view (big screen → windows → 486 PC) |
 | Left stick click held + right stick | Up/down: screen size; left/right: distance |
