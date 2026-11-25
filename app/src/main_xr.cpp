@@ -482,6 +482,9 @@ struct App {
 	uint32_t seenFlights = 0;
 	int spriteId[32] = {0};
 	int shownLevel = 0;
+	uint32_t gfxWaitSerial = 0;     // décor attendu (ses murs dessinés par le jeu pas encore là)
+	double gfxWaitSince = 0;
+	float levelFadeIn = 1.0f;       // fondu d'arrivée d'un nouveau décor (0 noir, 1 fini)
 	float partyX = 0, partyZ = 0, partyYaw = 0; // position affichée du groupe (glisse vers la vraie)
 	SceneState ss;
 	bool sceneOk = false;
@@ -647,8 +650,10 @@ float &screenWidth(App &app) { return app.widths[app.environment]; }
 // Un menu du jeu montré seul (options, sauvegarde, défaite) a sa propre taille : agrandir l'écran
 // pour une cinématique ne le grossit pas.
 float &menuWidth(App &app) {
+	// (au départ, la taille de l'écran par défaut, pas celle d'un écran agrandi pour une cinématique)
+	static const float kDefault[kEnvCount] = {1.1f, 1.8f, 0.62f, 0.62f};
 	if (app.menuWidths[app.environment] <= 0.0f)
-		app.menuWidths[app.environment] = app.widths[app.environment];
+		app.menuWidths[app.environment] = kDefault[app.environment];
 	return app.menuWidths[app.environment];
 }
 float &shownWidth(App &app) { return app.menuAlone && app.split ? menuWidth(app) : screenWidth(app); }
@@ -1200,7 +1205,7 @@ void loadSettings(App &app, int &environment) {
 				environment = iv;
 		} else if (!layoutCurrent && (!strcmp(name, "ecran") || !strcmp(name, "visee") || !strcmp(name, "panneau"))) {
 			continue;
-		} else if (!strcmp(name, "menu_ecran")) {
+		} else if (!strcmp(name, "taille_menu")) {
 			int e = -1;
 			float w = 0;
 			if (sscanf(rest, "%d %f", &e, &w) == 2 && e >= 0 && e < kEnvCount && w >= kLimits[e].wMin && w <= kLimits[e].wMax)
@@ -1313,7 +1318,7 @@ void saveSettings(App &app) {
 		fprintf(f, "ecran %.3f %.3f\n", app.widths[i], app.distances[i]);
 	for (int i = 0; i < kEnvCount; i++)
 		if (app.menuWidths[i] > 0.0f)
-			fprintf(f, "menu_ecran %d %.3f\n", i, app.menuWidths[i]);
+			fprintf(f, "taille_menu %d %.3f\n", i, app.menuWidths[i]);
 	fprintf(f, "feu %d\n", app.fireOn ? 1 : 0);
 	fprintf(f, "panneaux %d\n", app.detached ? 1 : 0);
 	fprintf(f, "interface %d\n", app.hudMode);
@@ -3139,7 +3144,25 @@ void updateDungeon(App &app, float dt) {
 		}
 	}
 	g.outdoor = isOutdoorTileset(app.tileset);
+	g.ceilingStyle = lolvr::ceilingStyleOf(app.tileset);
+	// Un nouveau décor (sortie du château, arrivée devant le garde) : les murs tels que le jeu les
+	// dessine arrivent un instant après ses graphismes. On attend ces dessins, la pièce dans le noir,
+	// plutôt que de montrer une fraction de seconde le décor tiré des seuls graphismes, puis l'autre.
+	if (l.gfxSerial != app.builtGfx && l.wallCaptureSerial != l.gfxSerial) {
+		if (app.gfxWaitSerial != l.gfxSerial) {
+			app.gfxWaitSerial = l.gfxSerial;
+			app.gfxWaitSince = app.clock;
+		}
+		if (app.clock - app.gfxWaitSince < 1.0) {
+			app.dungeonLight = 0.0f;
+			app.levelFadeIn = 0.0f;
+			app.dungeonVisible = app.dungeon.hasContent(); // (l'ancien décor, éteint)
+			return;
+		}
+	}
 	const bool gfxChanged = l.gfxSerial != app.builtGfx || l.wallCaptureSerial != app.builtCapture;
+	if (gfxChanged && app.shownLevel != 0)
+		app.levelFadeIn = 0.0f; // (le nouveau décor apparaît en fondu)
 	// Une image de lieu de plus (le jeu vient de la montrer) : seulement les textures et le maillage.
 	const bool texChanged = gfxChanged || l.placeSerial != app.builtPlaces;
 	if (texChanged) {
@@ -3461,6 +3484,10 @@ void updateDungeon(App &app, float dt) {
 	// Pénombre du jeu (lieux sombres, lampe, fondus) : la clarté de la palette à l'écran.
 	app.lightLevel += ((float)l.light / 256.0f - app.lightLevel) * clampf(dt * 6.0f, 0.0f, 1.0f);
 	light *= app.lightLevel;
+	if (app.levelFadeIn < 1.0f) {
+		app.levelFadeIn = fminf(1.0f, app.levelFadeIn + dt / 0.30f);
+		light *= app.levelFadeIn;
+	}
 	app.dungeonLight = light;
 	// La lanterne dans un lieu sombre : pleine d'huile, on voit loin ; presque vide, moins ; éteinte,
 	// comme dans le jeu : une pénombre où l'on voit encore la case devant, sans plus. Sa flamme vacille un peu.

@@ -88,6 +88,139 @@ void sampleTrapezoid(const Rgba *bg, Rgba *dst, float yFar, float yNear, float w
 	}
 }
 
+// Un bruit de valeurs qui se répète tous les `period` pixels (le plafond d'une case touche celui de
+// la suivante sans couture).
+static float ceilNoise(float x, float y, int period, uint32_t seed) {
+	auto h = [&](int ix, int iy) {
+		ix = ((ix % period) + period) % period;
+		iy = ((iy % period) + period) % period;
+		uint32_t v = (uint32_t)ix * 374761393u + (uint32_t)iy * 668265263u + seed * 2246822519u;
+		v = (v ^ (v >> 13)) * 1274126177u;
+		return (float)((v ^ (v >> 16)) & 0xFFFF) / 65535.0f;
+	};
+	const int x0 = (int)floorf(x), y0 = (int)floorf(y);
+	float fx = x - (float)x0, fy = y - (float)y0;
+	fx = fx * fx * (3.0f - 2.0f * fx);
+	fy = fy * fy * (3.0f - 2.0f * fy);
+	const float a = h(x0, y0), b = h(x0 + 1, y0), c = h(x0, y0 + 1), d = h(x0 + 1, y0 + 1);
+	return a + (b - a) * fx + (c - a) * fy + (a - b - c + d) * fx * fy;
+}
+
+// Plusieurs octaves, de `cells` cellules par case à leur double, leur quadruple.
+static float ceilFbm(int i, int j, int cells, uint32_t seed) {
+	float sum = 0.0f, amp = 0.5f, norm = 0.0f;
+	for (int o = 0; o < 4; o++) {
+		const int period = cells << o;
+		const float k = (float)period / (float)kDunTexSize;
+		sum += amp * ceilNoise((float)i * k, (float)j * k, period, seed + (uint32_t)o * 17u);
+		norm += amp;
+		amp *= 0.5f;
+	}
+	return sum / norm;
+}
+
+// Les plafonds dessinés : leurs couleurs viennent du plafond que le jeu dessine dans son image de
+// fond (une rampe du plus sombre au plus clair), le motif est le nôtre (le jeu, vu de face, n'en
+// montre qu'une bande en perspective, trop floue pour un plafond qu'on regarde en VR).
+static void makeCeiling(int style, const Rgba *bg, Rgba sky, Rgba *ceil) {
+	std::vector<Rgba> px;
+	for (int y = 0; y < 40; y++)
+		for (int x = 24; x < 152; x++)
+			px.push_back(bg[y * kBgW + x]);
+	auto lum = [](const Rgba &c) { return 0.30f * c.r + 0.59f * c.g + 0.11f * c.b; };
+	std::sort(px.begin(), px.end(), [&](const Rgba &a, const Rgba &b) { return lum(a) < lum(b); });
+	// (sans le noir du fond lointain : la rampe commence au premier pixel qui n'est pas noir)
+	size_t first = 0;
+	while (first + 16 < px.size() && lum(px[first]) < 6.0f)
+		first++;
+	Rgba ramp[8];
+	for (int k = 0; k < 8; k++)
+		ramp[k] = px[first + (size_t)(((float)k + 0.5f) / 8.0f * (float)(px.size() - first - 1))];
+	auto mix = [](Rgba a, Rgba b, float t) {
+		t = t < 0.0f ? 0.0f : t > 1.0f ? 1.0f : t;
+		return Rgba{(uint8_t)(a.r + (b.r - a.r) * t), (uint8_t)(a.g + (b.g - a.g) * t), (uint8_t)(a.b + (b.b - a.b) * t), 255};
+	};
+	auto rampAt = [&](float v) { // v de 0 (sombre) à 1 (clair)
+		v = v < 0.0f ? 0.0f : v > 0.999f ? 0.999f : v;
+		const float f = v * 7.0f;
+		const int k = (int)f;
+		return mix(ramp[k], ramp[k + 1 > 7 ? 7 : k + 1], f - (float)k);
+	};
+	auto scale = [](Rgba c, float k) {
+		auto ch = [&](int v) { v = (int)((float)v * k); return (uint8_t)(v < 0 ? 0 : v > 255 ? 255 : v); };
+		return Rgba{ch(c.r), ch(c.g), ch(c.b), 255};
+	};
+	const int N = kDunTexSize;
+	for (int j = 0; j < N; j++)
+		for (int i = 0; i < N; i++) {
+			const float grain = ceilFbm(i, j, 16, 7u);
+			Rgba c;
+			if (style == 1) {
+				// Caissons : une poutre sur le bord de la case (la moitié, l'autre moitié est chez la
+				// voisine), une moulure en deux marches, le creux sombre, un fleuron au milieu.
+				const int d = std::min(std::min(i, N - 1 - i), std::min(j, N - 1 - j));
+				const bool litSide = (i < j) == (i < N - 1 - j) ? i < N / 2 : j < N / 2; // (haut et gauche éclairés)
+				if (d < 9)
+					c = rampAt(0.80f + 0.18f * grain);
+				else if (d < 10)
+					c = rampAt(0.35f);
+				else if (d < 15)
+					c = rampAt((litSide ? 0.70f : 0.42f) + 0.12f * grain);
+				else if (d < 16)
+					c = rampAt(0.25f);
+				else if (d < 21)
+					c = rampAt((litSide ? 0.55f : 0.30f) + 0.10f * grain);
+				else {
+					c = rampAt(0.12f + 0.16f * grain);
+					const int cx = abs(i - N / 2), cy = abs(j - N / 2);
+					if (d == 28 || d == 29)
+						c = rampAt(0.38f + 0.1f * grain); // (un filet dans le creux)
+					if (cx + cy < 11)
+						c = rampAt(cx + cy < 4 ? 0.95f : (cx + cy) % 4 == 0 ? 0.30f : 0.72f); // le fleuron
+				}
+			} else if (style == 2) {
+				// Mines : des planches dans un sens, une grosse poutre en travers au bord de la case.
+				const int plank = j % 16;
+				const float wood = ceilFbm(i / 4, j, 8, 11u); // (fibres allongées)
+				if (i < 8 || i >= N - 8) {
+					c = rampAt(0.62f + 0.25f * ceilFbm(i, j / 4, 8, 13u));
+					if (i == 7 || i == N - 8)
+						c = rampAt(0.08f);
+				} else if (plank == 0) {
+					c = rampAt(0.04f);
+				} else {
+					c = rampAt(0.30f + 0.45f * wood + (plank == 1 ? 0.12f : 0.0f) - (plank == 15 ? 0.10f : 0.0f));
+				}
+			} else if (style == 3) {
+				// Roche : des bosses et des creux, à la couleur des parois du jeu.
+				// (en paliers, comme les pixels du jeu, avec un grain fin)
+				const float n = ceilFbm(i, j, 4, 23u), fine = ceilFbm(i, j, 32, 41u);
+				const float ridge = 1.0f - fabsf(ceilFbm(i, j, 8, 29u) - 0.5f) * 2.0f;
+				float v = 0.10f + 0.95f * (0.50f * n + 0.20f * grain + 0.30f * fine) - (ridge > 0.94f ? 0.30f : 0.0f);
+				v = floorf(v * 7.0f + 0.5f) / 7.0f;
+				c = rampAt(v);
+			} else {
+				// Dehors : les cimes, et le ciel entre elles.
+				const float n = ceilFbm(i, j, 4, 31u), leaf = ceilFbm(i, j, 32, 43u);
+				const float branch = fabsf(ceilFbm(i, j, 8, 37u) - 0.5f);
+				const float open = n + 0.18f * (leaf - 0.5f); // (des trouées aux bords feuillus)
+				if (open > 0.60f) {
+					const float t = (open - 0.60f) / 0.40f;
+					c = scale(sky, 1.05f + 0.55f * t);
+				} else {
+					float v = 0.18f + 0.95f * (0.65f * leaf + 0.35f * grain) * (0.7f + 0.5f * (0.60f - open));
+					v = floorf(v * 6.0f + 0.5f) / 6.0f;
+					// les feuilles, en paliers : la rampe du jeu (trop sombre là-haut) mêlée de vert
+					const Rgba gr = {(uint8_t)(24 + 70 * v), (uint8_t)(48 + 110 * v), (uint8_t)(18 + 45 * v), 255};
+					c = mix(scale(rampAt(v), 1.3f), gr, 0.55f);
+				}
+				if (branch < 0.018f && open < 0.66f)
+					c = rampAt(0.04f); // une branche
+			}
+			ceil[j * N + i] = c;
+		}
+}
+
 float clampDepth(float r) {
 	return r < 1.0f ? 1.0f : r > 3.0f ? 3.0f : r;
 }
@@ -150,6 +283,22 @@ bool hasSolidWall(const DungeonGfx &g, uint8_t t) {
 }
 
 } // namespace
+
+int ceilingStyleOf(const char *t) {
+	if (!t || !t[0])
+		return 0;
+	struct Entry {
+		const char *prefix;
+		int style;
+	};
+	static const Entry table[] = {{"KEEP", 1}, {"MANOR", 1}, {"TOWER", 1}, {"URBISH", 2}, {"MINE", 2}, {"CAVE", 3},
+	                              {"RUIN", 3}, {"CIMMERIA", 3}, {"CATWALK", 3}, {"FOREST", 4}, {"SWAMP", 4}, {"YVEL", 4}};
+	for (const Entry &e : table)
+		if (!strncmp(t, e.prefix, strlen(e.prefix)))
+			return e.style;
+	return 0;
+}
+
 
 void spriteToRgba(const uint8_t *px, const uint8_t *al, const uint8_t *pal, uint8_t *out) {
 	const int W = 176, H = 120, OH = 128;
@@ -722,6 +871,21 @@ void decodeDungeonTextures(const DungeonGfx &g, DungeonTextures &out) {
 		// Le plafond : la case devant le joueur, entre le haut du mur à un pas (ligne 8, 128 pixels
 		// de large) et le haut du mur à deux pas (ligne 16, 80 pixels).
 		sampleTrapezoid(bg.data(), ceil, 16.0f, 8.0f, 80.0f, 128.0f);
+		// (un vrai plafond quand on connaît la région : caissons, poutres, roche, cimes)
+		if (g.ceilingStyle > 0) {
+			Rgba skyCol = {70, 90, 140, 255};
+			float best = -1.0f;
+			for (int y = 0; y < 20; y++)
+				for (int x = 60; x < 116; x++) {
+					const Rgba &c = bg[y * kBgW + x];
+					const float bl = (float)c.b - 0.5f * ((float)c.r + (float)c.g);
+					if (bl > best && bl >= 8.0f) {
+						best = bl;
+						skyCol = c;
+					}
+				}
+			makeCeiling(g.ceilingStyle, bg.data(), skyCol, ceil);
+		}
 		// Dehors : le ciel, de la couleur du haut de l'image de fond (au centre, entre les arbres),
 		// plus clair au zénith, plus sombre vers l'horizon.
 		if (g.outdoor) {

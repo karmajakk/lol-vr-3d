@@ -44,7 +44,13 @@ struct DungeonGfx {
 	const uint8_t *doorRaise = nullptr; // 256
 	// Dehors (forêt, marais...) : pas de plafond, le ciel.
 	bool outdoor = false;
+	// Le plafond dessiné pour la région (voir ceilingStyleOf) : 0 celui tiré de l'image de fond.
+	int ceilingStyle = 0;
 };
+
+// Le plafond d'une région du jeu : 1 à caissons (château, manoir, tour), 2 à poutres de bois (mines),
+// 3 de roche (cavernes, ruines), 4 des cimes et du ciel (forêt, marais, Yvel) ; 0 inconnue.
+int ceilingStyleOf(const char *tileset);
 
 // Comment un type de mur est montré en 3D.
 enum WallKind {

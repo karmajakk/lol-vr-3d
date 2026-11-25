@@ -3,6 +3,18 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.49.0] — Real ceilings, smoother arrivals
+
+- **Ceilings** drawn per region, in the colours of the game's own ceiling: coffers in Gladstone
+  castle, Roland's manor and the towers; wooden planks and beams in the mines; textured rock in
+  the caves and ruins; treetops with sky between them in the forest, the swamp and Yvel.
+- Arriving in a new region (leaving the castle, the first meeting with the guard) no longer shows
+  the walls one way for a split second and then another: the room waits, dark, for the walls as
+  the game draws them, then fades in.
+- The ZZZ button without the black lines around it.
+- Game menus shown on their own start at the default screen size (not the size of a screen
+  enlarged for cutscenes); a menu size saved by 0.48 is dropped.
+
 ## [0.48.0] — Wrist buttons back, menus sized on their own
 
 - The floppy and ZZZ are buttons again, with their background (the ZZZ is the game's own rest

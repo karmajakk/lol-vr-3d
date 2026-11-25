@@ -336,13 +336,13 @@ struct Ui::Impl {
 	bool readZzz(const UiFrameInput &in) {
 		if (!in.gameRgba || in.gameW < 320 || in.gameH < 200)
 			return false;
-		const int W = 22, H = 22;
+		const int W = 20, H = 20; // (l'intérieur du bouton, x 33-52, y 180-199 : sans ses lignes noires)
 		std::vector<uint8_t> rgb((size_t)W * H * 3);
 		std::vector<uint8_t> yellow((size_t)W * H, 0);
 		int n = 0;
 		for (int y = 0; y < H; y++)
 			for (int x = 0; x < W; x++) {
-				const uint8_t *q = in.gameRgba + ((size_t)((178 + y) * in.gameH / 200) * in.gameW + (size_t)((33 + x) * in.gameW / 320)) * 4;
+				const uint8_t *q = in.gameRgba + ((size_t)((180 + y) * in.gameH / 200) * in.gameW + (size_t)((33 + x) * in.gameW / 320)) * 4;
 				memcpy(&rgb[((size_t)y * W + x) * 3], q, 3);
 				if (q[0] > 170 && q[1] > 95 && q[2] < 120 && q[0] > q[1]) {
 					yellow[(size_t)y * W + x] = 1;
@@ -3139,8 +3139,8 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 		p.halfH = palmQ.hh;
 		p.border = 0.0f; // (le bouton du jeu, sans cadre autour)
 		p.texture = d->zzzTex;
-		p.texW = 22;
-		p.texH = 22;
+		p.texW = 20;
+		p.texH = 20;
 	}
 	for (int w = 0; w < 3; w++) {
 		if ((w == 0 ? !gearVisible : w == 1 ? !d->menuOpen : !d->noticeOpen) || np >= SceneState::kMaxPanels - 2)

@@ -443,6 +443,8 @@ int main(int argc, char **argv) {
 				GameState gs;
 				if (host.gameState(gs))
 					g.outdoor = !strcmp(gs.tileset, "FOREST1") || !strcmp(gs.tileset, "SWAMP") || !strcmp(gs.tileset, "YVEL1");
+				if (host.gameState(gs))
+					g.ceilingStyle = ceilingStyleOf(gs.tileset);
 			}
 			printf("  murs dessinés par le moteur : %d (n°%u)\n", lvl.wallSlots, lvl.wallCaptureSerial);
 			if (lvl.gfxSerial != builtGfx || lvl.wallCaptureSerial != builtCapture || lvl.placeSerial != builtPlaces) {
