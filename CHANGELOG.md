@@ -3,6 +3,11 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.51.0] — Forest canopy in the walls' greens
+
+- Outdoors (Northland and Southland forests, swamp), the leaves of the ceiling take the greens of
+  the trees on the walls: blue-green in one forest, plain green in the other.
+
 ## [0.50.0] — Cave and castle ceilings
 
 - Caves: the ceiling is the cave wall itself.

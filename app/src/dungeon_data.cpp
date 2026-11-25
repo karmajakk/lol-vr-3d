@@ -175,6 +175,25 @@ static void makeCeiling(int style, const Rgba *bg, const Rgba *wall, Rgba sky, R
 		const int k = (int)f;
 		return mix(ramp[k], ramp[k + 1 > 7 ? 7 : k + 1], f - (float)k);
 	};
+	// Dehors : le vert du feuillage des murs (forêt du nord, forêt du sud, marais), du plus sombre
+	// au plus clair, pour que les cimes du plafond soient celles des arbres qu'on longe.
+	Rgba leaves[8];
+	bool haveLeaves = false;
+	if (style == 4 && wall) {
+		std::vector<Rgba> green;
+		for (int y = 0; y < kDunWallRows; y++)
+			for (int x = 0; x < N; x++) {
+				const Rgba c = wall[y * N + x];
+				if (c.a && (int)c.g >= (int)c.r + 12 && (int)c.g + (int)c.b > 60)
+					green.push_back(c);
+			}
+		if (green.size() > 200) {
+			std::sort(green.begin(), green.end(), [&](const Rgba &a, const Rgba &b) { return lum(a) < lum(b); });
+			for (int k = 0; k < 8; k++)
+				leaves[k] = green[(size_t)(((float)k + 0.5f) / 8.0f * (float)(green.size() - 1))];
+			haveLeaves = true;
+		}
+	}
 	auto scale = [](Rgba c, float k) {
 		auto ch = [&](int v) { v = (int)((float)v * k); return (uint8_t)(v < 0 ? 0 : v > 255 ? 255 : v); };
 		return Rgba{ch(c.r), ch(c.g), ch(c.b), 255};
@@ -239,8 +258,15 @@ static void makeCeiling(int style, const Rgba *bg, const Rgba *wall, Rgba sky, R
 					float v = 0.18f + 0.95f * (0.65f * leaf + 0.35f * grain) * (0.7f + 0.5f * (0.60f - open));
 					v = floorf(v * 6.0f + 0.5f) / 6.0f;
 					// les feuilles, en paliers : la rampe du jeu (trop sombre là-haut) mêlée de vert
-					const Rgba gr = {(uint8_t)(24 + 70 * v), (uint8_t)(48 + 110 * v), (uint8_t)(18 + 45 * v), 255};
-					c = mix(scale(rampAt(v), 1.3f), gr, 0.55f);
+					if (haveLeaves) {
+						const float lv = v * 0.85f; // (le feuillage des murs est plutôt sombre)
+						const float f = (lv < 0.0f ? 0.0f : lv > 0.999f ? 0.999f : lv) * 7.0f;
+						const int k = (int)f;
+						c = mix(leaves[k], leaves[k + 1 > 7 ? 7 : k + 1], f - (float)k);
+					} else {
+						const Rgba gr = {(uint8_t)(24 + 70 * v), (uint8_t)(48 + 110 * v), (uint8_t)(18 + 45 * v), 255};
+						c = mix(scale(rampAt(v), 1.3f), gr, 0.55f);
+					}
 				}
 				if (branch < 0.018f && open < 0.66f)
 					c = rampAt(0.04f); // une branche
