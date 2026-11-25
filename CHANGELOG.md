@@ -3,6 +3,20 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.44.0] — The block reworked, book tabs
+
+- **Windows interface**: the inventory now sits on top of the block and the message line with the
+  characters at the bottom; the spellbook and the compass column run the full height on either
+  side. The whole block has one brass frame (thin seams between its windows), so corners no
+  longer overlap, and it grows or shrinks by the corners of that frame.
+- The inventory opens **upwards**, in front of the view; its tabs sit above it.
+- **Book tabs** as in Lands of Lore 2, in the inventory's colour with a brass edge and rounded top.
+  The open/close tab lights the arrow pointing outwards when the inventory is closed and the one
+  pointing inwards when it is open.
+- The yellow frame of the selected character no longer flashes over the game's text box while it
+  slides down over the portraits.
+- LOL2 UI uses the same single frame and tabs.
+
 ## [0.43.0] — LOL2 UI
 
 - New interface choice in "VR controls" → "Interface": **LOL2 UI**, one tall block left of the

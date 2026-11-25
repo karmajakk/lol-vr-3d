@@ -2072,7 +2072,7 @@ index 30c59a7..ed22548 100644
  	switch (param[0]) {
  	case 0:
 diff --git a/engines/kyra/text/text_lol.cpp b/engines/kyra/text/text_lol.cpp
-index 22882f4..a4b226f 100644
+index 22882f4..16f0c9b 100644
 --- a/engines/kyra/text/text_lol.cpp
 +++ b/engines/kyra/text/text_lol.cpp
 @@ -65,6 +65,7 @@ void TextDisplayer_LoL::setupField(bool mode) {
@@ -2083,11 +2083,12 @@ index 22882f4..a4b226f 100644
  			_screen->setScreenDim(clearDim(4));
  			int cp = _screen->setCurPage(2);
  			_screen->copyRegionToBuffer(3, 0, 0, 320, 40, _vm->_pageBuffer1);
-@@ -97,6 +98,7 @@ void TextDisplayer_LoL::expandField() {
+@@ -97,6 +98,8 @@ void TextDisplayer_LoL::expandField() {
  	uint8 *tmp = _vm->_pageBuffer1 + 13000;
  
  	if (_vm->textEnabled()) {
 +		_vm->_lolvrFieldExpanded = true; // lol-vr-3d
++		g_lolvrLevel.textBox = _vm->lolvrTextBox(); // lol-vr-3d : dès le début de l'animation (rien par-dessus)
  		_vm->_fadeText = false;
  		_vm->_textColorFlag = 0;
  		_vm->_timer->disable(11);

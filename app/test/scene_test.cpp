@@ -261,6 +261,8 @@ int main(int argc, char **argv) {
 		{"hint", kEnvLibrary, kThemeKeep, seat, 0, -10, 1.0f, false, 0.0f, 0.0f, 6},
 		{"keyboard", kEnvLibrary, kThemeKeep, seat, 0, -26, 0.85f, true, 0.0f, 0.0f, 2},
 		{"curseur", kEnvLibrary, kThemeKeep, seat, 0, 0, 0.6f, false, 0.0f, 0.0f, 7},
+		{"block", kEnvLibrary, kThemeKeep, {0.0f, 1.10f, 0.2f}, 0, -6, 0.8f, false, 0.0f, 0.0f, 9},
+		{"block_open", kEnvLibrary, kThemeKeep, {0.0f, 1.10f, 0.2f}, 0, -2, 0.8f, false, 0.0f, 0.0f, 10},
 		{"lol2", kEnvLibrary, kThemeKeep, {0.15f, 1.20f, 0.6f}, 8, 2, 1.1f, false, 0.0f, 0.0f, 8},
 	};
 
@@ -312,8 +314,8 @@ int main(int argc, char **argv) {
 		check(near(200, 132), "dessous : la ligne de messages, au-dessus des personnages");
 		{
 			const SceneState::Panel pa = panel(0), iv = panel(1);
-			check(iv.center.y < pa.center.y - pa.halfH && iv.center.y + iv.halfH > pa.center.y - pa.halfH - 0.08f && fabsf(iv.center.x - pa.center.x) < 0.02f,
-			      "l'inventaire juste sous les personnages, centré (un seul bloc)");
+			check(iv.center.y > pa.center.y + pa.halfH && iv.center.y - iv.halfH < pa.center.y + pa.halfH + 0.02f && fabsf(iv.center.x - pa.center.x) < 0.02f,
+			      "l'inventaire juste au-dessus des personnages, centré (un seul bloc)");
 		}
 		aimAt(panel(1).center);
 		ui.update(in, o, tmp);
@@ -325,10 +327,14 @@ int main(int argc, char **argv) {
 			aimIn(3, 16, 61, 32, 122);
 			check(near(304, 61), "à droite des personnages : la colonne de la boussole");
 			const SceneState::Panel pa = panel(0), sp = panel(2), co = panel(3);
-			check(sp.center.x + sp.halfW < pa.center.x - pa.halfW && sp.center.x + sp.halfW > pa.center.x - pa.halfW - 0.05f &&
-			      co.center.x - co.halfW > pa.center.x + pa.halfW - 0.02f && co.center.x - co.halfW < pa.center.x + pa.halfW + 0.05f &&
-			      fabsf((sp.center.y + sp.halfH) - (pa.center.y + pa.halfH)) < 0.03f && fabsf((co.center.y + co.halfH) - (pa.center.y + pa.halfH)) < 0.03f,
-			      "un seul bloc : les sorts collés à gauche, la colonne à droite, le haut aligné");
+			const SceneState::Panel iv = panel(1);
+			auto lx = [&](const SceneState::Panel &q) { return dot(q.center - pa.center, pa.right); };
+			auto ly = [&](const SceneState::Panel &q) { return dot(q.center - pa.center, pa.up); };
+			const float top = ly(iv) + iv.halfH, bot = -pa.halfH;
+			check(lx(sp) + sp.halfW < -pa.halfW && lx(sp) + sp.halfW > -pa.halfW - 0.02f && lx(co) - co.halfW > pa.halfW && lx(co) - co.halfW < pa.halfW + 0.02f &&
+			      fabsf(ly(sp) + sp.halfH - top) < 0.005f && fabsf(ly(co) + co.halfH - top) < 0.005f &&
+			      fabsf(ly(sp) - sp.halfH - bot) < 0.005f && fabsf(ly(co) - co.halfH - bot) < 0.005f,
+			      "un seul bloc : les sorts à gauche, la colonne à droite, de toute la hauteur, côte à côte");
 		}
 		// Mode immersif, interface classique : la barre du bas du jeu (384 x 79) sous la vue, la colonne
 		// de la boussole coupée en deux à sa droite ; plus de fenêtre d'inventaire.
@@ -405,7 +411,8 @@ int main(int argc, char **argv) {
 				aimAt(tmp.panels[tabTop].center);
 				click();
 				const SceneState::Panel inv1 = panel(1);
-				check(fabsf(inv1.halfH / inv1.halfW - 176.0f * 1.2f / 132.0f) < 0.01f && fabsf(lx(inv1.center) + inv1.halfW - invRight) < 0.003f,
+				check(fabsf(inv1.halfH / inv1.halfW - 176.0f * 1.2f / 132.0f) < 0.01f &&
+				      length(normalize(inv1.center + inv1.right * inv1.halfW - in.anchorPos) - normalize(inv.center + inv.right * inv.halfW - in.anchorPos)) < 0.01f,
 				      "LOL2 UI : l'onglet du haut ouvre l'inventaire vers la gauche");
 				aimIn(1, 11, 33, 132, 176);
 				in.triggerDown = in.triggerPressed = true;
@@ -495,11 +502,11 @@ int main(int argc, char **argv) {
 				int tabL = -1, tabR = -1;
 				for (int k = 0; k < SceneState::kMaxPanels; k++) {
 					const SceneState::Panel &b = tmp.panels[k];
-					if (!b.visible || b.halfW <= b.halfH || b.halfW > inv0.halfW * 0.5f || b.center.y > inv0.center.y - inv0.halfH)
+					if (!b.visible || b.halfW <= b.halfH || b.halfW > inv0.halfW * 0.5f || dot(b.center - inv0.center, inv0.up) < inv0.halfH)
 						continue;
-					if (b.center.x < inv0.center.x) tabL = k; else tabR = k;
+					if (dot(b.center - inv0.center, inv0.right) < 0.0f) tabL = k; else tabR = k;
 				}
-				check(tabL >= 0 && tabR >= 0, "deux onglets sous l'inventaire, en bas à gauche et à droite");
+				check(tabL >= 0 && tabR >= 0, "deux onglets au-dessus de l'inventaire, à gauche et à droite");
 				if (tabR >= 0 && tabL >= 0) {
 					const SceneState::Panel tr = tmp.panels[tabR], tl = tmp.panels[tabL];
 					aimAt(tr.center);
@@ -509,12 +516,13 @@ int main(int argc, char **argv) {
 					in.triggerDown = in.triggerPressed = false;
 					ui.update(in, o, tmp);
 					const SceneState::Panel inv1 = panel(1);
-					check(fabsf(inv1.halfH / inv1.halfW - 132.0f * 1.2f / 176.0f) < 0.01f, "onglet de droite : l'inventaire s'ouvre (six lignes)");
+					check(fabsf(inv1.halfH / inv1.halfW - 132.0f * 1.2f / 176.0f) < 0.01f && length(normalize(inv1.center - inv1.up * inv1.halfH - in.anchorPos) - normalize(inv0.center - inv0.up * inv0.halfH - in.anchorPos)) < 0.01f,
+					      "onglet de droite : l'inventaire s'ouvre vers le haut (six lignes)");
 					(void)tl;
 					SceneState::Panel tl2 = tl;
 					for (int k = 0; k < SceneState::kMaxPanels; k++) {
 						const SceneState::Panel &b = tmp.panels[k];
-						if (b.visible && b.halfW > b.halfH && b.halfW < inv1.halfW * 0.5f && b.center.y < inv1.center.y - inv1.halfH && b.center.x < inv1.center.x)
+						if (b.visible && b.halfW > b.halfH && b.halfW < inv1.halfW * 0.5f && dot(b.center - inv1.center, inv1.up) > inv1.halfH && dot(b.center - inv1.center, inv1.right) < 0.0f)
 							tl2 = b;
 					}
 					aimAt(tl2.center);
@@ -525,6 +533,7 @@ int main(int argc, char **argv) {
 					in.triggerDown = in.triggerPressed = false;
 					ui.update(in, o, tmp);
 				}
+				ui.setInventoryExpanded(false);
 				in.invRgb = nullptr;
 			}
 			in.holdToMove = false;
@@ -636,8 +645,12 @@ int main(int argc, char **argv) {
 		}
 		// 7c. Coins : on attrape un coin, on l'écarte, la fenêtre grandit ; pareil pour l'écran
 		{
-			// (le bloc : on prend le coin libre en haut à gauche du livre de sorts ; tout le bloc suit)
+			// (le bloc : on prend le coin haut gauche de son cadre, derrière le livre de sorts ; tout suit)
+			panel(0);
 			SceneState::Panel inv = panel(2);
+			for (int k = 0; k < SceneState::kMaxPanels; k++)
+				if (tmp.panels[k].visible && tmp.panels[k].texW == 2 && tmp.panels[k].texH == 2)
+					inv = tmp.panels[k];
 			Vec3 corner = inv.center - inv.right * (inv.halfW + 0.02f) + inv.up * (inv.halfH + 0.02f);
 			float scale0 = ui.placement[kPanelSpells].scale;
 			aimAt(corner);
@@ -654,8 +667,8 @@ int main(int argc, char **argv) {
 			float grown = ui.placement[kPanelSpells].scale / scale0;
 			check(grown > 1.2f, "coin écarté : le bloc grandit");
 			SceneState::Panel inv2 = panel(1), party2 = panel(0);
-			const float gap = length((party2.center - party2.up * party2.halfH) - (inv2.center + inv2.up * inv2.halfH));
-			check(gap < 0.03f && fabsf(party2.halfW / inv2.halfW - 1.0f) < 0.01f, "… tout le bloc grandit, l'inventaire reste collé sous les personnages");
+			const float gap = length((party2.center + party2.up * party2.halfH) - (inv2.center - inv2.up * inv2.halfH));
+			check(gap < 0.03f && fabsf(party2.halfW / inv2.halfW - 1.0f) < 0.01f, "… tout le bloc grandit, l'inventaire reste collé au-dessus des personnages");
 			for (int k = 0; k < 60; k++) {
 				aimAt(inv.center + (corner - inv.center) * 0.7f);
 				ui.update(in, o, tmp);
@@ -1110,7 +1123,7 @@ int main(int argc, char **argv) {
 			in.headDir = {0, 0, -1};
 		}
 		static std::vector<uint8_t> lol2Inv((size_t)176 * 132 * 3);
-		if (sh.mode == 8) {
+		if (sh.mode >= 8) {
 			// LOL2 UI : le bloc debout à gauche de la vue (des cases en damier pour l'inventaire)
 			for (int y = 0; y < 132; y++)
 				for (int x = 0; x < 176; x++) {
@@ -1123,7 +1136,8 @@ int main(int argc, char **argv) {
 			in.characters = 3;
 			in.partyMark[0] = 149; in.partyMark[1] = 143; in.partyMark[2] = 66; in.partyMark[3] = 34;
 			ui.setDungeonOption(1);
-			ui.setHudMode(2);
+			ui.setHudMode(sh.mode == 8 ? 2 : 0); // (9, 10 : le grand bloc des fenêtres, fermé puis ouvert)
+			ui.setInventoryExpanded(sh.mode == 10);
 		}
 		if (sh.mode == 1) {
 			in.partyMark[0] = 149; in.partyMark[1] = 143; in.partyMark[2] = 66; in.partyMark[3] = 34;

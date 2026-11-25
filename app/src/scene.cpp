@@ -494,6 +494,7 @@ struct Scene::Impl {
 		float rect[4] = {0, 0, 1, 1}, border[2] = {0.01f, 0.01f}, alpha = 1.0f, hot[4] = {0, 0, 0, 0};
 		float mode = 0.0f, glow = 0.0f;
 		bool onTop = false;
+		int layer = 0;
 		GLuint texture = 0;
 		float texSize[2] = {320, 200};
 		Vec3 center = {0, 0, 0};
@@ -997,6 +998,7 @@ void Scene::prepare(const SceneState &s) {
 		pd.texSize[1] = (float)(pn.texture ? pn.texH : s.gameHeight);
 		pd.center = pn.center;
 		pd.onTop = pn.onTop;
+		pd.layer = pn.layer;
 		d->panelDraws.push_back(pd);
 	}
 	for (int i = 0; i < SceneState::kMaxHandles && d->texturesReady; i++) {
@@ -1168,6 +1170,8 @@ void Scene::render(const Mat4 &view, const Mat4 &proj, const SceneState &s) {
 		std::sort(order.begin(), order.end(), [&](int a, int b) {
 			if (d->panelDraws[a].onTop != d->panelDraws[b].onTop)
 				return d->panelDraws[b].onTop; // par-dessus tout : en dernier
+			if (d->panelDraws[a].layer != d->panelDraws[b].layer)
+				return d->panelDraws[a].layer < d->panelDraws[b].layer; // (le cadre d'un groupe d'abord, les onglets après)
 			Vec3 da = d->panelDraws[a].center - camPos, db = d->panelDraws[b].center - camPos;
 			return dot(da, da) > dot(db, db);
 		});
