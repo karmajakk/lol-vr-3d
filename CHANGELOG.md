@@ -3,6 +3,11 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.50.0] — Cave and castle ceilings
+
+- Caves: the ceiling is the cave wall itself.
+- Gladstone castle: the coffers take the pale tone of the castle walls.
+
 ## [0.49.0] — Real ceilings, smoother arrivals
 
 - **Ceilings** drawn per region, in the colours of the game's own ceiling: coffers in Gladstone

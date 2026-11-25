@@ -48,8 +48,9 @@ struct DungeonGfx {
 	int ceilingStyle = 0;
 };
 
-// Le plafond d'une région du jeu : 1 à caissons (château, manoir, tour), 2 à poutres de bois (mines),
-// 3 de roche (cavernes, ruines), 4 des cimes et du ciel (forêt, marais, Yvel) ; 0 inconnue.
+// Le plafond d'une région du jeu : 1 à caissons (manoir, tour), 2 à poutres de bois (mines), 3 de
+// roche (ruines), 4 des cimes et du ciel (forêt, marais, Yvel), 5 à caissons aussi pâles que les murs
+// (château), 6 le mur lui-même (cavernes) ; 0 inconnue.
 int ceilingStyleOf(const char *tileset);
 
 // Comment un type de mur est montré en 3D.
@@ -64,6 +65,7 @@ struct DungeonTextures {
 	std::vector<uint8_t> rgba; // layers x 128 x 128 x 4, première ligne en haut
 	int pageLayer[64];         // page VMP -> couche (-1 = aucune)
 	int typeLayer[256];        // type de mur -> couche (dessin du moteur ; -1 = aucune)
+	int baseWallLayer = -1;    // le mur ordinaire du niveau (dessin du moteur ; -1 = aucun)
 	int doorLayer[256];        // type de mur -> couche de sa porte (-1 = aucune)
 	float doorDepth[256];      // la porte est à cette fraction de la case (1 = sur la face, 2 = au milieu)
 	float faceDepth[256];      // de même pour le mur lui-même (cadres de porte : au milieu de la case)

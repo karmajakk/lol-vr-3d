@@ -122,11 +122,31 @@ static float ceilFbm(int i, int j, int cells, uint32_t seed) {
 // Les plafonds dessinés : leurs couleurs viennent du plafond que le jeu dessine dans son image de
 // fond (une rampe du plus sombre au plus clair), le motif est le nôtre (le jeu, vu de face, n'en
 // montre qu'une bande en perspective, trop floue pour un plafond qu'on regarde en VR).
-static void makeCeiling(int style, const Rgba *bg, Rgba sky, Rgba *ceil) {
+static void makeCeiling(int style, const Rgba *bg, const Rgba *wall, Rgba sky, Rgba *ceil) {
+	const int N = kDunTexSize;
+	// Les cavernes : le plafond est la paroi elle-même (étirée sur la case).
+	if (style == 6 && wall) {
+		for (int j = 0; j < N; j++)
+			for (int i = 0; i < N; i++)
+				ceil[j * N + i] = wall[(j * kDunWallRows / N) * N + i];
+		return;
+	}
 	std::vector<Rgba> px;
-	for (int y = 0; y < 40; y++)
-		for (int x = 24; x < 152; x++)
-			px.push_back(bg[y * kBgW + x]);
+	if (style == 5 && wall) {
+		// (le château : les couleurs de ses murs, pâles, et non celles du plafond du jeu, plus sombre)
+		for (int y = 0; y < kDunWallRows; y++)
+			for (int x = 0; x < N; x++)
+				px.push_back(wall[y * N + x]);
+	} else {
+		for (int y = 0; y < 40; y++)
+			for (int x = 24; x < 152; x++)
+				px.push_back(bg[y * kBgW + x]);
+	}
+	const bool pale = style == 5 && wall;
+	if (style == 5)
+		style = 1;
+	if (style == 6)
+		style = 3; // (sans dessin de paroi : de la roche)
 	auto lum = [](const Rgba &c) { return 0.30f * c.r + 0.59f * c.g + 0.11f * c.b; };
 	std::sort(px.begin(), px.end(), [&](const Rgba &a, const Rgba &b) { return lum(a) < lum(b); });
 	// (sans le noir du fond lointain : la rampe commence au premier pixel qui n'est pas noir)
@@ -136,6 +156,15 @@ static void makeCeiling(int style, const Rgba *bg, Rgba sky, Rgba *ceil) {
 	Rgba ramp[8];
 	for (int k = 0; k < 8; k++)
 		ramp[k] = px[first + (size_t)(((float)k + 0.5f) / 8.0f * (float)(px.size() - first - 1))];
+	if (pale && px.size() > 16) {
+		// (château : la teinte claire des murs, en nuances assez écartées pour lire les caissons)
+		const Rgba mid = px[first + (px.size() - first) * 6 / 10];
+		for (int k = 0; k < 8; k++) {
+			const float f = 0.58f + 0.08f * (float)k;
+			auto ch = [&](int v) { v = (int)((float)v * f); return (uint8_t)(v > 255 ? 255 : v); };
+			ramp[k] = Rgba{ch(mid.r), ch(mid.g), ch(mid.b), 255};
+		}
+	}
 	auto mix = [](Rgba a, Rgba b, float t) {
 		t = t < 0.0f ? 0.0f : t > 1.0f ? 1.0f : t;
 		return Rgba{(uint8_t)(a.r + (b.r - a.r) * t), (uint8_t)(a.g + (b.g - a.g) * t), (uint8_t)(a.b + (b.b - a.b) * t), 255};
@@ -150,7 +179,6 @@ static void makeCeiling(int style, const Rgba *bg, Rgba sky, Rgba *ceil) {
 		auto ch = [&](int v) { v = (int)((float)v * k); return (uint8_t)(v < 0 ? 0 : v > 255 ? 255 : v); };
 		return Rgba{ch(c.r), ch(c.g), ch(c.b), 255};
 	};
-	const int N = kDunTexSize;
 	for (int j = 0; j < N; j++)
 		for (int i = 0; i < N; i++) {
 			const float grain = ceilFbm(i, j, 16, 7u);
@@ -291,7 +319,7 @@ int ceilingStyleOf(const char *t) {
 		const char *prefix;
 		int style;
 	};
-	static const Entry table[] = {{"KEEP", 1}, {"MANOR", 1}, {"TOWER", 1}, {"URBISH", 2}, {"MINE", 2}, {"CAVE", 3},
+	static const Entry table[] = {{"KEEP", 5}, {"MANOR", 1}, {"TOWER", 1}, {"URBISH", 2}, {"MINE", 2}, {"CAVE", 6},
 	                              {"RUIN", 3}, {"CIMMERIA", 3}, {"CATWALK", 3}, {"FOREST", 4}, {"SWAMP", 4}, {"YVEL", 4}};
 	for (const Entry &e : table)
 		if (!strncmp(t, e.prefix, strlen(e.prefix)))
@@ -341,6 +369,7 @@ void decodeDungeonTextures(const DungeonGfx &g, DungeonTextures &out) {
 	out = DungeonTextures();
 	for (int i = 0; i < 64; i++)
 		out.pageLayer[i] = -1;
+	out.baseWallLayer = -1;
 	for (int i = 0; i < 256; i++) {
 		out.typeLayer[i] = out.doorLayer[i] = out.decalLayer[i] = -1;
 		out.doorDepth[i] = 1.0f;
@@ -836,6 +865,7 @@ void decodeDungeonTextures(const DungeonGfx &g, DungeonTextures &out) {
 		if (baseLayer >= 0)
 			for (uint8_t pt : pendingBase)
 				out.typeLayer[pt] = baseLayer;
+		out.baseWallLayer = baseLayer;
 		// Deux dalles qui se suivent, la seconde dessinée plus bas : c'est la même, enfoncée.
 		// (les dalles vont par deux : levée et enfoncée ; un dessin seul, une flaque d'eau, reste à plat)
 		bool pairOk[256] = {false};
@@ -884,7 +914,8 @@ void decodeDungeonTextures(const DungeonGfx &g, DungeonTextures &out) {
 						skyCol = c;
 					}
 				}
-			makeCeiling(g.ceilingStyle, bg.data(), skyCol, ceil);
+			const Rgba *wall = out.baseWallLayer >= 0 ? (const Rgba *)&out.rgba[(size_t)out.baseWallLayer * layerBytes] : nullptr;
+			makeCeiling(g.ceilingStyle, bg.data(), wall, skyCol, ceil);
 		}
 		// Dehors : le ciel, de la couleur du haut de l'image de fond (au centre, entre les arbres),
 		// plus clair au zénith, plus sombre vers l'horizon.
