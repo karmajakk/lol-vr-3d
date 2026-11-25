@@ -81,7 +81,7 @@ index 1016080..bfba10b 100644
  		// the global subtitles settings, we're using this hack to enable subtitles
  		// for fan translations
 diff --git a/engines/kyra/engine/lol.cpp b/engines/kyra/engine/lol.cpp
-index c4f86a3..334b8d7 100644
+index c4f86a3..740d98f 100644
 --- a/engines/kyra/engine/lol.cpp
 +++ b/engines/kyra/engine/lol.cpp
 @@ -21,6 +21,8 @@
@@ -898,7 +898,7 @@ index c4f86a3..334b8d7 100644
 +		gui_drawInventory();
 +	} else if (op == 2) {
 +		Common::Array<Item> items;
-+		const int first = arg == 8 ? 8 : 16; // (les lignes rapides ne sont pas triées : deux, ou une en LOL2 UI)
++		const int first = 16; // (les deux lignes rapides, 0-15, ne sont pas triées)
 +		for (int i = first; i < 48; i++)
 +			if (_inventory[i])
 +				items.push_back(_inventory[i]);

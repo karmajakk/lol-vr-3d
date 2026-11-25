@@ -510,7 +510,7 @@ struct App {
 	// Interface détachée : l'écran ne garde que la vue du donjon, le reste part sur des panneaux.
 	lolvr::Ui ui;
 	bool detached = true;        // choix du joueur
-	int hudMode = 0;             // mode immersif : 0 les fenêtres, 1 la barre du bas du jeu, 2 LOL2 UI
+	int hudMode = 0;             // mode immersif : 0 tout regroupé, 1 la barre du bas du jeu, 2 des fenêtres séparées
 	bool split = false;          // en vigueur en ce moment
 	bool splitWanted = false;
 	double splitWantedSince = 0;
@@ -2361,7 +2361,7 @@ void updateUi(App &app, XrTime time, float dt, double now, bool pointer, bool tr
 	if (out.invSlot >= 0)
 		CoreHost::get().inventoryClick(out.invSlot);
 	if (out.invSort)
-		CoreHost::get().inventorySort(app.hudMode == 2 ? 8 : 16); // (LOL2 UI : une seule ligne rapide)
+		CoreHost::get().inventorySort();
 	switch (out.action) {
 	case lolvr::kUiActionToggleFire:
 		app.fireOn = !app.fireOn;
@@ -2417,8 +2417,8 @@ void updateUi(App &app, XrTime time, float dt, double now, bool pointer, bool tr
 		app.settingsDirty = true;
 		break;
 	case lolvr::kUiActionToggleHud:
-		// Mode immersif : les fenêtres, la barre du bas du jeu, puis LOL2 UI.
-		app.hudMode = (app.hudMode + 1) % 3;
+		// Mode immersif : tout regroupé, des fenêtres séparées, puis la barre du bas du jeu.
+		app.hudMode = app.hudMode == 0 ? 2 : app.hudMode == 2 ? 1 : 0;
 		app.ui.setHudMode(app.hudMode);
 		app.settingsDirty = true;
 		break;

@@ -4,7 +4,7 @@
 
 Pendant l'exploration, l'interface du jeu est répartie dans des fenêtres que tu places où tu veux (toujours en mode immersif ; en Classique et en Réalité mixte avec la vue « Fenêtres ») :
 
-- un seul grand bloc sous la vue, dans un même cadre de laiton : à gauche le livre de sorts, au milieu l'inventaire (deux lignes rapides) avec dessous la ligne de messages et les personnages côte à côte, à droite la colonne de la boussole (boussole, atlas, lanterne, bourse). Le bloc se déplace d'une pièce (une seule barrette, dessous) et s'agrandit ou rapetisse par les coins de son cadre ;
+- un seul grand bloc sous la vue, dans un même cadre : à gauche le livre de sorts, au milieu l'inventaire (deux lignes rapides) avec dessous la ligne de messages et les personnages côte à côte, à droite la colonne de la boussole (boussole, atlas, lanterne, bourse). Le bloc se déplace d'une pièce (une seule barrette, dessous) et s'agrandit ou rapetisse par les coins de son cadre ;
 - au-dessus de l'inventaire, deux onglets de livre comme dans Lands of Lore 2 : à droite, deux flèches opposées ouvrent tout l'inventaire vers le haut, devant la vue (six lignes), et le referment (la flèche allumée montre le sens) ; à gauche, trois barres le trient (lignes 3 à 6 ; les deux lignes rapides ne sont jamais triées). Le tri marche aussi inventaire fermé ;
 - deux boutons sur l'intérieur de tes poignets, toujours là : à gauche la disquette (menu du jeu, réglages VR), à droite le repos (ZZZ). Regarde l'intérieur de ton poignet et clique-le avec l'autre main ;
 - à droite, dès que le groupe a la carte, l'**Atlas** : la page de l'atlas du jeu elle-même (même parchemin, mêmes symboles, même police, même légende), à jour à chaque pas à mesure que tu explores. Son bandeau (« Atlas +/- ») la replie jusqu'au bandeau seul ; « Atlas » dans Réglages VR la masque tout à fait.
@@ -19,6 +19,8 @@ Une **fiche de personnage** est montrée en entier sur l'écran, qui s'élargit 
 
 Le bouton **Tout ranger** du clavier dispose les fenêtres autour de l'écran, où qu'il soit. Pour déplacer ou redimensionner une fenêtre, voir [Commandes](Controls.md).
 
-## LOL2 UI
+## Regroupée ou fenêtres séparées
 
-Dans « Réglages VR », « Interface » propose aussi **LOL2 UI** : un seul grand bloc debout à gauche de la vue, comme dans Lands of Lore 2. De bas en haut : la ligne de messages ; au-dessus, l'inventaire debout en colonne (une ligne rapide de 8 cases), les trois personnages empilés l'un sur l'autre et la colonne de la boussole ; tout en haut, le livre de sorts. À gauche de l'inventaire, deux onglets : en haut, deux flèches opposées ouvrent tout l'inventaire vers la gauche (un autre clic le referme) ; en bas, trois barres le trient (la ligne rapide n'est jamais triée). L'atlas est à droite de la vue.
+En mode immersif, « Réglages VR » → « Interface » passe par trois choix : **Regroupée** (le grand bloc décrit plus haut, agrandi par les quatre coins de son cadre), **Fenêtres** (les mêmes fenêtres séparées — livre de sorts, personnages avec la ligne de messages au-dessus, inventaire et ses onglets, colonne de la boussole — chacune avec sa barrette, placée et redimensionnée seule ; l'inventaire s'ouvre vers le haut) et **Classique** (la barre du bas du jeu). Dans les modes VR Classique et Réalité mixte, la vue « Fenêtres » est toujours regroupée.
+
+Les fenêtres ont un fin bord sombre, comme les lignes qui entourent les zones de l'interface du jeu.

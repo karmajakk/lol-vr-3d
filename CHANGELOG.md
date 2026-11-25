@@ -3,6 +3,17 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.45.0] — Grouped or separate windows, sober edges
+
+- **LOL2 UI removed**: it did not fit the game.
+- "Interface" (immersive mode) now offers **Grouped** (the big block, as before), **Windows**
+  (separate windows again: the spellbook, the characters with the message line above them, the
+  inventory with its tabs above it and the compass column, each with its own handle, placed and
+  resized on its own; the inventory opens upwards) and **Classic** (the game's bottom bar).
+- Grouped: the resize corners are only the four corners of the big frame.
+- Every window now has a thin dark edge, like the lines around the game's own interface areas,
+  instead of the wide gold frame.
+
 ## [0.44.0] — The block reworked, book tabs
 
 - **Windows interface**: the inventory now sits on top of the block and the message line with the

@@ -4,7 +4,7 @@
 
 Beim Erkunden ist die Oberfläche des Spiels auf Fenster verteilt, die du hinstellst, wo du willst (immer im immersiven Modus; in Klassisch und Mixed Reality mit der Ansicht „Fenster“):
 
-- ein einziger großer Block unter der Ansicht, in einem gemeinsamen Messingrahmen: links das Zauberbuch, in der Mitte das Inventar (zwei Schnellzeilen) und darunter die Nachrichtenzeile mit den Figuren nebeneinander, rechts die Kompass-Spalte (Kompass, Atlas, Laterne, Geldbeutel). Der Block bewegt sich als Ganzes (ein einziger Griff, darunter) und wird an den Ecken seines Rahmens größer oder kleiner;
+- ein einziger großer Block unter der Ansicht, in einem gemeinsamen Rahmen: links das Zauberbuch, in der Mitte das Inventar (zwei Schnellzeilen) und darunter die Nachrichtenzeile mit den Figuren nebeneinander, rechts die Kompass-Spalte (Kompass, Atlas, Laterne, Geldbeutel). Der Block bewegt sich als Ganzes (ein einziger Griff, darunter) und wird an den Ecken seines Rahmens größer oder kleiner;
 - über dem Inventar zwei Buchreiter wie in Lands of Lore 2: rechts öffnen zwei gegenläufige Pfeile das ganze Inventar nach oben, vor der Ansicht (sechs Zeilen), und schließen es wieder (der leuchtende Pfeil zeigt die Richtung); links sortieren drei Striche (Zeilen 3 bis 6; die zwei Schnellzeilen werden nie sortiert). Sortieren geht auch bei geschlossenem Inventar;
 - zwei Knöpfe an der Innenseite deiner Handgelenke, immer da: links die Diskette (Spielmenü, VR-Optionen), rechts der Rast-Knopf (ZZZ). Schau auf die Innenseite deines Handgelenks und klicke ihn mit der anderen Hand an;
 - rechts, sobald die Gruppe die Karte hat, der **Atlas**: die Atlasseite des Spiels selbst (gleiches Pergament, gleiche Symbole, gleiche Schrift, gleiche Legende), bei jedem Schritt aktualisiert, während du erkundest. Sein Streifen („Atlas +/-“) klappt ihn bis auf den Streifen ein; „Atlas“ in den VR-Optionen blendet ihn ganz aus.
@@ -19,6 +19,8 @@ Ein **Figurenbogen** wird vollständig auf dem Bildschirm gezeigt, der sich nach
 
 Der Knopf **Ordnen** der Tastatur stellt die Fenster um den Bildschirm, wo immer er ist. Zum Verschieben oder Vergrößern eines Fensters siehe [Steuerung](Controls.md).
 
-## LOL2 UI
+## Gruppiert oder getrennte Fenster
 
-In „VR-Optionen“ bietet „Oberfläche“ auch **LOL2 UI**: ein einziger hoher Block links von der Ansicht, wie in Lands of Lore 2. Von unten nach oben: die Nachrichtenzeile; darüber das Inventar als Spalte (eine Schnellzeile mit 8 Feldern), die drei Figuren übereinander und die Kompass-Spalte; ganz oben das Zauberbuch. Links vom Inventar zwei Reiter: oben öffnen zwei gegenläufige Pfeile das ganze Inventar nach links (ein weiterer Klick schließt es); unten sortieren drei Striche (die Schnellzeile wird nie sortiert). Der Atlas steht rechts von der Ansicht.
+Im immersiven Modus wechselt „VR-Optionen“ → „Oberfläche“ zwischen drei Möglichkeiten: **Gruppiert** (der große Block oben, an den vier Ecken seines Rahmens größer oder kleiner), **Fenster** (dieselben Fenster getrennt — Zauberbuch, Figuren mit der Nachrichtenzeile darüber, Inventar mit seinen Reitern, Kompass-Spalte — jedes mit eigenem Griff, einzeln platziert und skaliert; das Inventar öffnet sich nach oben) und **Klassisch** (die untere Leiste des Spiels). In den VR-Modi Klassisch und Mixed Reality ist die Ansicht „Fenster“ immer gruppiert.
+
+Die Fenster haben einen dünnen dunklen Rand, wie die Linien um die Bereiche der Spieloberfläche.

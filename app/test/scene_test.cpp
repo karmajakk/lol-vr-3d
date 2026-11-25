@@ -263,7 +263,7 @@ int main(int argc, char **argv) {
 		{"curseur", kEnvLibrary, kThemeKeep, seat, 0, 0, 0.6f, false, 0.0f, 0.0f, 7},
 		{"block", kEnvLibrary, kThemeKeep, {0.0f, 1.10f, 0.2f}, 0, -6, 0.8f, false, 0.0f, 0.0f, 9},
 		{"block_open", kEnvLibrary, kThemeKeep, {0.0f, 1.10f, 0.2f}, 0, -2, 0.8f, false, 0.0f, 0.0f, 10},
-		{"lol2", kEnvLibrary, kThemeKeep, {0.15f, 1.20f, 0.6f}, 8, 2, 1.1f, false, 0.0f, 0.0f, 8},
+		{"split_windows", kEnvLibrary, kThemeKeep, {0.0f, 1.20f, 0.6f}, 0, -4, 1.1f, false, 0.0f, 0.0f, 8},
 	};
 
 	// --- Essai de l'interface sans casque : pointage, poignées, clavier, butées ---
@@ -363,8 +363,7 @@ int main(int argc, char **argv) {
 			aimIn(0, 167, 39, 235, 57);
 			check(near(250, 160), "interface en fenêtres : les personnages reviennent sous la vue");
 		}
-		// LOL2 UI : un seul bloc debout à droite de la vue ; en bas la ligne de messages, au-dessus
-		// l'inventaire en colonne, les personnages empilés et la colonne de la boussole, en haut les sorts.
+		// Fenêtres séparées (mode immersif) : chacune seule, à sa place ; l'inventaire s'ouvre vers le haut.
 		{
 			static std::vector<uint8_t> invPix((size_t)176 * 132 * 3, 90);
 			in.invRgb = invPix.data();
@@ -373,84 +372,67 @@ int main(int argc, char **argv) {
 			in.holdToMove = false;
 			ui.setHudMode(2);
 			ui.update(in, o, tmp);
-			const SceneState::Panel pa = panel(0), inv = panel(1), sp = panel(2);
-			check(pa.visible && fabsf(pa.halfH / pa.halfW - 464.0f * 1.2f / 470.0f) < 0.01f && pa.center.x < in.screenPos.x - 0.2f,
-			      "LOL2 UI : le bloc des personnages, à gauche de la vue");
-			aimIn(0, 235, 442, 470, 464);
-			check(near(200, 132), "LOL2 UI : la ligne de messages, tout en bas");
-			{
-				const int t = (235 - 2 * 66) / 3;
-				aimIn(0, 75 + 132, 140 + 70, 470, 464);
-				check(near((float)(66 + t * 2 + 83 + 33), 160.5f), "LOL2 UI : le second personnage, sous le premier");
-			}
-			aimIn(0, 415, 210, 470, 464);
-			check(near(304, 61), "LOL2 UI : la colonne de la boussole, à droite");
-			check(sp.visible && fabsf(sp.halfW - pa.halfW) < 0.002f && sp.center.y - sp.halfH > pa.center.y + pa.halfH - 0.001f &&
-			      sp.center.y - sp.halfH < pa.center.y + pa.halfH + 0.03f, "LOL2 UI : le livre de sorts en haut, de toute la largeur");
-			// (dans le plan du bloc, qui fait face au joueur)
-			auto lx = [&](Vec3 q) { return dot(q - pa.center, pa.right); };
-			auto ly = [&](Vec3 q) { return dot(q - pa.center, pa.up); };
-			const float invRight = -pa.halfW + 53.0f / 470.0f * 2.0f * pa.halfW;
-			check(inv.visible && fabsf(inv.halfH / inv.halfW - 176.0f * 1.2f / 22.0f) < 0.05f && fabsf(lx(inv.center) + inv.halfW - invRight) < 0.003f &&
-			      fabsf((ly(inv.center) + inv.halfH) - pa.halfH) < 0.003f, "LOL2 UI : l'inventaire debout, une ligne rapide, à gauche des personnages");
-			int tabTop = -1, tabBot = -1;
-			for (int k = 0; k < SceneState::kMaxPanels; k++) {
-				const SceneState::Panel &b = tmp.panels[k];
-				if (!b.visible || k == 1 || lx(b.center) > lx(inv.center) - inv.halfW || lx(b.center) < lx(inv.center) - inv.halfW - 0.05f || fabsf(dot(b.right, pa.up)) < 0.9f)
-					continue;
-				if (ly(b.center) > ly(inv.center)) tabTop = k; else tabBot = k;
-			}
-			check(tabTop >= 0 && tabBot >= 0, "LOL2 UI : deux onglets debout à gauche de l'inventaire, en haut et en bas");
-			auto click = [&]() {
+			const SceneState::Panel pa = panel(0), inv = panel(1), sp = panel(2), co = panel(3);
+			check(sp.center.x + sp.halfW < in.screenPos.x - in.dispW * 0.5f && co.center.x - co.halfW > in.screenPos.x + in.dispW * 0.5f,
+			      "fenêtres séparées : le livre de sorts à gauche de la vue, la colonne à droite");
+			check(pa.center.y + pa.halfH < in.screenPos.y - in.dispH * 0.5f && inv.center.x - inv.halfW > pa.center.x + pa.halfW &&
+			      fabsf(inv.halfH / inv.halfW - 44.0f * 1.2f / 176.0f) < 0.01f, "fenêtres séparées : les personnages sous la vue, l'inventaire (deux lignes) à leur droite");
+			bool framed = false;
+			int handles = 0;
+			for (int k = 0; k < SceneState::kMaxPanels; k++)
+				framed |= tmp.panels[k].visible && tmp.panels[k].texW == 2 && tmp.panels[k].texH == 2;
+			for (int k = 0; k < SceneState::kMaxHandles; k++)
+				handles += tmp.handles[k].visible ? 1 : 0;
+			check(!framed && handles >= 5, "fenêtres séparées : pas de grand cadre, une barrette par fenêtre");
+			aimIn(0, 167, 39, 235, 57);
+			check(near(250, 160), "fenêtres séparées : un personnage");
+			auto findTab = [&](const SceneState::Panel &iv, bool right) {
+				int t = -1;
+				for (int k = 0; k < SceneState::kMaxPanels; k++) {
+					const SceneState::Panel &b = tmp.panels[k];
+					if (b.visible && b.texW == 384 && dot(b.center - iv.center, iv.up) > iv.halfH && (dot(b.center - iv.center, iv.right) > 0.0f) == right)
+						t = k;
+				}
+				return t;
+			};
+			auto click = [&](Vec3 at) {
+				aimAt(at);
 				ui.update(in, o, tmp);
 				in.triggerDown = in.triggerPressed = true;
 				ui.update(in, o, tmp);
 				in.triggerDown = in.triggerPressed = false;
 			};
-			if (tabTop >= 0 && tabBot >= 0) {
-				aimAt(tmp.panels[tabTop].center);
-				click();
+			panel(1);
+			const int tr = findTab(inv, true), tl = findTab(inv, false);
+			check(tr >= 0 && tl >= 0, "fenêtres séparées : les deux onglets au-dessus de l'inventaire");
+			if (tr >= 0 && tl >= 0) {
+				click(tmp.panels[tr].center);
 				const SceneState::Panel inv1 = panel(1);
-				check(fabsf(inv1.halfH / inv1.halfW - 176.0f * 1.2f / 132.0f) < 0.01f &&
-				      length(normalize(inv1.center + inv1.right * inv1.halfW - in.anchorPos) - normalize(inv.center + inv.right * inv.halfW - in.anchorPos)) < 0.01f,
-				      "LOL2 UI : l'onglet du haut ouvre l'inventaire vers la gauche");
-				aimIn(1, 11, 33, 132, 176);
-				in.triggerDown = in.triggerPressed = true;
-				ui.update(in, o, tmp);
-				in.triggerDown = in.triggerPressed = false;
-				check(o.invSlot == 41, "LOL2 UI : la colonne de gauche est la dernière ligne de l'inventaire");
-				int bot = -1;
-				for (int k = 0; k < SceneState::kMaxPanels; k++) {
-					const SceneState::Panel &b = tmp.panels[k];
-					if (b.visible && k != 1 && lx(b.center) < lx(inv1.center) - inv1.halfW && lx(b.center) > lx(inv1.center) - inv1.halfW - 0.05f && fabsf(dot(b.right, pa.up)) > 0.9f && ly(b.center) < ly(inv1.center))
-						bot = k;
-				}
-				check(bot >= 0, "LOL2 UI : l'onglet du tri suit le bord gauche");
-				if (bot >= 0) {
-					aimAt(tmp.panels[bot].center);
+				check(fabsf(inv1.halfH / inv1.halfW - 132.0f * 1.2f / 176.0f) < 0.01f &&
+				      length(normalize(inv1.center - inv1.up * inv1.halfH - in.anchorPos) - normalize(inv.center - inv.up * inv.halfH - in.anchorPos)) < 0.01f,
+				      "fenêtres séparées : l'inventaire s'ouvre vers le haut, le bas reste en place");
+				const int tl2 = findTab(inv1, false);
+				if (tl2 >= 0) {
+					aimAt(tmp.panels[tl2].center);
 					ui.update(in, o, tmp);
 					in.triggerDown = in.triggerPressed = true;
 					ui.update(in, o, tmp);
-					check(o.invSort, "LOL2 UI : l'onglet du bas trie");
+					check(o.invSort, "fenêtres séparées : l'onglet de gauche trie");
 					in.triggerDown = in.triggerPressed = false;
-				}
-				aimAt(tmp.panels[tabTop].center);
-				panel(0);
-				for (int k = 0; k < SceneState::kMaxPanels; k++) {
-					const SceneState::Panel &b = tmp.panels[k];
-					if (b.visible && k != 1 && lx(b.center) < lx(inv1.center) - inv1.halfW && fabsf(dot(b.right, pa.up)) > 0.9f && ly(b.center) > ly(inv1.center))
-						aimAt(b.center);
-				}
-				click();
+				} else
+					check(false, "fenêtres séparées : l'onglet de gauche trie");
+				const int tr2 = findTab(inv1, true);
+				if (tr2 >= 0)
+					click(tmp.panels[tr2].center);
 				const SceneState::Panel inv2 = panel(1);
-				check(fabsf(inv2.halfW - inv.halfW) < 0.001f, "LOL2 UI : un autre clic le referme");
+				check(fabsf(inv2.halfW - inv.halfW) < 0.001f && length(inv2.center - inv.center) < 0.01f, "fenêtres séparées : un autre clic le referme, à sa place");
 			}
 			ui.setHudMode(0);
 			in.holdToMove = hold;
 			in.invRgb = nullptr;
 			ui.update(in, o, tmp);
 			aimIn(0, 167, 39, 235, 57);
-			check(near(250, 160), "retour aux fenêtres après LOL2 UI");
+			check(near(250, 160), "retour au bloc regroupé");
 		}
 		// Gâchette maintenue pour déplacer une fenêtre (plus de poignées) ; un appui bref reste un clic.
 		{
@@ -1122,21 +1104,21 @@ int main(int argc, char **argv) {
 			in.headPos = sh.eye;
 			in.headDir = {0, 0, -1};
 		}
-		static std::vector<uint8_t> lol2Inv((size_t)176 * 132 * 3);
+		static std::vector<uint8_t> shotInv((size_t)176 * 132 * 3);
 		if (sh.mode >= 8) {
-			// LOL2 UI : le bloc debout à gauche de la vue (des cases en damier pour l'inventaire)
+			// Les fenêtres séparées, puis le grand bloc fermé et ouvert (des cases en damier pour l'inventaire)
 			for (int y = 0; y < 132; y++)
 				for (int x = 0; x < 176; x++) {
-					uint8_t *q = &lol2Inv[((size_t)y * 176 + x) * 3];
+					uint8_t *q = &shotInv[((size_t)y * 176 + x) * 3];
 					const bool edge = x % 22 == 0 || y % 22 == 0;
 					q[0] = edge ? 30 : (uint8_t)(60 + (y / 22) * 30); q[1] = edge ? 20 : 70; q[2] = edge ? 10 : (uint8_t)(40 + (x / 22) * 20);
 				}
-			in.invRgb = lol2Inv.data();
+			in.invRgb = shotInv.data();
 			in.invSerial = 3;
 			in.characters = 3;
 			in.partyMark[0] = 149; in.partyMark[1] = 143; in.partyMark[2] = 66; in.partyMark[3] = 34;
 			ui.setDungeonOption(1);
-			ui.setHudMode(sh.mode == 8 ? 2 : 0); // (9, 10 : le grand bloc des fenêtres, fermé puis ouvert)
+			ui.setHudMode(sh.mode == 8 ? 2 : 0); // (8 : fenêtres séparées ; 9, 10 : le grand bloc, fermé puis ouvert)
 			ui.setInventoryExpanded(sh.mode == 10);
 		}
 		if (sh.mode == 1) {

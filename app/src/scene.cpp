@@ -317,9 +317,10 @@ void main() {
 	}
 	vec2 outside = max(uRect.xy - vUv, vUv - uRect.zw);
 	if (outside.x > 0.0 || outside.y > 0.0) {
+		// Une ligne sombre, sobre, comme celles qui entourent les zones de l'interface du jeu (un
+		// soupçon de brun au bord extérieur pour qu'elle ne soit pas qu'un trou noir).
 		float e = clamp(max(outside.x / uBorder.x, outside.y / uBorder.y), 0.0, 1.0);
-		vec3 brass = mix(vec3(0.95, 0.72, 0.30), vec3(0.40, 0.26, 0.09), smoothstep(0.1, 1.0, e));
-		c = mix(vec3(0.08, 0.05, 0.03), brass, smoothstep(0.0, 0.18, e));
+		c = mix(vec3(0.035, 0.025, 0.018), vec3(0.17, 0.12, 0.08), smoothstep(0.55, 1.0, e));
 	} else {
 		// Pixels nets quand l'image est grande ; quand un pixel du jeu tient sur moins de deux
 		// pixels du casque (fenêtre lointaine ou vue de biais), une moyenne de plusieurs prises :

@@ -164,7 +164,7 @@ public:
 	// Ramasser l'objet posé numéro item (sur la case du groupe ou celle devant).
 	void pickupItem(int item);
 	void inventoryClick(int slot);
-	void inventorySort(int firstSlot = 16); // (les cases avant firstSlot, rapides, ne bougent pas)
+	void inventorySort();
 	void nextSpell(); // le sort suivant du parchemin
 	// L'app dessine elle-même le curseur du jeu, là où vise le joueur (le cœur ne le met plus dans l'image).
 	void setOwnCursor(bool own);

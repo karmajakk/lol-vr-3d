@@ -223,9 +223,8 @@ public:
 	// personnages, les flèches et la ligne d'objets d'origine), montrée dans les réglages VR.
 	void setHudClassic(bool classic);
 	bool hudClassic() const;
-	// L'interface du mode immersif : 0 fenêtres, 1 classique, 2 « LOL2 UI » (un seul bloc vertical :
-	// le livre de sorts en haut ; l'inventaire en colonne, les personnages empilés et la colonne de la
-	// boussole au milieu ; la ligne de messages en bas).
+	// L'interface du mode immersif : 0 tout regroupé (un seul bloc dans un cadre), 1 classique (la
+	// barre du bas du jeu), 2 des fenêtres séparées (chacune se place et se redimensionne seule).
 	void setHudMode(int mode);
 	int hudMode() const;
 	// L'inventaire collé sous les personnages (fenêtres) ; détaché par son bouton, recollé en le

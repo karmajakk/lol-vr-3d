@@ -4,7 +4,7 @@
 
 While exploring, the game interface is spread over windows you place wherever you like (always in immersive mode; in Classic and Mixed reality with the "Windows" view):
 
-- one big block below the view, in a single brass frame: on the left the spellbook, in the middle the inventory (two quick rows) with the message line and the characters side by side under it, on the right the compass column (compass, atlas, lamp, purse). The block moves as one piece (a single handle, underneath) and grows or shrinks by the corners of its frame;
+- one big block below the view, in a single frame: on the left the spellbook, in the middle the inventory (two quick rows) with the message line and the characters side by side under it, on the right the compass column (compass, atlas, lamp, purse). The block moves as one piece (a single handle, underneath) and grows or shrinks by the corners of its frame;
 - above the inventory, two book tabs as in Lands of Lore 2: on the right, two opposed arrows open the whole inventory upwards, in front of the view (six rows), and close it again (the lit arrow shows which way it goes); on the left, three bars sort it (rows 3 to 6; the two quick rows are never sorted). Sorting works with the inventory closed too;
 - two buttons on the inner side of your wrists, always there: on the left the floppy (game menu, VR controls), on the right the rest button (ZZZ). Look at the inside of your wrist and click it with the other hand;
 - on the right, once the party has the map, the **Atlas**: the game's own atlas page (same parchment, symbols, font and legend), updated at every step as you explore. It is closed by default: the atlas icon of the game (open book, in the compass column) or the map button opens it, and the "Close" box on the page closes it. Its arrows open the game's own atlas on the screen, one page turned, to browse the maps of the other levels. You can move it like the other windows.
@@ -21,6 +21,8 @@ A **character sheet** is shown in full on the screen, which widens to the right 
 
 The **Reset layout** button of the keyboard arranges the windows around the screen, wherever it is. To move or resize a window, see [Controls](Controls.md).
 
-## LOL2 UI
+## Grouped or separate windows
 
-In "VR controls", "Interface" also offers **LOL2 UI**: one tall block to the left of the view, as in Lands of Lore 2. From the bottom up: the message line; above it the inventory standing as a column (one quick row of 8 slots), the three characters stacked one above the other and the compass column; at the top, the spellbook. Left of the inventory, two tabs: at the top, two opposed arrows open the whole inventory towards the left (one more click closes it); at the bottom, three bars sort it (the quick row is never sorted). The atlas sits to the right of the view.
+In immersive mode, "VR controls" → "Interface" cycles through three choices: **Grouped** (the big block described above, its corners in the four corners of its frame), **Windows** (the same windows apart — spellbook, characters with the message line above them, inventory with its tabs, compass column — each with its own handle, placed and resized on its own; the inventory opens upwards) and **Classic** (the game's own bottom bar). In the Classic and Mixed reality VR modes, the "Windows" view is always grouped.
+
+The windows have a thin dark edge, like the lines around the game's own interface areas.
