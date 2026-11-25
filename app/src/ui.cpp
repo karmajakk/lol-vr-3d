@@ -75,6 +75,8 @@ struct Composite {
 };
 const int kCompParty = 0, kCompSpells = 1, kCompAtlas = 2, kCompInv = 3, kCompColumn = 4;
 const int kCompTexW[5] = {240, 300, kAtlasW, 240, 32}, kCompTexH[5] = {64, 288, kAtlasH, 132, 124};
+// LOL2 UI : le bloc des personnages, en demi-pixels du jeu (voir compose).
+const int kLol2W = 470, kLol2Mid = 420, kLol2Text = 44, kLol2InvW = 53, kLol2ColX = 360;
 const int kSpellTabH = 0; // (plus de bandeau au-dessus du livre de sorts) // bandeau du haut de la fenêtre de gauche : ouvrir ou replier le livre de sorts
 
 // Les pixels du jeu sont 1,2 fois plus hauts que larges ; ceux du clavier sont carrés.
@@ -367,8 +369,10 @@ struct Ui::Impl {
 	bool menuOpen = false;
 	bool menuAhead = false; // à placer devant le joueur à la prochaine image
 	int vrMode = 1, classicView = 0;
-	bool hudClassic = false, partyReplace = false;
-	bool classicBar() const { return hudClassic && dungeonMode; } // la barre du bas, comme dans le jeu
+	int hudMode = 0; // 0 fenêtres, 1 classique, 2 LOL2 UI
+	bool partyReplace = false;
+	bool classicBar() const { return hudMode == 1 && dungeonMode; } // la barre du bas, comme dans le jeu
+	bool lol2() const { return hudMode == 2 && dungeonMode; }       // le bloc vertical, comme Lands of Lore 2
 	bool gearShown = false; // la disquette du poignet (un peu de marge pour qu'elle ne clignote pas)
 	bool palmShown = false; // le repos sur la paume droite
 	// L'inventaire collé sous les personnages (un seul bloc, comme dans le jeu) ; un bouton (au
@@ -595,7 +599,8 @@ void Ui::Impl::makeButtons() {
 
 void Ui::Impl::composeInv(const UiFrameInput &in) {
 	Composite &c = comp[kCompInv];
-	const int key = 1000 + (invExpanded ? 1 : 0) + (invHot + 1) * 2;
+	const bool v = lol2(); // (LOL2 UI : en colonnes, la ligne rapide à droite, le reste s'ouvre à gauche)
+	const int key = 1000 + (invExpanded ? 1 : 0) + (invHot + 1) * 2 + (v ? 100000 : 0);
 	if (c.tex && c.serial == in.invSerial && c.key == key)
 		return;
 	c.serial = in.invSerial;
@@ -605,6 +610,12 @@ void Ui::Impl::composeInv(const UiFrameInput &in) {
 	c.pieces.clear();
 	c.w = 176; // (les cases seules : les boutons sont à côté, hors de la fenêtre)
 	c.h = invExpanded ? 132 : 44; // (deux lignes rapides)
+	if (v) {
+		c.texW = 132;
+		c.texH = 176;
+		c.w = invExpanded ? 132 : 22; // (une seule ligne rapide, debout)
+		c.h = 176;
+	}
 	c.px.assign((size_t)c.texW * c.texH * 4, 0);
 	auto put = [&](int x, int y, uint8_t r, uint8_t g, uint8_t b) {
 		if (x < 0 || y < 0 || x >= c.texW || y >= c.texH)
@@ -615,16 +626,30 @@ void Ui::Impl::composeInv(const UiFrameInput &in) {
 	for (int y = 0; y < c.h; y++)
 		for (int x = 0; x < c.w; x++)
 			put(x, y, 42, 28, 20);
-	const int rows = invExpanded ? 6 : 2;
-	for (int y = 0; y < rows * 22; y++)
-		for (int x = 0; x < 176; x++) {
-			const uint8_t *s = in.invRgb + ((size_t)y * 176 + x) * 3;
-			put(x, y, s[0], s[1], s[2]);
-		}
-	// Un filet entre les deux lignes rapides (jamais triées) et le reste.
-	if (invExpanded)
-		for (int x = 0; x < 176; x++)
-			put(x, 43, 200, 160, 80);
+	const int rows = v ? (invExpanded ? 6 : 1) : invExpanded ? 6 : 2;
+	if (v) {
+		// La ligne k de l'inventaire devient la colonne (rows - 1 - k) : la ligne rapide contre les
+		// personnages, les autres vers la gauche.
+		for (int k = 0; k < rows; k++)
+			for (int y = 0; y < 22; y++)
+				for (int x = 0; x < 176; x++) {
+					const uint8_t *s = in.invRgb + ((size_t)(k * 22 + y) * 176 + x) * 3;
+					put((rows - 1 - k) * 22 + y, x, s[0], s[1], s[2]);
+				}
+		if (invExpanded)
+			for (int y = 0; y < 176; y++)
+				put((rows - 1) * 22, y, 200, 160, 80);
+	} else {
+		for (int y = 0; y < rows * 22; y++)
+			for (int x = 0; x < 176; x++) {
+				const uint8_t *s = in.invRgb + ((size_t)y * 176 + x) * 3;
+				put(x, y, s[0], s[1], s[2]);
+			}
+		// Un filet entre les deux lignes rapides (jamais triées) et le reste.
+		if (invExpanded)
+			for (int x = 0; x < 176; x++)
+				put(x, 43, 200, 160, 80);
+	}
 	auto box = [&](int x0, int y0, int x1, int y1, bool hot) {
 		for (int x = x0; x < x1; x++) {
 			put(x, y0, hot ? 255 : 140, hot ? 230 : 108, hot ? 140 : 72);
@@ -636,7 +661,7 @@ void Ui::Impl::composeInv(const UiFrameInput &in) {
 		}
 	};
 	if (invHot >= 0 && invHot < 48 && invHot / 8 < rows) {
-		const int cx = (invHot % 8) * 22, cy = (invHot / 8) * 22;
+		const int cx = v ? (rows - 1 - invHot / 8) * 22 : (invHot % 8) * 22, cy = v ? (invHot % 8) * 22 : (invHot / 8) * 22;
 		box(cx, cy, cx + 22, cy + 22, true);
 		box(cx + 1, cy + 1, cx + 21, cy + 21, true);
 	}
@@ -651,7 +676,7 @@ void Ui::Impl::compose(int which, const UiFrameInput &in) {
 	Composite &c = comp[which];
 	const int n = in.characters < 0 ? 0 : in.characters > 4 ? 4 : in.characters;
 	const bool blank = in.compassBlank;
-	const int key = (which == kCompInv ? 1 : which == kCompParty ? n * 2 + (blank ? 1 : 0) : (spellsCollapsed ? 1 : 0) + language * 2 + (spellTabHot ? 4 : 0) + (blank ? 8 : 0)) + (in.textBoxActive ? 64 : 0) + (in.spellsCovered ? 128 : 0) + (classicBar() ? 256 : 0) +
+	const int key = (which == kCompInv ? 1 : which == kCompParty ? n * 2 + (blank ? 1 : 0) : (spellsCollapsed ? 1 : 0) + language * 2 + (spellTabHot ? 4 : 0) + (blank ? 8 : 0)) + (in.textBoxActive ? 64 : 0) + (in.spellsCovered ? 128 : 0) + (classicBar() ? 256 : 0) + (lol2() ? 512 : 0) +
 	                (which == kCompColumn ? (blank ? 4096 : 0) : 0);
 	if (c.tex && in.gameSerial == c.serial && key == c.key)
 		return;
@@ -699,6 +724,22 @@ void Ui::Impl::compose(int which, const UiFrameInput &in) {
 		c.pieces.push_back({352, 0, 32, 68, 288, 54, 32, 68});
 		c.w = 384;
 		c.h = 79;
+	} else if (which == kCompParty && lol2()) {
+		// LOL2 UI (en demi-pixels du jeu) : en bas, la ligne de messages (pixels doublés) ; au-dessus,
+		// la place de l'inventaire (sa fenêtre s'y pose), les personnages empilés (pixels quadruplés)
+		// et la colonne de la boussole.
+		c.texW = kLol2W;
+		c.texH = kLol2Mid + kLol2Text;
+		c.w = kLol2W;
+		c.h = kLol2Mid + kLol2Text;
+		c.pieces.push_back({0, kLol2Mid, kLol2W, kLol2Text, 83, 121, 235, 22});
+		const int k = n > 0 && kLol2Mid / (n * 35) < 4 ? kLol2Mid / (n * 35) : 4;
+		const int pw = 66 * k, x0 = kLol2InvW + (kLol2ColX - kLol2InvW - pw) / 2;
+		for (int i = 0; i < n; i++) {
+			const int t = (235 - n * 66) / (n + 1);
+			c.pieces.push_back({x0, i * 35 * k, pw, 35 * k, i * 66 + t * (i + 1) + 83, 143, 66, 35});
+		}
+		c.pieces.push_back({kLol2ColX, 0, kLol2W - kLol2ColX, kLol2Mid, 288, 0, 32, 122});
 	} else if (which == kCompParty) {
 		// Comme dans le jeu : la ligne de messages, et dessous les personnages côte à côte (le jeu les
 		// place lui-même, au milieu, symétriques). La fenêtre se pose sur l'inventaire. Le repos (ZZZ)
@@ -831,6 +872,20 @@ void Ui::Impl::composeAtlas(const UiFrameInput &in) {
 }
 
 void Ui::Impl::placeAtlas(UiPlacement *placement) {
+	if (lol2()) {
+		// À droite du bloc, le haut au niveau du haut du livre de sorts.
+		const UiPlacement &p = placement[kPanelParty];
+		UiPlacement &a = placement[kPanelAtlas];
+		const float dist = p.c >= 0.2f ? p.c : 1.0f;
+		const float pw = kLol2W * p.scale * 0.5f, ph = (kLol2Mid + kLol2Text) * 1.2f * p.scale * 0.5f;
+		const float spellsH = 244.0f * (kLol2W / 236.0f) * 1.2f * p.scale + 0.012f;
+		a.scale = clampf(p.scale * (0.0008f / 0.0009f), 0.0004f, 0.02f);
+		const float aw = kAtlasW * a.scale * 0.5f, ah = kAtlasH * 1.2f * a.scale * 0.5f;
+		a.c = dist;
+		a.a = wrapAngle(p.a - (pw + 0.04f + aw) / dist);
+		a.b = clampf(p.b + (ph + spellsH - ah) / dist, -1.35f, 1.35f);
+		return;
+	}
 	if (!classicBar()) {
 		// À droite du grand bloc (à droite de la colonne de la boussole), le haut au même niveau.
 		const UiPlacement &p = placement[kPanelParty];
@@ -1258,10 +1313,10 @@ void Ui::Impl::renderMenu() {
 	static const char *const modes[3][3] = {{"Immersive", "Classic", "Mixed reality"}, {"Immersif", "Classique", "Réalité mixte"}, {"Immersiv", "Klassisch", "Mixed Reality"}};
 	static const char *const views[3][3] = {{"Big screen", "Windows", "486 PC"}, {"Grand écran", "Fenêtres", "PC 486"}, {"Großbild", "Fenster", "486er-PC"}};
 	const int L = language, lg = L == kLangFrench ? 1 : L == kLangGerman ? 2 : 0, mode = dungeonMode ? 0 : vrMode, view = classicView < 0 || classicView > 2 ? 0 : classicView;
-	static const char *const huds[3][2] = {{"Windows", "Classic"}, {"Fenêtres", "Classique"}, {"Fenster", "Klassisch"}};
+	static const char *const huds[3][3] = {{"Windows", "Classic", "LOL2 UI"}, {"Fenêtres", "Classique", "LOL2 UI"}, {"Fenster", "Klassisch", "LOL2 UI"}};
 	// Mode immersif : à la place de la vue, l'interface (les fenêtres ou la barre du bas du jeu).
 	const char *names[2] = {tr(L, "VR mode", "Mode VR", "VR-Modus"), dungeonMode ? tr(L, "Interface", "Interface", "Oberfläche") : tr(L, "View (L3)", "Vue (L3)", "Ansicht (L3)")};
-	const char *values[2] = {modes[lg][mode < 0 || mode > 2 ? 1 : mode], dungeonMode ? huds[lg][hudClassic ? 1 : 0] : views[lg][view]};
+	const char *values[2] = {modes[lg][mode < 0 || mode > 2 ? 1 : mode], dungeonMode ? huds[lg][hudMode < 0 || hudMode > 2 ? 0 : hudMode] : views[lg][view]};
 	const int split = 196, th = Canvas::textH(2);
 	cv.gcenter(latin1(tr(L, "VR controls", "Réglages VR", "VR-Optionen")), 0, kMenuW, (kMenuRowH - th) / 2 + 2, 2, kWhite);
 	for (int r = 1; r < kMenuRows; r++) {
@@ -1507,8 +1562,8 @@ void Ui::setDungeonOption(int mode) {
 	if (mode != d->dungeonMode) {
 		d->dungeonMode = mode;
 		d->menuDirty = true;
-		if (d->hudClassic && placed)
-			d->partyReplace = true; // (la barre du bas n'existe qu'en mode immersif)
+		if (d->hudMode != 0 && placed)
+			d->partyReplace = true; // (la barre du bas et le bloc LOL2 n'existent qu'en mode immersif)
 	}
 }
 
@@ -1605,7 +1660,6 @@ void Ui::placeParty(const UiFrameInput &in) {
 	const float fullW = in.fullW > 0.05f ? in.fullW : 0.05f;
 	const float viewH = kSplitViewHeight, viewW = viewH * 176.0f / 144.0f, viewY = kSplitViewLift;
 	const float bottom = viewY - viewH * 0.5f;
-	(void)viewW;
 	auto set = [&](int id, float x, float y, float scale) {
 		Vec3 c = in.basePos + rotate(in.screenRot, Vec3{x, y, 0.0f} * fullW);
 		Vec3 v = c - in.anchorPos;
@@ -1620,6 +1674,17 @@ void Ui::placeParty(const UiFrameInput &in) {
 		// La barre du bas du jeu, centrée sous la vue.
 		const float s = 0.0024f, hh = 79.0f * 1.2f * s * 0.5f;
 		set(kPanelParty, 0.0f, bottom - 0.03f - hh, s);
+	} else if (d->lol2()) {
+		// LOL2 UI : le bloc debout à gauche de la vue (et de son cadre doré), centré sur elle : son
+		// inventaire s'ouvre vers la gauche, dans le vide. Ici, la place des personnages et de la ligne
+		// de messages, sous le livre de sorts. L'atlas, lui, va à droite de la vue.
+		const float s = 0.0007f, w = kLol2W * s, partyH = (kLol2Mid + kLol2Text) * 1.2f * s;
+		const float spellsH = 244.0f * (kLol2W / 236.0f) * 1.2f * s, gap = 0.012f;
+		const float frame = 0.092f * viewW, total = spellsH + gap + partyH;
+		set(kPanelParty, -(viewW * 0.5f + frame + 0.04f + w * 0.5f), viewY + total * 0.5f - spellsH - gap - partyH * 0.5f, s);
+		const float as = s * (0.0008f / 0.0009f), aw = kAtlasW * as, ah = kAtlasH * 1.2f * as;
+		set(kPanelAtlas, viewW * 0.5f + frame + 0.04f + aw * 0.5f, viewY + viewH * 0.5f - ah * 0.5f, as);
+		return;
 	} else {
 		// Un seul grand bloc sous la vue, comme le bas de l'écran du jeu : à gauche le livre de sorts,
 		// au milieu les messages, les personnages et l'inventaire, à droite la colonne de la boussole
@@ -1632,18 +1697,24 @@ void Ui::placeParty(const UiFrameInput &in) {
 	d->placeAtlas(placement);
 }
 
-void Ui::setHudClassic(bool classic) {
-	if (classic != d->hudClassic) {
-		d->hudClassic = classic;
+void Ui::setHudClassic(bool classic) { setHudMode(classic ? 1 : 0); }
+
+bool Ui::hudClassic() const { return d->hudMode == 1; }
+
+void Ui::setHudMode(int mode) {
+	mode = mode < 0 || mode > 2 ? 0 : mode;
+	if (mode != d->hudMode) {
+		d->hudMode = mode;
 		d->menuDirty = true;
 		d->comp[kCompParty].key = -1;
 		d->comp[kCompSpells].key = -1;
+		d->comp[kCompInv].key = -1;
 		if (placed && d->dungeonMode)
 			d->partyReplace = true;
 	}
 }
 
-bool Ui::hudClassic() const { return d->hudClassic; }
+int Ui::hudMode() const { return d->hudMode; }
 
 void Ui::setInventoryGrouped(bool) {} // (plus de fenêtres détachables : tout reste collé)
 
@@ -1813,7 +1884,7 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 	if (d->classicBar()) // (la ligne d'objets est dans la barre du bas)
 		visible[kPanelInventory] = false;
 	// La colonne de la boussole, détachée du livre de sorts
-	visible[kPanelColumn] = placed && in.split && !d->classicBar();
+	visible[kPanelColumn] = placed && in.split && !d->classicBar() && !d->lol2(); // (LOL2 UI : dans le bloc)
 	if (visible[kPanelColumn])
 		d->compose(kCompColumn, in);
 	if (visible[kPanelParty]) {
@@ -1942,7 +2013,44 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 	}
 	// Collé : l'inventaire prolonge le bloc des personnages, juste dessous, dans le même plan et à la
 	// même échelle (les deux cadres n'en font qu'un).
-	if (!d->classicBar() && visible[kPanelParty]) {
+	if (d->lol2() && visible[kPanelParty]) {
+		// LOL2 UI : l'inventaire debout dans la place qui l'attend, à gauche des personnages (un peu en
+		// avant : ouvert, il s'étend vers la gauche) ; le livre de sorts en haut, de toute la largeur.
+		const Quad &pq = content[kPanelParty];
+		const Composite &cp = d->comp[kCompParty], &ci = d->comp[kCompInv], &cs = d->comp[kCompSpells];
+		const float unit = cp.w > 0 ? 2.0f * pq.hw / (float)cp.w : 0.0f;
+		const float border = clampf(0.012f * panelDist[kPanelParty], 0.004f, 0.012f);
+		const Vec3 top = pq.c + pq.u * pq.hh, left = pq.c - pq.r * pq.hw;
+		auto note = [&](int id, float scale) {
+			panelDist[id] = length(content[id].c - in.anchorPos);
+			UiPlacement &pl = placement[id];
+			const Vec3 v = content[id].c - in.anchorPos;
+			pl.c = clampf(length(v), 0.20f, 6.0f);
+			pl.b = clampf(asinf(clampf(v.y / pl.c, -1.0f, 1.0f)), -1.35f, 1.35f);
+			pl.a = wrapAngle(atan2f(-v.x, -v.z) - in.anchorYaw);
+			pl.scale = scale;
+		};
+		{
+			Quad &iq = content[kPanelInventory];
+			const float invScale = unit * (float)kLol2Mid / 176.0f;
+			iq.r = pq.r;
+			iq.u = pq.u;
+			iq.hw = (ci.w ? (float)ci.w : 22.0f) * invScale * 0.5f;
+			iq.hh = 176.0f * pixelAspect(kPanelInventory) * invScale * 0.5f;
+			iq.c = left + pq.r * ((float)kLol2InvW * unit - iq.hw) + top - pq.c - pq.u * iq.hh + cross(pq.r, pq.u) * 0.003f;
+			note(kPanelInventory, invScale);
+		}
+		if (visible[kPanelSpells]) {
+			Quad &sq = content[kPanelSpells];
+			const float sw = cs.w ? (float)cs.w : 236.0f, sh = cs.h ? (float)cs.h : 244.0f, sc = 2.0f * pq.hw / sw;
+			sq.r = pq.r;
+			sq.u = pq.u;
+			sq.hw = pq.hw;
+			sq.hh = sh * pixelAspect(kPanelSpells) * sc * 0.5f;
+			sq.c = top + pq.u * (border + sq.hh);
+			note(kPanelSpells, sc);
+		}
+	} else if (!d->classicBar() && visible[kPanelParty]) {
 		const Quad &pq = content[kPanelParty];
 		Quad &iq = content[kPanelInventory];
 		const UiPlacement &pp = placement[kPanelParty];
@@ -2016,8 +2124,23 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 			q.c = iq.c + iq.r * (side * (iq.hw - tw * 0.5f - 4.0f * sc)) - iq.u * (iq.hh + border + th * 0.5f);
 			btnVis[b] = true;
 		};
-		tab(kBtnExpand, 1.0f);
-		tab(kBtnSort, -1.0f);
+		if (d->lol2()) {
+			// Debout, à gauche de l'inventaire : ouvrir / fermer en haut, trier en bas.
+			auto side = [&](int b, float vert) {
+				Quad &q = btnQ[b];
+				q.r = iq.u;
+				q.u = iq.r * -1.0f;
+				q.hw = tw * 0.5f;
+				q.hh = th * 0.5f;
+				q.c = iq.c - iq.r * (iq.hw + border * 0.5f + th * 0.5f) + iq.u * (vert * (iq.hh - tw * 0.5f - 4.0f * sc));
+				btnVis[b] = true;
+			};
+			side(kBtnExpand, 1.0f);
+			side(kBtnSort, -1.0f);
+		} else {
+			tab(kBtnExpand, 1.0f);
+			tab(kBtnSort, -1.0f);
+		}
 	}
 	if (visible[kPanelParty]) {
 		const Quad &pq = content[kPanelParty];
@@ -2032,6 +2155,12 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 		out.partyBlockGameW = d->classicBar() ? 320.0f : 235.0f;
 		out.partyBlockGameBottom = d->classicBar() ? 200.0f : 178.0f;
 		out.partyBlockLiveLine = !d->classicBar();
+		if (d->lol2() && cp.w > 0) {
+			// La ligne de messages est en bas, pixels doublés : la zone de texte agrandie (lignes 121 à
+			// 178 du jeu) se pose au bas du bloc, sur les portraits, comme dans le jeu.
+			out.partyBlockPixel = 2.0f * (2.0f * pq.hw / (float)cp.w);
+			out.partyBlockTopLeft = pq.c - pq.r * pq.hw - pq.u * pq.hh + pq.u * (57.0f * out.partyBlockPixel * 1.2f);
+		}
 	}
 	// Poignée de l'écran : au-dessus du cadre (ou du moniteur)
 	{
@@ -2460,7 +2589,8 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 				d->composeInv(in);
 				UiPlacement &pl = placement[kPanelInventory];
 				const float dh = (float)(cc.h - oldH) * pixelAspect(kPanelInventory) * pl.scale * 0.5f;
-				pl.b -= atan2f(dh, pl.c);
+				if (!d->lol2()) // (LOL2 UI : l'inventaire reste à sa place, il s'ouvre vers la gauche)
+					pl.b -= atan2f(dh, pl.c);
 				out.layoutChanged = true;
 			} else if (hitIndex == kBtnSort) {
 				out.invSort = true;
@@ -2664,7 +2794,11 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 				out.gu = 160.0f / 320.0f;
 				out.gv = 189.0f / 200.0f;
 				out.hitPixel = c.w > 0 ? 2.0f * q.hw / (float)c.w : 0.0f;
-				if (cx < 176.0f && cy >= 0.0f && cy < (float)c.h)
+				if (d->lol2()) {
+					const int cols = c.w / 22;
+					if (cx >= 0.0f && cx < (float)c.w && cy >= 0.0f && cy < 176.0f)
+						invHot = (cols - 1 - (int)cx / 22) * 8 + (int)cy / 22;
+				} else if (cx < 176.0f && cy >= 0.0f && cy < (float)c.h)
 					invHot = ((int)cy / 22) * 8 + (int)cx / 22;
 				if (invHot >= 0 && in.triggerPressed) {
 					out.invSlot = invHot;

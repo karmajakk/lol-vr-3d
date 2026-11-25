@@ -20,3 +20,7 @@ The **inventory** is a quick bar of 8 slots (3D dungeon); the button on its righ
 A **character sheet** is shown in full on the screen, which widens to the right while it's open. The windows stay where they are; the atlas column goes dark, because the sheet uses that part of the image.
 
 The **Reset layout** button of the keyboard arranges the windows around the screen, wherever it is. To move or resize a window, see [Controls](Controls.md).
+
+## LOL2 UI
+
+In "VR controls", "Interface" also offers **LOL2 UI**: one tall block to the left of the view, as in Lands of Lore 2. From the bottom up: the message line; above it the inventory standing as a column (one quick row of 8 slots), the three characters stacked one above the other and the compass column; at the top, the spellbook. Left of the inventory, two tabs: at the top, two opposed arrows open the whole inventory towards the left (one more click closes it); at the bottom, three bars sort it (the quick row is never sorted). The atlas sits to the right of the view.

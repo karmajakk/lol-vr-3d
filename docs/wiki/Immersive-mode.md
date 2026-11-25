@@ -19,7 +19,7 @@ Switch to the classic view in "VR controls" (game menu, floppy on the left wrist
 
 ## Classic interface
 
-In "VR controls" (game menu, floppy on the back of the left hand), "Interface" switches between **Windows** (the characters, the spellbook and the inventory each in their own window) and **Classic**: the game's own bottom bar under the view, as in the original — messages, movement arrows, floppy and rest, the characters, the item strip with its arrows — and the compass column (compass, atlas, lamp, purse) at its right. The bar can be moved and resized like any window.
+In "VR controls" (game menu, floppy on the back of the left hand), "Interface" switches between **Windows** (the characters, the spellbook and the inventory each in their own window) and **Classic**: the game's own bottom bar under the view, as in the original — messages, movement arrows, floppy and rest, the characters, the item strip with its arrows — and the compass column (compass, atlas, lamp, purse) at its right. The bar can be moved and resized like any window. A third choice, **LOL2 UI**, stacks everything in one tall block left of the view, as in Lands of Lore 2 (see [Windows](Detached-interface.md#lol2-ui)).
 
 ## Picking up items
 

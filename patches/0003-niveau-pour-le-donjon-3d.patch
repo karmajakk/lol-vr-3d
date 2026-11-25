@@ -81,7 +81,7 @@ index 1016080..bfba10b 100644
  		// the global subtitles settings, we're using this hack to enable subtitles
  		// for fan translations
 diff --git a/engines/kyra/engine/lol.cpp b/engines/kyra/engine/lol.cpp
-index c4f86a3..6e67a34 100644
+index c4f86a3..334b8d7 100644
 --- a/engines/kyra/engine/lol.cpp
 +++ b/engines/kyra/engine/lol.cpp
 @@ -21,6 +21,8 @@
@@ -422,7 +422,7 @@ index c4f86a3..6e67a34 100644
  	} else {
  		if (_activeSpell.p->mpRequired[spellLevel] > _characters[charNum].magicPointsCur)
  			return 0;
-@@ -2136,13 +2329,584 @@ int LoLEngine::castSpell(int charNum, int spellType, int spellLevel) {
+@@ -2136,13 +2329,585 @@ int LoLEngine::castSpell(int charNum, int spellType, int spellLevel) {
  		setCharacterMagicOrHitPoints(charNum, 0, -_activeSpell.p->hpRequired[spellLevel], 1);
  		gui_drawCharPortraitWithStats(charNum);
  
@@ -898,7 +898,8 @@ index c4f86a3..6e67a34 100644
 +		gui_drawInventory();
 +	} else if (op == 2) {
 +		Common::Array<Item> items;
-+		for (int i = 16; i < 48; i++) // (les deux lignes rapides, 0-15, ne sont pas triées)
++		const int first = arg == 8 ? 8 : 16; // (les lignes rapides ne sont pas triées : deux, ou une en LOL2 UI)
++		for (int i = first; i < 48; i++)
 +			if (_inventory[i])
 +				items.push_back(_inventory[i]);
 +		for (uint a = 1; a < items.size(); a++) {
@@ -916,8 +917,8 @@ index c4f86a3..6e67a34 100644
 +			}
 +			items[b] = it;
 +		}
-+		for (int i = 16; i < 48; i++)
-+			_inventory[i] = (uint)(i - 16) < items.size() ? items[i - 16] : 0;
++		for (int i = first; i < 48; i++)
++			_inventory[i] = (uint)(i - first) < items.size() ? items[i - first] : 0;
 +		gui_drawInventory();
 +	}
 +}
@@ -1007,7 +1008,7 @@ index c4f86a3..6e67a34 100644
  int LoLEngine::castSpark(ActiveSpell *a) {
  	processMagicSpark(a->charNum, a->level);
  	return 1;
-@@ -3206,6 +3970,10 @@ void LoLEngine::addSpellToScroll(int spell, int charNum) {
+@@ -3206,6 +3971,10 @@ void LoLEngine::addSpellToScroll(int spell, int charNum) {
  		}
  	}
  
@@ -1018,7 +1019,7 @@ index c4f86a3..6e67a34 100644
  	if (spell > 1)
  		transferSpellToScollAnimation(charNum, spell, slot - 1);
  
-@@ -3521,6 +4289,8 @@ int LoLEngine::calcInflictableDamage(int16 attacker, int16 target, int hitType)
+@@ -3521,6 +4290,8 @@ int LoLEngine::calcInflictableDamage(int16 attacker, int16 target, int hitType)
  int LoLEngine::inflictDamage(uint16 target, int damage, uint16 attacker, int skill, int flags) {
  	LoLMonster *m = 0;
  	LoLCharacter *c = 0;
@@ -1027,7 +1028,7 @@ index c4f86a3..6e67a34 100644
  
  	if (target & 0x8000) {
  		m = &_monsters[target & 0x7FFF];
-@@ -4130,7 +4900,6 @@ uint16 LoLEngine::getNearestPartyMemberFromPos(int x, int y) {
+@@ -4130,7 +4901,6 @@ uint16 LoLEngine::getNearestPartyMemberFromPos(int x, int y) {
  // magic atlas
  
  void LoLEngine::displayAutomap() {
@@ -1035,7 +1036,7 @@ index c4f86a3..6e67a34 100644
  	snd_playSoundEffect(105, -1);
  	gui_toggleButtonDisplayMode(_flags.isTalkie ? 78 : 76, 1);
  
-@@ -4174,6 +4943,9 @@ void LoLEngine::displayAutomap() {
+@@ -4174,6 +4944,9 @@ void LoLEngine::displayAutomap() {
  
  	_screen->copyPage(2, 0);
  	_screen->updateScreen();

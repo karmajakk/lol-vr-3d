@@ -18,3 +18,7 @@ Bei Zwischensequenzen, Menüs, der Karte und Szenen über die ganze Breite kommt
 Ein **Figurenbogen** wird vollständig auf dem Bildschirm gezeigt, der sich nach rechts verbreitert, solange er offen ist. Die Fenster bleiben, wo sie sind; die Atlas-Spalte wird dunkel, weil der Bogen diesen Teil des Bildes nutzt.
 
 Der Knopf **Ordnen** der Tastatur stellt die Fenster um den Bildschirm, wo immer er ist. Zum Verschieben oder Vergrößern eines Fensters siehe [Steuerung](Controls.md).
+
+## LOL2 UI
+
+In „VR-Optionen“ bietet „Oberfläche“ auch **LOL2 UI**: ein einziger hoher Block links von der Ansicht, wie in Lands of Lore 2. Von unten nach oben: die Nachrichtenzeile; darüber das Inventar als Spalte (eine Schnellzeile mit 8 Feldern), die drei Figuren übereinander und die Kompass-Spalte; ganz oben das Zauberbuch. Links vom Inventar zwei Reiter: oben öffnen zwei gegenläufige Pfeile das ganze Inventar nach links (ein weiterer Klick schließt es); unten sortieren drei Striche (die Schnellzeile wird nie sortiert). Der Atlas steht rechts von der Ansicht.

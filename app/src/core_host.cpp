@@ -650,7 +650,7 @@ void CoreHost::inventoryEnable() { retro_lolvr_inventory(0, 0); }
 void CoreHost::inventoryDisable() { retro_lolvr_inventory(4, 0); }
 void CoreHost::pickupItem(int item) { retro_lolvr_inventory(5, item); }
 void CoreHost::inventoryClick(int slot) { retro_lolvr_inventory(1, slot); }
-void CoreHost::inventorySort() { retro_lolvr_inventory(2, 0); }
+void CoreHost::inventorySort(int firstSlot) { retro_lolvr_inventory(2, firstSlot); }
 void CoreHost::nextSpell() { retro_lolvr_inventory(3, 0); }
 void CoreHost::setOwnCursor(bool own) { retro_lolvr_hide_cursor(own ? 1 : 0); }
 bool CoreHost::cursorShown() const { return retro_lolvr_cursor_shown() != 0; }

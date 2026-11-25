@@ -510,7 +510,7 @@ struct App {
 	// Interface détachée : l'écran ne garde que la vue du donjon, le reste part sur des panneaux.
 	lolvr::Ui ui;
 	bool detached = true;        // choix du joueur
-	bool hudClassic = false;     // mode immersif : la barre du bas du jeu au lieu des fenêtres
+	int hudMode = 0;             // mode immersif : 0 les fenêtres, 1 la barre du bas du jeu, 2 LOL2 UI
 	bool split = false;          // en vigueur en ce moment
 	bool splitWanted = false;
 	double splitWantedSince = 0;
@@ -1248,7 +1248,7 @@ void loadSettings(App &app, int &environment) {
 				app.ui.setInventoryGrouped(iv != 0);
 		} else if (!strcmp(name, "interface")) {
 			if (sscanf(rest, "%d", &iv) == 1)
-				app.hudClassic = iv != 0;
+				app.hudMode = iv >= 0 && iv <= 2 ? iv : 0;
 		} else if (!strcmp(name, "panneaux")) {
 			if (sscanf(rest, "%d", &iv) == 1)
 				app.detached = iv != 0;
@@ -1299,7 +1299,7 @@ void saveSettings(App &app) {
 		fprintf(f, "ecran %.3f %.3f\n", app.widths[i], app.distances[i]);
 	fprintf(f, "feu %d\n", app.fireOn ? 1 : 0);
 	fprintf(f, "panneaux %d\n", app.detached ? 1 : 0);
-	fprintf(f, "interface %d\n", app.hudClassic ? 1 : 0);
+	fprintf(f, "interface %d\n", app.hudMode);
 	fprintf(f, "inventaire_colle %d\n", app.ui.inventoryGrouped() ? 1 : 0);
 	fprintf(f, "colonne_collee %d\n", app.ui.columnGrouped() ? 1 : 0);
 	fprintf(f, "langue %d\n", app.language);
@@ -2237,9 +2237,9 @@ void updateUi(App &app, XrTime time, float dt, double now, bool pointer, bool tr
 	}
 	app.ui.setOptions(app.fireOn, app.detached);
 	app.ui.setDungeonOption(app.dungeonMode);
-	app.ui.setHudClassic(app.hudClassic);
+	app.ui.setHudMode(app.hudMode);
 	app.ui.setAtlasOption(app.atlasOn);
-	if (app.dungeonMode && app.hudClassic) {
+	if (app.dungeonMode && app.hudMode == 1) {
 		CoreHost::get().inventoryDisable(); // la ligne d'objets du jeu, avec ses flèches
 	} else if (app.dungeonMode) {
 		CoreHost::get().inventoryEnable();
@@ -2361,7 +2361,7 @@ void updateUi(App &app, XrTime time, float dt, double now, bool pointer, bool tr
 	if (out.invSlot >= 0)
 		CoreHost::get().inventoryClick(out.invSlot);
 	if (out.invSort)
-		CoreHost::get().inventorySort();
+		CoreHost::get().inventorySort(app.hudMode == 2 ? 8 : 16); // (LOL2 UI : une seule ligne rapide)
 	switch (out.action) {
 	case lolvr::kUiActionToggleFire:
 		app.fireOn = !app.fireOn;
@@ -2417,9 +2417,9 @@ void updateUi(App &app, XrTime time, float dt, double now, bool pointer, bool tr
 		app.settingsDirty = true;
 		break;
 	case lolvr::kUiActionToggleHud:
-		// Mode immersif : les fenêtres ou la barre du bas du jeu.
-		app.hudClassic = !app.hudClassic;
-		app.ui.setHudClassic(app.hudClassic);
+		// Mode immersif : les fenêtres, la barre du bas du jeu, puis LOL2 UI.
+		app.hudMode = (app.hudMode + 1) % 3;
+		app.ui.setHudMode(app.hudMode);
 		app.settingsDirty = true;
 		break;
 	case lolvr::kUiActionCycleView:

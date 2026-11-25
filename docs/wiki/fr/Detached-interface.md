@@ -18,3 +18,7 @@ Pendant les cinématiques, les menus, la carte et les scènes sur toute la large
 Une **fiche de personnage** est montrée en entier sur l'écran, qui s'élargit vers la droite tant qu'elle est ouverte. Les fenêtres restent où elles sont ; la colonne de l'atlas s'assombrit, car la fiche utilise cette partie de l'image.
 
 Le bouton **Tout ranger** du clavier dispose les fenêtres autour de l'écran, où qu'il soit. Pour déplacer ou redimensionner une fenêtre, voir [Commandes](Controls.md).
+
+## LOL2 UI
+
+Dans « Réglages VR », « Interface » propose aussi **LOL2 UI** : un seul grand bloc debout à gauche de la vue, comme dans Lands of Lore 2. De bas en haut : la ligne de messages ; au-dessus, l'inventaire debout en colonne (une ligne rapide de 8 cases), les trois personnages empilés l'un sur l'autre et la colonne de la boussole ; tout en haut, le livre de sorts. À gauche de l'inventaire, deux onglets : en haut, deux flèches opposées ouvrent tout l'inventaire vers la gauche (un autre clic le referme) ; en bas, trois barres le trient (la ligne rapide n'est jamais triée). L'atlas est à droite de la vue.

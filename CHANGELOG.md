@@ -3,6 +3,18 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.43.0] — LOL2 UI
+
+- New interface choice in "VR controls" → "Interface": **LOL2 UI**, one tall block left of the
+  view, as in Lands of Lore 2. From the bottom up: the message line; the inventory standing as a
+  column (one quick row of 8 slots), the characters stacked one above the other and the compass
+  column; the spellbook at the top. "Interface" now cycles Windows → Classic → LOL2 UI.
+- LOL2 UI inventory tabs, left of the column: two opposed arrows at the top open the whole
+  inventory towards the left (another click closes it); three bars at the bottom sort it (rows 2
+  to 6; the quick row is never sorted).
+- When the game's text box grows, it lies over the bottom of the block, on the portraits.
+- The atlas sits to the right of the view in LOL2 UI.
+
 ## [0.42.0] — One big block, Lands of Lore 2 tabs
 
 - **Windows interface**: one big block below the view, like the bottom of the game's screen:
