@@ -630,10 +630,17 @@ int main(int argc, char **argv) {
 			// (le bloc : on prend le coin haut gauche de son cadre, derrière le livre de sorts ; tout suit)
 			panel(0);
 			SceneState::Panel inv = panel(2);
-			for (int k = 0; k < SceneState::kMaxPanels; k++)
-				if (tmp.panels[k].visible && tmp.panels[k].texW == 2 && tmp.panels[k].texH == 2)
-					inv = tmp.panels[k];
-			Vec3 corner = inv.center - inv.right * (inv.halfW + 0.02f) + inv.up * (inv.halfH + 0.02f);
+			{
+				// (le contour du bloc : du coin haut gauche du livre de sorts au coin bas droit de la colonne)
+				const SceneState::Panel col = panel(3);
+				inv = panel(2);
+				const Vec3 tl = inv.center - inv.right * inv.halfW + inv.up * inv.halfH;
+				const Vec3 br = col.center + col.right * col.halfW - col.up * col.halfH;
+				inv.center = (tl + br) * 0.5f;
+				inv.halfW = dot(br - tl, inv.right) * 0.5f;
+				inv.halfH = dot(tl - br, inv.up) * 0.5f;
+			}
+			Vec3 corner = inv.center - inv.right * (inv.halfW + 0.01f) + inv.up * (inv.halfH + 0.01f);
 			float scale0 = ui.placement[kPanelSpells].scale;
 			aimAt(corner);
 			ui.update(in, o, tmp);

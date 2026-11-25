@@ -351,29 +351,16 @@ struct Ui::Impl {
 			}
 		if (n < 15 || n > 220)
 			return false;
-		std::vector<uint8_t> px((size_t)W * H * 4, 0);
-		for (int y = 0; y < H; y++)
-			for (int x = 0; x < W; x++) {
-				const uint8_t *c = &rgb[((size_t)y * W + x) * 3];
-				bool keep = yellow[(size_t)y * W + x] != 0;
-				if (!keep && c[0] + c[1] + c[2] < 40) // (le contour noir des lettres)
-					for (int dy = -1; dy <= 1 && !keep; dy++)
-						for (int dx = -1; dx <= 1 && !keep; dx++) {
-							const int xx = x + dx, yy = y + dy;
-							keep = xx >= 0 && yy >= 0 && xx < W && yy < H && yellow[(size_t)yy * W + xx];
-						}
-				if (keep) {
-					uint8_t *o = &px[((size_t)y * W + x) * 4];
-					o[0] = c[0]; o[1] = c[1]; o[2] = c[2]; o[3] = 255;
-				}
-			}
+		// (le bouton entier, son fond compris)
+		std::vector<uint8_t> px((size_t)W * H * 4, 255);
+		for (int i = 0; i < W * H; i++)
+			memcpy(&px[(size_t)i * 4], &rgb[(size_t)i * 3], 3);
 		if (px != zzzPx) {
 			zzzPx = px;
 			upload(zzzTex, zzzPx, W, H, "zzz");
 		}
 		return true;
 	}
-	GLuint frameTex = 0; // (le fond du cadre du grand bloc)
 	void makeButtons();
 	// Le fond des onglets : le grain d'une case vide de l'inventaire du jeu (18 x 18, RGB), relevé
 	// dans l'image de l'inventaire (la case la plus répétée : les cases vides sont identiques).
@@ -1390,7 +1377,8 @@ static const char *const kFloppy[16] = {
 
 void Ui::Impl::renderGear() {
 	const int N = kGearSize, S = 3, ox = (N - 16 * S) / 2 + 1, oy = (N - 16 * S) / 2;
-	Canvas cv{N, N, std::vector<uint8_t>((size_t)N * N * 4)}; // (fond transparent : la disquette seule)
+	Canvas cv{N, N, std::vector<uint8_t>((size_t)N * N * 4)};
+	cv.bevel(0, 0, N, N, 3, true); // (le bouton de terre cuite, sans cadre autour)
 	for (int pass = 0; pass < 2; pass++)
 		for (int y = 0; y < 16; y++)
 			for (int x = 0; x < 16; x++) {
@@ -2121,7 +2109,8 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 	}
 	// Collé : l'inventaire prolonge le bloc des personnages, juste dessous, dans le même plan et à la
 	// même échelle (les deux cadres n'en font qu'un).
-	// Le grand bloc : un seul cadre de laiton autour (dessiné derrière), un filet entre ses fenêtres.
+	// Le grand bloc : ses fenêtres se touchent par leurs fins bords sombres ; son contour (frameQ) sert
+	// à l'agrandir par ses quatre coins.
 	Quad frameQ;
 	bool frameVis = false;
 	const float blockThin = clampf(0.0015f * panelDist[kPanelParty], 0.0008f, 0.002f), blockGap = 2.0f * blockThin;
@@ -2295,7 +2284,7 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 	if (placed && in.wristValid) {
 		gearVisible = true;
 		// Tant que le joueur ne l'a jamais ouverte, la montre bat doucement pour se faire remarquer.
-		watch(in.wristPos, in.wristRot, 1.0f, gearQ, in.gearHint && !d->menuOpen ? 0.02f * (1.15f + 0.15f * sinf((float)in.time * 6.0f)) : 0.02f);
+		watch(in.wristPos, in.wristRot, 1.0f, gearQ, in.gearHint && !d->menuOpen ? 0.024f * (1.15f + 0.15f * sinf((float)in.time * 6.0f)) : 0.024f);
 	}
 	d->gearShown = gearVisible;
 	bool palmVisible = false;
@@ -2304,7 +2293,7 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 	const bool zzzLive = d->readZzz(in);
 	if (placed && in.palmValid && d->zzzTex && (zzzLive || in.textBoxActive || in.gameModal)) {
 		palmVisible = true;
-		watch(in.palmPos, in.palmRot, -1.0f, palmQ, 0.02f);
+		watch(in.palmPos, in.palmRot, -1.0f, palmQ, 0.024f);
 	}
 	d->palmShown = palmVisible;
 	const float kMenuScale = 0.0009f;
@@ -3074,24 +3063,6 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 			}
 		}
 	}
-	// Le cadre du grand bloc, derrière ses fenêtres (du bois sombre entre elles)
-	if (frameVis && np < SceneState::kMaxPanels - 2) {
-		if (!d->frameTex)
-			d->upload(d->frameTex, std::vector<uint8_t>{26, 17, 12, 255, 26, 17, 12, 255, 26, 17, 12, 255, 26, 17, 12, 255}, 2, 2, "cadre");
-		SceneState::Panel &p = scene.panels[np++];
-		p = SceneState::Panel();
-		p.visible = true;
-		p.center = frameQ.c;
-		p.right = frameQ.r;
-		p.up = frameQ.u;
-		p.halfW = frameQ.hw;
-		p.halfH = frameQ.hh;
-		p.border = clampf(0.0035f * panelDist[kPanelParty], 0.0015f, 0.004f);
-		p.layer = -1;
-		p.texture = d->frameTex;
-		p.texW = 2;
-		p.texH = 2;
-	}
 	// Invitation du premier lancement : un peu sous le regard, à portée de lecture, elle suit la tête
 	// sans à-coups. Elle s'efface quand on regarde sa main (l'engrenage prend le relais).
 	// (l'invitation s'efface dès qu'on regarde la montre)
@@ -3166,8 +3137,7 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 		p.up = palmQ.u;
 		p.halfW = palmQ.hw;
 		p.halfH = palmQ.hh;
-		p.border = 0.0f;
-		p.cutout = true; // (les lettres seules, sans le bouton)
+		p.border = 0.0f; // (le bouton du jeu, sans cadre autour)
 		p.texture = d->zzzTex;
 		p.texW = 22;
 		p.texH = 22;
@@ -3185,7 +3155,6 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 		p.halfW = q.hw;
 		p.halfH = q.hh;
 		p.border = w == 0 ? 0.0f : 0.004f;
-		p.cutout = w == 0; // (la disquette seule, sans cadre ni fond)
 		p.texture = w == 0 ? d->gearTex : w == 1 ? d->menuTex : d->noticeTex;
 		p.texW = w == 0 ? kGearSize : w == 1 ? kMenuW : kNoticeW;
 		p.texH = w == 0 ? kGearSize : w == 1 ? d->menuH() : (d->noticeKind == 1 ? kCreditsH : kNoticeH);

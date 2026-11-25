@@ -3,6 +3,16 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.48.0] — Wrist buttons back, menus sized on their own
+
+- The floppy and ZZZ are buttons again, with their background (the ZZZ is the game's own rest
+  button), only without the dark frame around them.
+- A game menu shown on its own (options, save, quit, defeat) has its own size: making the screen
+  bigger for cutscenes no longer makes the menus huge, and resizing while a menu is shown sizes
+  the menus only.
+- Grouped interface: no more backing panel behind the block (its windows simply touch); with a very
+  large block, it could be drawn over the windows depending on the viewing angle.
+
 ## [0.47.0] — Fixes after a rest, smaller tabs and corners
 
 - After resting, the dungeon could end up a quarter turn off from the game (walking "forward"

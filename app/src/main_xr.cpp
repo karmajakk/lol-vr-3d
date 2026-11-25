@@ -497,6 +497,7 @@ struct App {
 	Vec3 screenPos = {0, 0, -2.2f};
 	float screenYaw = 0.0f;
 	float widths[kEnvCount] = {1.1f, 1.8f, 0.62f, 0.62f}; // mètres : largeur de l'image entière (hauteur = 3/4)
+	float menuWidths[kEnvCount] = {0, 0, 0, 0};             // la même chose pour un menu du jeu montré seul (0 : comme l'écran)
 	float distances[kEnvCount] = {1.15f, 2.0f, 0.95f, 0.95f};
 	// Ce que l'écran affiche en ce moment : portion de l'image du jeu (pixels) et taille réelle (mètres).
 	float cropX = 0, cropY = 0, cropW = 320, cropH = 200;
@@ -643,6 +644,14 @@ struct App {
 };
 
 float &screenWidth(App &app) { return app.widths[app.environment]; }
+// Un menu du jeu montré seul (options, sauvegarde, défaite) a sa propre taille : agrandir l'écran
+// pour une cinématique ne le grossit pas.
+float &menuWidth(App &app) {
+	if (app.menuWidths[app.environment] <= 0.0f)
+		app.menuWidths[app.environment] = app.widths[app.environment];
+	return app.menuWidths[app.environment];
+}
+float &shownWidth(App &app) { return app.menuAlone && app.split ? menuWidth(app) : screenWidth(app); }
 float &screenDistance(App &app) { return app.distances[app.environment]; }
 Quat screenRot(const App &app) { return quatYaw(app.screenYaw); }
 
@@ -1191,6 +1200,11 @@ void loadSettings(App &app, int &environment) {
 				environment = iv;
 		} else if (!layoutCurrent && (!strcmp(name, "ecran") || !strcmp(name, "visee") || !strcmp(name, "panneau"))) {
 			continue;
+		} else if (!strcmp(name, "menu_ecran")) {
+			int e = -1;
+			float w = 0;
+			if (sscanf(rest, "%d %f", &e, &w) == 2 && e >= 0 && e < kEnvCount && w >= kLimits[e].wMin && w <= kLimits[e].wMax)
+				app.menuWidths[e] = w;
 		} else if (!strcmp(name, "ecran")) {
 			float w = 0, d = 0;
 			if (screenIndex < kEnvCount && sscanf(rest, "%f %f", &w, &d) == 2) {
@@ -1297,6 +1311,9 @@ void saveSettings(App &app) {
 	fprintf(f, "decor %d\n", app.dungeonMode ? app.classicEnv : app.environment);
 	for (int i = 0; i < kEnvCount; i++)
 		fprintf(f, "ecran %.3f %.3f\n", app.widths[i], app.distances[i]);
+	for (int i = 0; i < kEnvCount; i++)
+		if (app.menuWidths[i] > 0.0f)
+			fprintf(f, "menu_ecran %d %.3f\n", i, app.menuWidths[i]);
 	fprintf(f, "feu %d\n", app.fireOn ? 1 : 0);
 	fprintf(f, "panneaux %d\n", app.detached ? 1 : 0);
 	fprintf(f, "interface %d\n", app.hudMode);
@@ -1441,7 +1458,7 @@ void dragScreen(App &app, Vec3 center, float zoom) {
 // Le joueur tient un coin de l'écran : seule sa taille change.
 void resizeScreen(App &app, float zoom) {
 	const Limits &lim = kLimits[app.environment];
-	screenWidth(app) = clampf(screenWidth(app) * zoom, lim.wMin, lim.wMax);
+	shownWidth(app) = clampf(shownWidth(app) * zoom, lim.wMin, lim.wMax);
 	placeScreen(app, false);
 }
 
@@ -1847,7 +1864,7 @@ void updateLayout(App &app, double now) {
 		if (app.screenPlaced)
 			placeScreen(app, false);
 	}
-	float w = screenWidth(app);
+	float w = shownWidth(app);
 	if (app.split) {
 		// La vue seule est un peu moins haute que l'image entière et remontée, pour laisser la place
 		// aux fenêtres du groupe et de l'inventaire dessous, dans le même plan.
@@ -2800,7 +2817,7 @@ void updateInput(App &app, XrTime time, float dt, double now) {
 	if (zoomMode) {
 		const Limits &lim = kLimits[app.environment];
 		if (fabsf(right.y) > 0.3f && fabsf(right.y) >= fabsf(right.x)) {
-			screenWidth(app) = clampf(w * (1.0f + right.y * 0.8f * dt), lim.wMin, lim.wMax);
+			shownWidth(app) = clampf(shownWidth(app) * (1.0f + right.y * 0.8f * dt), lim.wMin, lim.wMax); // (un menu seul : sa taille à lui)
 			app.zoomUsed = true;
 		} else if (fabsf(right.x) > 0.3f) {
 			screenDistance(app) = clampf(screenDistance(app) * (1.0f + right.x * 0.6f * dt), lim.dMin, lim.dMax);
