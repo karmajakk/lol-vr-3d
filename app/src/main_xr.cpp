@@ -1173,9 +1173,9 @@ void loadSettings(App &app, int &environment) {
 	while (fgets(line, sizeof(line), f)) {
 		if (!strncmp(line, "disposition 2", 13))
 			layoutCurrent = true;
-		// (« fenetres 3 » : les personnages côte à côte au-dessus de l'inventaire ; avant, les
+		// (« fenetres 4 » : le grand bloc sorts / personnages + inventaire / colonne ; avant, les
 		// fenêtres d'alors ne sont pas reprises)
-		if (!strncmp(line, "fenetres 3", 10))
+		if (!strncmp(line, "fenetres 4", 10))
 			panelsCurrent = true;
 	}
 	rewind(f);
@@ -1293,7 +1293,7 @@ void saveSettings(App &app) {
 	if (!f)
 		return;
 	fprintf(f, "disposition 2\n");
-	fprintf(f, "fenetres 3\n");
+	fprintf(f, "fenetres 4\n");
 	fprintf(f, "decor %d\n", app.dungeonMode ? app.classicEnv : app.environment);
 	for (int i = 0; i < kEnvCount; i++)
 		fprintf(f, "ecran %.3f %.3f\n", app.widths[i], app.distances[i]);
@@ -2296,6 +2296,7 @@ void updateUi(App &app, XrTime time, float dt, double now, bool pointer, bool tr
 	in.helpOpen = app.helpOpen;
 	in.compassBlank = app.split && app.charSheet;
 	in.textBoxActive = (app.bandShown && app.level.textRect != 0) || app.cutscene || (app.dungeonMode && app.level.sceneBusy && !app.charSheet) || app.atlasLive;
+	in.partyMarkOff = app.level.textRect != 0 || in.textBoxActive;
 	if (!app.frame.rgba.empty()) {
 		in.gameRgba = app.frame.rgba.data();
 		in.gameW = app.frame.width;

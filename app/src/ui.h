@@ -35,6 +35,8 @@ const float kSplitViewLift = 0.16f;
 // La disquette du poignet, dans le repère de la manette gauche (visée) : sur le dessus de la main
 // (-X : le dos de la main gauche), vers le poignet (+Z).
 const Vec3 kWristFloppy = {-0.054f, -0.050f, 0.142f}; // (la montre : sur le bracelet de laiton du gant, au poignet)
+// Les boutons des poignets sont côté intérieur (paume) : +X à gauche, -X à droite.
+inline Vec3 wristButtonOffset(bool left) { return {left ? -kWristFloppy.x : kWristFloppy.x, kWristFloppy.y, kWristFloppy.z}; }
 
 enum UiAction { kUiActionNone = 0, kUiActionToggleFire, kUiActionToggleDetach, kUiActionResetLayout, kUiActionCloseKeyboard, kUiActionToggleHelp, kUiActionCloseHelp, kUiActionToggleLanguage, kUiActionToggleKeyboard, kUiActionToggleDungeon, kUiActionToggleScreenAlways, kUiActionChooseClassic, kUiActionChooseImmersive, kUiActionGameMenu, kUiActionCycleView, kUiActionChooseLanguage, kUiActionToggleAtlas, kUiActionOpenKeyboard, kUiActionAtlasPrev, kUiActionAtlasNext, kUiActionToggleHud };
 
@@ -137,6 +139,7 @@ struct UiFrameInput {
 	// Le jeu a agrandi sa zone de texte par-dessus les portraits (remarque, conversation) : les
 	// fenêtres des personnages et des sorts gardent l'image d'avant (la boîte a sa propre fenêtre).
 	bool textBoxActive = false;
+	bool partyMarkOff = false;    // la zone de texte du jeu couvre les portraits : pas de cadre jaune
 	// L'image du jeu (RGBA, première ligne en haut) et son numéro : la colonne du groupe en est
 	// recomposée (portraits empilés sous la colonne de la boussole).
 	// L'atlas du jeu ouvert depuis la fenêtre d'atlas (ses flèches) : la fenêtre montre l'écran du jeu

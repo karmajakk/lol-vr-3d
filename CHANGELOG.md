@@ -3,6 +3,21 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.42.0] — One big block, Lands of Lore 2 tabs
+
+- **Windows interface**: one big block below the view, like the bottom of the game's screen:
+  spellbook on the left, message line + characters + inventory in the middle, compass column on
+  the right. It moves and resizes as one piece (one handle, under the inventory). Detaching
+  windows is gone for now.
+- The inventory shows **two quick rows** (16 slots), never sorted; sorting orders rows 3 to 6.
+- **Tabs** under the inventory, as in Lands of Lore 2: bottom right, two opposed arrows open and
+  close the whole inventory; bottom left, three bars sort it (works closed too).
+- The floppy and ZZZ buttons are on the **inner side of the wrists**, upright when you look at
+  the inside of your wrist.
+- The yellow frame of the selected character no longer shows over the game's text box while it
+  opens over the portraits.
+- Windows placed with an earlier version are laid out again once.
+
 ## [0.41.1] — Licenses
 
 - Third-party components and their licenses listed in `THIRD_PARTY_NOTICES.md`; the license

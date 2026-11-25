@@ -81,7 +81,7 @@ index 1016080..bfba10b 100644
  		// the global subtitles settings, we're using this hack to enable subtitles
  		// for fan translations
 diff --git a/engines/kyra/engine/lol.cpp b/engines/kyra/engine/lol.cpp
-index c4f86a3..aba32d4 100644
+index c4f86a3..6e67a34 100644
 --- a/engines/kyra/engine/lol.cpp
 +++ b/engines/kyra/engine/lol.cpp
 @@ -21,6 +21,8 @@
@@ -153,7 +153,7 @@ index c4f86a3..aba32d4 100644
 +}
 +
 +// The headset's inventory window: op 0 switches it on (the quick bar is the first 8 slots), op 1
-+// clicks slot `arg` (0..47) as the game does with the pointer, op 2 sorts slots 8..47 by kind,
++// clicks slot `arg` (0..47) as the game does with the pointer, op 2 sorts slots 16..47 by kind,
 +// op 3 selects the next spell of the scroll, op 4 switches the window off (the game's own strip again),
 +// op 5 picks up item `arg` lying on the party's block or the one ahead (aimed at in the headset).
 +int g_lolvrInvMode = 0;
@@ -898,7 +898,7 @@ index c4f86a3..aba32d4 100644
 +		gui_drawInventory();
 +	} else if (op == 2) {
 +		Common::Array<Item> items;
-+		for (int i = 8; i < 48; i++)
++		for (int i = 16; i < 48; i++) // (les deux lignes rapides, 0-15, ne sont pas triées)
 +			if (_inventory[i])
 +				items.push_back(_inventory[i]);
 +		for (uint a = 1; a < items.size(); a++) {
@@ -916,8 +916,8 @@ index c4f86a3..aba32d4 100644
 +			}
 +			items[b] = it;
 +		}
-+		for (int i = 8; i < 48; i++)
-+			_inventory[i] = (uint)(i - 8) < items.size() ? items[i - 8] : 0;
++		for (int i = 16; i < 48; i++)
++			_inventory[i] = (uint)(i - 16) < items.size() ? items[i - 16] : 0;
 +		gui_drawInventory();
 +	}
 +}

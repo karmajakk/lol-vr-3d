@@ -13,8 +13,8 @@
 | Y | Karte |
 | **X** | **Rechtsklick**, wohin du zielst: Trank trinken, Gegenstand benutzen |
 | Menütaste (linker Controller) | ScummVM-Menü: speichern, laden, beenden |
-| **Linke Uhr (Diskette)** | Das Spielmenü (laden, speichern, Sprache …), und darin „VR-Optionen“: VR-Modus, Ansicht, Atlas, Steuerung und Tasten |
-| **Rechte Uhr (ZZZ)** | Immer an deinem rechten Handgelenk: schau sie an und klicke sie mit der linken Hand, um zu rasten |
+| **Diskette, Innenseite des linken Handgelenks** | Das Spielmenü (laden, speichern, Sprache …), und darin „VR-Optionen“: VR-Modus, Ansicht, Atlas, Steuerung und Tasten |
+| **ZZZ, Innenseite des rechten Handgelenks** | Immer da: schau auf die Innenseite deines Handgelenks und klicke ihn mit der linken Hand, um zu rasten |
 | Rechten Stick klicken | Bildschirm, Raum und Fenster vor dir neu ausrichten. Bei offenen Zauberstufen: nächste Stufe |
 | Linken Stick kurz klicken (L3) | Klassisch und Mixed Reality: nächste Ansicht (Großbild → Fenster → 486er-PC) |
 | Linken Stick gedrückt halten + rechter Stick | Auf/ab: Bildschirmgröße; links/rechts: Abstand |
