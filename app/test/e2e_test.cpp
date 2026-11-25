@@ -417,6 +417,11 @@ int main(int argc, char **argv) {
 			}
 			printf("  menu %08x, lanterne %d, clarté %d ; niveau publié : %d, case %d (x=%d y=%d), direction %d, vmp=%zu vcn=%zu, murs n°%u, graphismes n°%u\n", lvl.menuRect, lvl.lamp, lvl.light, lvl.level, lvl.block,
 			       lvl.block & 31, lvl.block >> 5, lvl.direction, lvl.vmp.size(), lvl.vcn.size() / 32, lvl.wallsSerial, lvl.gfxSerial);
+			{
+				GameState ts;
+				if (host.gameState(ts))
+					printf("  décor : %s (plafond %d)\n", ts.tileset, ceilingStyleOf(ts.tileset));
+			}
 			DungeonGfx g;
 			g.vmpMap = lvl.vmpMap;
 			g.wallFlags = lvl.wallFlags;

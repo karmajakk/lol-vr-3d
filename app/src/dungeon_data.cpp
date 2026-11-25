@@ -273,6 +273,21 @@ static void makeCeiling(int style, const Rgba *bg, const Rgba *wall, Rgba sky, R
 			}
 			ceil[j * N + i] = c;
 		}
+	// Aussi pixelisé que les murs (dont un pixel du jeu fait deux texels) : un pixel du plafond fait
+	// deux texels sur deux, sinon il paraissait bien plus fin que les murs.
+	// Et le grain des murs du jeu : chaque gros pixel un peu plus clair ou plus sombre que son voisin
+	// (le bois des mines, un grain étiré le long des planches).
+	const float amp = style == 2 ? 0.12f : style == 4 ? 0.0f : style == 1 ? 0.05f : 0.08f;
+	for (int j = 0; j < N; j += 2)
+		for (int i = 0; i < N; i += 2) {
+			uint32_t h = (uint32_t)(i / 2) * 2654435761u ^ (uint32_t)(style == 2 ? j / 6 : j / 2) * 2246822519u ^ 0x9E3779B9u;
+			h = (h ^ (h >> 15)) * 2246822519u;
+			const float k = 1.0f + amp * ((float)((h >> 8) & 255) / 127.5f - 1.0f);
+			ceil[j * N + i] = scale(ceil[j * N + i], k);
+		}
+	for (int j = 0; j < N; j++)
+		for (int i = 0; i < N; i++)
+			ceil[j * N + i] = ceil[(j & ~1) * N + (i & ~1)];
 }
 
 float clampDepth(float r) {

@@ -3,6 +3,13 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.52.0] — Ceilings as pixelated as the walls
+
+- The drawn ceilings (coffers, mine planks, rock, treetops) now have pixels as big as the walls'
+  (two texels per game pixel) and a light grain, so they no longer look finer than the walls.
+  The cave ceilings, copies of their walls, are unchanged.
+- Opinwood (a Forest region like the others) gets the same treetops in its walls' greens.
+
 ## [0.51.0] — Forest canopy in the walls' greens
 
 - Outdoors (Northland and Southland forests, swamp), the leaves of the ceiling take the greens of
