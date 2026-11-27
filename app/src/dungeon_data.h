@@ -49,8 +49,8 @@ struct DungeonGfx {
 };
 
 // Le plafond d'une région du jeu : 1 à caissons (manoir, tour), 2 à poutres de bois (mines), 3 de
-// roche (ruines), 4 des cimes et du ciel (forêt, marais, Yvel), 5 à caissons aussi pâles que les murs
-// (château), 6 le mur lui-même (cavernes) ; 0 inconnue.
+// roche (ruines), 4 des cimes et du ciel (forêt, Yvel), 5 à caissons aussi pâles que les murs
+// (château), 6 le mur lui-même (cavernes, marais) ; 0 inconnue.
 int ceilingStyleOf(const char *tileset);
 
 // Comment un type de mur est montré en 3D.

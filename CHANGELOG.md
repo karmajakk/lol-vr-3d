@@ -3,6 +3,20 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.53.0] — Saving in shops, wall pictures, bigger tabs
+
+- Swamp: the ceiling is a copy of the swamp wall.
+- Opinwood beggar, the mine exit and the barrier of Upper Opinwood: drawn as a single picture at
+  the back of the block (or across a corridor), like the other places to visit, instead of a cross.
+- Clicking a side wall turns the party back to its direction afterwards, so it no longer ends up
+  90° off (seen after resting in the swamp).
+- The inventory tabs are bigger and easier to click.
+- In a shop or a place, the floppy on the wrist makes a quick save (slot 990, "VR - quick save"),
+  confirmed by three pulses in the left hand. Load it from the game menu.
+- The ZZZ icon is no longer black at the character selection.
+- Coming back from a shop or a place in the same level no longer reloads the textures: smoother.
+- "You have been defeated": the black bands above and below are trimmed.
+
 ## [0.52.0] — Ceilings as pixelated as the walls
 
 - The drawn ceilings (coffers, mine planks, rock, treetops) now have pixels as big as the walls'

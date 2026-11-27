@@ -349,7 +349,15 @@ struct Ui::Impl {
 					n++;
 				}
 			}
-		if (n < 15 || n > 220)
+		// (et le fond rose du bouton tout autour : à l'écran du choix des personnages, le même
+		// endroit a quelques pixels jaunes sur du noir, et le ZZZ relevé était tout noir)
+		int pink = 0;
+		for (int i = 0; i < W * H; i++) {
+			const uint8_t *c = &rgb[(size_t)i * 3];
+			if (c[0] >= 110 && c[0] <= 190 && c[1] >= 45 && c[1] <= 105 && c[2] >= 40 && c[2] <= 100 && c[0] > c[1] + 35)
+				pink++;
+		}
+		if (n < 15 || n > 220 || pink < 120)
 			return false;
 		// (le bouton entier, son fond compris)
 		std::vector<uint8_t> px((size_t)W * H * 4, 255);
@@ -2210,7 +2218,7 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 		const Quad &iq = content[kPanelInventory];
 		const float sc = 2.0f * iq.hw / (float)(d->comp[kCompInv].w > 0 ? d->comp[kCompInv].w : 176);
 		// Des onglets de livre (voir makeButtons) qui sortent de l'inventaire, un peu en avant de son cadre.
-		const float tw = 22.0f * sc, th = 11.0f * 1.2f * sc; // (la largeur d'une case)
+		const float tw = 32.0f * sc, th = 15.0f * 1.2f * sc; // (une case et demie : plus faciles à viser)
 		const Vec3 fwd = cross(iq.r, iq.u) * 0.0015f;
 		auto tab = [&](int b, Vec3 out, Vec3 along, float pos, float edge) {
 			Quad &q = btnQ[b];

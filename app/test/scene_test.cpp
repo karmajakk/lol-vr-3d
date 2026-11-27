@@ -856,7 +856,12 @@ int main(int argc, char **argv) {
 				int introNone = 0;
 				for (int i = 0; i < SceneState::kMaxPanels; i++) introNone += tmp.panels[i].visible ? 1 : 0;
 				check(intro == introNone, "pas de bouton de repos dans l'image du jeu : pas de ZZZ");
-				// (le bouton de repos du jeu : des lettres jaunes)
+				// (le bouton de repos du jeu : des lettres jaunes sur son fond rose)
+				for (int y = 180; y < 200; y++)
+					for (int x = 33; x < 53; x++) {
+						uint8_t *q = &zf[((size_t)y * 320 + x) * 4];
+						q[0] = 150; q[1] = 75; q[2] = 68;
+					}
 				for (int y = 184; y < 196; y++)
 					for (int x = 38; x < 52; x++)
 						if ((x + y) % 3 == 0) {

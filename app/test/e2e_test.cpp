@@ -303,6 +303,22 @@ int main(int argc, char **argv) {
 					seen += (m.map.flags[b] & 7) == 7;
 				printf("  atlas : carte %s, %d cases vues, %d lieux, titre \"%s\"\n", m.map.available ? "oui" : "non", seen, (int)m.map.legend.size(), m.map.title.c_str());
 			}
+		} else if (op == "sauverapide") {
+			// sauverapide N : la sauvegarde du casque (boutiques) à l'emplacement N ; on attend sa confirmation
+			int slot = 990;
+			cs >> slot;
+			GameState g0;
+			host.gameState(g0);
+			host.quickSave(slot);
+			bool ok = false;
+			for (int i = 0; i < 40 && !ok; i++) {
+				pump(0.05);
+				GameState g1;
+				ok = host.gameState(g1) && g1.quickSaveSerial != g0.quickSaveSerial;
+			}
+			printf("  sauvegarde rapide %d : %s\n", slot, ok ? "faite" : "ÉCHEC");
+			if (!ok)
+				failures++;
 		} else if (op == "ramasse") {
 			// ramasse : chaque objet posé visible tour à tour, ramassé directement (sa case ou celle
 			// devant) ; on dit ce qui est arrivé dans la main, puis on le repose (clic sur la vue)

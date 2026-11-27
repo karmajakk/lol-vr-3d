@@ -361,7 +361,7 @@ int ceilingStyleOf(const char *t) {
 		int style;
 	};
 	static const Entry table[] = {{"KEEP", 5}, {"MANOR", 1}, {"TOWER", 1}, {"URBISH", 2}, {"MINE", 2}, {"CAVE", 6},
-	                              {"RUIN", 3}, {"CIMMERIA", 3}, {"CATWALK", 3}, {"FOREST", 4}, {"SWAMP", 4}, {"YVEL", 4}};
+	                              {"RUIN", 3}, {"CIMMERIA", 3}, {"CATWALK", 3}, {"FOREST", 4}, {"SWAMP", 6}, {"YVEL", 4}};
 	for (const Entry &e : table)
 		if (!strncmp(t, e.prefix, strlen(e.prefix)))
 			return e.style;
@@ -618,7 +618,14 @@ void decodeDungeonTextures(const DungeonGfx &g, DungeonTextures &out) {
 							y0 = y < y0 ? y : y0; y1 = y > y1 ? y : y1;
 						}
 				const int bw = x1 - x0 + 1, bh = y1 - y0 + 1;
-				if (x1 >= 0 && bw >= 56 && bh >= 44 && y0 < 28) { // (la fontaine du château : y0 36)
+				int filled = 0;
+				for (int y = y0; y <= y1 && x1 >= 0; y++)
+					for (int x = x0; x <= x1; x++)
+						filled += al[y * kDunTexSize + x] ? 1 : 0;
+				// (et une image rectangulaire avec son fond — le mendiant d'Opinwood — : comme un lieu à
+				// visiter, au fond de la case ; on avance vers elle et le jeu fait la suite)
+				const bool framedPicture = x1 >= 0 && bw >= 24 && bh >= 16 && filled == bw * bh;
+				if (x1 >= 0 && ((bw >= 56 && bh >= 44 && y0 < 28) || framedPicture)) { // (la fontaine du château : y0 36)
 					out.scenery[t] = true;
 					for (int y = 0; y < kDunWallRows; y++)
 						for (int x = 0; x < kDunTexSize; x++) {
@@ -1068,15 +1075,25 @@ void buildDungeonMesh(const uint8_t *walls, const DungeonGfx &g, const DungeonTe
 			if (tex.kind[t] == kWallObject) {
 				if (!objectDone && tex.typeLayer[t] >= 0 && tex.scenery[t]) {
 					// Un décor entier : au fond de la case, face à l'unique ouverture (sinon, comme un objet).
-					int open = -1, nOpen = 0;
-					for (int k2 = 0; k2 < 4; k2++)
-						if (!isSolidBlock(walls, (b + dx[k2] + dz[k2] * 32) & 1023, g)) {
+					int open = -1, nOpen = 0, openMask = 0;
+					for (int k2 = 0; k2 < 4; k2++) {
+						if (!isSolidBlock(walls, (b + dx[k2] + dz[k2] * 32) & 1023, g)) { // (le plan boucle, comme le jeu)
 							open = k2;
 							nOpen++;
+							openMask |= 1 << k2;
 						}
+					}
 					if (nOpen == 1) {
 						objectDone = true;
 						upright(cx - dx[open] * (S * 0.5f - 0.01f), cz - dz[open] * (S * 0.5f - 0.01f), (float)dx[open], (float)dz[open], (float)tex.typeLayer[t], faceShade[open], 1.0f, false);
+						continue;
+					}
+					if (openMask == 5 || openMask == 10) {
+						// Dans un couloir (une barrière, celle de Scotia) : une seule image en travers,
+						// visible des deux côtés, et non deux images croisées.
+						objectDone = true;
+						const int k2 = openMask == 5 ? 0 : 1;
+						upright(cx, cz, (float)dx[k2], (float)dz[k2], (float)tex.typeLayer[t], faceShade[k2], 1.0f, true);
 						continue;
 					}
 				}

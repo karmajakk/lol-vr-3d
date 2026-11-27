@@ -46,6 +46,7 @@ struct GameState {
 	bool menuOpen = false;    // un menu du jeu est affiché
 	bool nameEntry = false;   // le joueur écrit le nom d'une sauvegarde
 	int vrMenuSerial = 0;     // change à chaque clic sur « Réglages VR » dans le menu du jeu
+	int quickSaveSerial = 0;  // change à chaque sauvegarde faite depuis le casque (boutiques)
 	int gameLang = -1;        // la langue du jeu (0 anglais, 1 français, 2 allemand ; -1 pas encore connue)
 };
 
@@ -165,6 +166,7 @@ public:
 	void pickupItem(int item);
 	void inventoryClick(int slot);
 	void inventorySort();
+	void quickSave(int slot); // une sauvegarde à cet emplacement, même dans une boutique
 	void nextSpell(); // le sort suivant du parchemin
 	// L'app dessine elle-même le curseur du jeu, là où vise le joueur (le cœur ne le met plus dans l'image).
 	void setOwnCursor(bool own);

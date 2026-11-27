@@ -651,6 +651,7 @@ void CoreHost::inventoryDisable() { retro_lolvr_inventory(4, 0); }
 void CoreHost::pickupItem(int item) { retro_lolvr_inventory(5, item); }
 void CoreHost::inventoryClick(int slot) { retro_lolvr_inventory(1, slot); }
 void CoreHost::inventorySort() { retro_lolvr_inventory(2, 0); }
+void CoreHost::quickSave(int slot) { retro_lolvr_inventory(6, slot); }
 void CoreHost::nextSpell() { retro_lolvr_inventory(3, 0); }
 void CoreHost::setOwnCursor(bool own) { retro_lolvr_hide_cursor(own ? 1 : 0); }
 bool CoreHost::cursorShown() const { return retro_lolvr_cursor_shown() != 0; }
@@ -771,6 +772,7 @@ bool CoreHost::gameState(GameState &out) const {
 	out.menuOpen = (s->reserved[2] & (2 | 4)) != 0; // menu du jeu, ou menu de ScummVM (jeu en pause)
 	out.nameEntry = (s->reserved[2] & 8) != 0;
 	out.vrMenuSerial = (s->reserved[2] >> 8) & 0xFF;
+	out.quickSaveSerial = (s->reserved[2] >> 24) & 15;
 	out.gameLang = (s->reserved[2] & 0x40000) ? (s->reserved[2] >> 16) & 3 : -1;
 	memcpy(out.tileset, s->tileset, sizeof(out.tileset));
 	memcpy(out.sfxName, s->sfxName, sizeof(out.sfxName));

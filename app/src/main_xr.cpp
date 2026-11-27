@@ -483,6 +483,9 @@ struct App {
 	int spriteId[32] = {0};
 	int shownLevel = 0;
 	uint32_t gfxWaitSerial = 0;     // décor attendu (ses murs dessinés par le jeu pas encore là)
+	int builtLevelNo = -1;          // le niveau et la région des textures en place
+	char builtTileset[16] = {0};
+	uint64_t builtTexHash = 0;
 	double gfxWaitSince = 0;
 	float levelFadeIn = 1.0f;       // fondu d'arrivée d'un nouveau décor (0 noir, 1 fini)
 	float partyX = 0, partyZ = 0, partyYaw = 0; // position affichée du groupe (glisse vers la vraie)
@@ -542,6 +545,13 @@ struct App {
 	int pickFace = -1;            // le mur visé : 0 nord .. 3 ouest (-1 : sol, au loin)
 	int pickItem = -1;            // l'objet posé visé (sa case ou celle devant) : son numéro dans le jeu
 	int pendingFace = -1;
+	int pendingFrom = -1;          // la direction du groupe avant ce demi-tour vers un mur de côté
+	int returnFace = -1;
+	double quickSaveAsked = -1;    // une sauvegarde rapide demandée (boutique) : sa confirmation
+	int quickSaveSeen = -1;
+	int quickSavePulses = 0;
+	double quickSavePulseAt = 0;           // après le clic : s'y retourner (le groupe regarde de nouveau devant le joueur)
+	double returnAt = 0;
 	float pendingU = 0, pendingV = 0;
 	double pendingUntil = 0;
 	bool holdTrigger = false;     // la gâchette du clic reporté est encore enfoncée
@@ -1599,6 +1609,20 @@ void updateGameEvents(App &app, double now) {
 			app.settingsDirty = true;
 		}
 	}
+	// La sauvegarde rapide d'une boutique : faite, trois petites vibrations de la main gauche.
+	if (gs.quickSaveSerial != app.quickSaveSeen) {
+		if (app.quickSaveSeen >= 0 && app.quickSaveAsked >= 0 && now - app.quickSaveAsked < 5.0) {
+			pulse(app, kLeft, 0.5f, 0.05f);
+			app.quickSavePulses = 2;
+			app.quickSavePulseAt = now + 0.15;
+		}
+		app.quickSaveSeen = gs.quickSaveSerial;
+	}
+	if (app.quickSavePulses > 0 && now >= app.quickSavePulseAt) {
+		pulse(app, kLeft, 0.5f, 0.05f);
+		app.quickSavePulses--;
+		app.quickSavePulseAt = now + 0.15;
+	}
 	// « Réglages VR » choisi dans le menu du jeu : la fenêtre des réglages s'ouvre devant le joueur.
 	if (gs.vrMenuSerial != app.vrMenuSerial) {
 		if (app.vrMenuSerial >= 0)
@@ -1892,17 +1916,17 @@ void updateLayout(App &app, double now) {
 					const uint8_t *row = app.frame.rgba.data() + (size_t)(y * fh / 200) * fw * 4;
 					for (int x = (int)mx; x < (int)(mx + mw); x += 2) {
 						const uint8_t *q = row + (size_t)(x * fw / 320) * 4;
-						if (q[0] + q[1] + q[2] > 24)
+						if (q[0] + q[1] + q[2] > 60) // (noir, ou presque : l'écran assombri derrière la boîte)
 							return false;
 					}
 					return true;
 				};
 				const float mh0 = mh;
-				while (mh > 16.0f && mh > mh0 * 0.6f && rowBlack((int)my)) {
+				while (mh > 16.0f && mh > mh0 * 0.3f && rowBlack((int)my)) {
 					my += 1.0f;
 					mh -= 1.0f;
 				}
-				while (mh > 16.0f && mh > mh0 * 0.6f && rowBlack((int)(my + mh) - 1))
+				while (mh > 16.0f && mh > mh0 * 0.3f && rowBlack((int)(my + mh) - 1))
 					mh -= 1.0f;
 				// (et à gauche et à droite : la question « quitter le jeu ? »)
 				auto colBlack = [&](int x) {
@@ -1911,17 +1935,17 @@ void updateLayout(App &app, double now) {
 						return false;
 					for (int y = (int)my; y < (int)(my + mh); y += 2) {
 						const uint8_t *q = app.frame.rgba.data() + ((size_t)(y * fh / 200) * fw + (size_t)(x * fw / 320)) * 4;
-						if (q[0] + q[1] + q[2] > 24)
+						if (q[0] + q[1] + q[2] > 60) // (noir, ou presque : l'écran assombri derrière la boîte)
 							return false;
 					}
 					return true;
 				};
 				const float mw0 = mw;
-				while (mw > 16.0f && mw > mw0 * 0.6f && colBlack((int)mx)) {
+				while (mw > 16.0f && mw > mw0 * 0.3f && colBlack((int)mx)) {
 					mx += 1.0f;
 					mw -= 1.0f;
 				}
-				while (mw > 16.0f && mw > mw0 * 0.6f && colBlack((int)(mx + mw) - 1))
+				while (mw > 16.0f && mw > mw0 * 0.3f && colBlack((int)(mx + mw) - 1))
 					mw -= 1.0f;
 				cx = mx;
 				cy = my;
@@ -2537,6 +2561,11 @@ void updateUi(App &app, XrTime time, float dt, double now, bool pointer, bool tr
 		// La disquette du poignet : le bouton des options du jeu (11..32, 179..199), ou referme le menu.
 		if (app.gameMenuOpen) {
 			typeKey(app, RETROK_ESCAPE, 0, now);
+		} else if (app.gameStarted && app.inDungeon && app.level.sceneBusy) {
+			// Une boutique, un dialogue : le menu du jeu ne s'y ouvre pas. Une sauvegarde rapide
+			// (emplacement 990, « VR - quick save ») ; la charger ramène devant la boutique.
+			CoreHost::get().quickSave(990);
+			app.quickSaveAsked = now;
 		} else if (app.gameStarted && (app.inDungeon || app.charSheet)) {
 			app.synthU = 21.5f / 320.0f;
 			app.synthV = 189.0f / 200.0f;
@@ -2698,6 +2727,7 @@ void updateInput(App &app, XrTime time, float dt, double now) {
 			app.alignUntil = now + 1.0;
 			app.moveBlockUntil = now + 0.30;
 			app.pendingFace = app.pickFace;
+			app.pendingFrom = pd;
 			app.pendingU = ui.gu;
 			app.pendingV = ui.gv;
 			app.pendingUntil = now + 1.5;
@@ -2717,6 +2747,25 @@ void updateInput(App &app, XrTime time, float dt, double now) {
 			app.synthV = app.pendingV;
 			app.synthClickUntil = now + 0.16;
 			app.pendingFace = -1;
+			// Puis se retourner : sans ça, le groupe restait tourné vers ce mur, le monde immobile,
+			// et « devant » n'était plus devant le joueur (marcher menait au mur ; après un repos
+			// réveillé par un tel clic, par exemple) jusqu'au recentrage.
+			app.returnFace = app.pendingFrom;
+			app.returnAt = now + 0.45;
+		}
+	}
+	if (app.returnFace >= 0) {
+		const int pd = app.level.direction & 3, diff = (app.returnFace - pd) & 3;
+		if (diff == 0 || now > app.returnAt + 3.0) {
+			app.returnFace = -1;
+		} else if (now >= app.returnAt && app.alignTurn == 0 && !app.level.sceneBusy && (diff == 1 || diff == 3)) {
+			const bool leftTurn = diff == 3;
+			typeKey(app, leftTurn ? RETROK_HOME : RETROK_PAGEUP, 0, now);
+			app.alignTurn = leftTurn ? 1 : -1;
+			app.alignExpect = app.returnFace;
+			app.alignUntil = now + 1.0;
+			app.moveBlockUntil = now + 0.30;
+			app.returnFace = -1;
 		}
 	}
 	if (now < app.synthClickUntil) {
@@ -3148,7 +3197,10 @@ void updateDungeon(App &app, float dt) {
 	// Un nouveau décor (sortie du château, arrivée devant le garde) : les murs tels que le jeu les
 	// dessine arrivent un instant après ses graphismes. On attend ces dessins, la pièce dans le noir,
 	// plutôt que de montrer une fraction de seconde le décor tiré des seuls graphismes, puis l'autre.
-	if (l.gfxSerial != app.builtGfx && l.wallCaptureSerial != l.gfxSerial) {
+	// (le même niveau rechargé — retour d'une boutique, d'un lieu — : l'ancien décor est le bon, on le
+	// garde allumé ; seul un vrai changement de région attend dans le noir)
+	const bool sameScene = l.level == app.builtLevelNo && !strcmp(app.tileset, app.builtTileset);
+	if (l.gfxSerial != app.builtGfx && l.wallCaptureSerial != l.gfxSerial && !sameScene) {
 		if (app.gfxWaitSerial != l.gfxSerial) {
 			app.gfxWaitSerial = l.gfxSerial;
 			app.gfxWaitSince = app.clock;
@@ -3161,19 +3213,33 @@ void updateDungeon(App &app, float dt) {
 		}
 	}
 	const bool gfxChanged = l.gfxSerial != app.builtGfx || l.wallCaptureSerial != app.builtCapture;
-	if (gfxChanged && app.shownLevel != 0)
+	if (gfxChanged && app.shownLevel != 0 && !sameScene)
 		app.levelFadeIn = 0.0f; // (le nouveau décor apparaît en fondu)
 	// Une image de lieu de plus (le jeu vient de la montrer) : seulement les textures et le maillage.
-	const bool texChanged = gfxChanged || l.placeSerial != app.builtPlaces;
+	bool texChanged = gfxChanged || l.placeSerial != app.builtPlaces;
 	if (texChanged) {
 		app.builtCapture = l.wallCaptureSerial;
 		app.builtPlaces = l.placeSerial;
 		lolvr::decodeDungeonTextures(g, app.dunTex);
 		for (size_t i = 0; i < l.placeTypes.size() && (i + 1) * 176 * 120 * 3 <= l.placeRgb.size(); i++)
 			lolvr::applyPlacePicture(app.dunTex, l.placeTypes[i], &l.placeRgb[i * 176 * 120 * 3]);
-		app.dungeon.setTextures(app.dunTex);
+		// Les mêmes textures qu'avant (le niveau rechargé à la sortie d'une boutique) : rien à
+		// renvoyer à la carte graphique ni à refaire — c'était l'à-coup du retour.
+		uint64_t h = 1469598103934665603ull ^ (uint64_t)app.dunTex.layers;
+		for (size_t i = 0; i < app.dunTex.rgba.size(); i += 7)
+			h = (h ^ app.dunTex.rgba[i]) * 1099511628211ull;
+		for (int i = 0; i < 256; i++)
+			h = (h ^ (uint64_t)(app.dunTex.typeLayer[i] + 1)) * 1099511628211ull;
+		if (h == app.builtTexHash && app.builtLevelNo == l.level) {
+			texChanged = false;
+		} else {
+			app.builtTexHash = h;
+			app.dungeon.setTextures(app.dunTex);
+			LOGI("donjon 3D : niveau %d, %d textures, %d lieux", l.level, app.dunTex.layers, (int)l.placeTypes.size());
+		}
 		app.builtGfx = l.gfxSerial;
-		LOGI("donjon 3D : niveau %d, %d textures, %d lieux", l.level, app.dunTex.layers, (int)l.placeTypes.size());
+		app.builtLevelNo = l.level;
+		memcpy(app.builtTileset, app.tileset, sizeof(app.builtTileset));
 	}
 	if (texChanged || l.wallsSerial != app.builtWalls || (l.direction & 3) != app.builtDir || app.openBlock != app.builtOpen) {
 		app.builtDir = l.direction & 3;
