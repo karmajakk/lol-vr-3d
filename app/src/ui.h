@@ -41,7 +41,7 @@ const Vec3 kWristFloppy = {0.016f, -0.0045f, 0.1447f}; // (un peu en saillie, ho
 inline Vec3 wristButtonOffset(bool left) { return {left ? -kWristFloppy.x : kWristFloppy.x, kWristFloppy.y, kWristFloppy.z}; }
 inline Vec3 wristButtonNormal() { return {0.0f, 0.941f, 0.339f}; }
 
-enum UiAction { kUiActionNone = 0, kUiActionToggleFire, kUiActionToggleDetach, kUiActionResetLayout, kUiActionCloseKeyboard, kUiActionToggleHelp, kUiActionCloseHelp, kUiActionToggleLanguage, kUiActionToggleKeyboard, kUiActionToggleDungeon, kUiActionToggleScreenAlways, kUiActionChooseClassic, kUiActionChooseImmersive, kUiActionGameMenu, kUiActionCycleView, kUiActionChooseLanguage, kUiActionToggleAtlas, kUiActionOpenKeyboard, kUiActionAtlasPrev, kUiActionAtlasNext, kUiActionToggleHud };
+enum UiAction { kUiActionNone = 0, kUiActionToggleFire, kUiActionToggleDetach, kUiActionResetLayout, kUiActionCloseKeyboard, kUiActionToggleHelp, kUiActionCloseHelp, kUiActionToggleLanguage, kUiActionToggleKeyboard, kUiActionToggleDungeon, kUiActionToggleScreenAlways, kUiActionChooseClassic, kUiActionChooseImmersive, kUiActionGameMenu, kUiActionCycleView, kUiActionChooseLanguage, kUiActionToggleAtlas, kUiActionOpenKeyboard, kUiActionAtlasPrev, kUiActionAtlasNext, kUiActionToggleHud, kUiActionCycleCinema, kUiActionToggleCinemaIntro };
 
 // Les boutons qu'on peut changer dans un profil de manettes, et ce que chacun peut faire. La gâchette,
 // les joysticks (marcher, tourner), le bouton menu et la disquette restent fixes.
@@ -159,6 +159,10 @@ struct UiFrameInput {
 	bool gearHint = false;
 	// Le grand écran est caché (donjon 3D : il n'apparaît que lorsqu'on en a besoin).
 	bool screenHidden = false;
+	// Mode cinéma : l'écran est courbe (un cylindre de ce rayon autour du joueur ; 0 = plat) et ne se
+	// déplace ni ne se redimensionne à la main (sa taille est un réglage).
+	float curveRadius = 0.0f;
+	bool screenLocked = false;
 	// L'atlas : sa fenêtre est montrée (réglage) et la carte (nulle : pas de fenêtre).
 	bool atlasOn = false;
 	const UiMap *map = nullptr;
@@ -231,6 +235,9 @@ public:
 	// barre du bas du jeu), 2 des fenêtres séparées (chacune se place et se redimensionne seule).
 	void setHudMode(int mode);
 	int hudMode() const;
+	// Le mode cinéma, montré dans les réglages VR : la taille de l'écran (0 moyen, 1 grand, 2 petit,
+	// 3 sans), et l'intro et les menus d'avant la partie dans le noir aussi.
+	void setCinema(int size, bool intro);
 	// L'inventaire collé sous les personnages (fenêtres) ; détaché par son bouton, recollé en le
 	// reposant contre eux. Enregistré avec les fenêtres.
 	void setInventoryGrouped(bool grouped);

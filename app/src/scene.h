@@ -96,7 +96,22 @@ struct SceneState {
 	float dungeonLight = 1.0f;
 	bool screenFrameless = false; // l'écran sans son cadre (le menu du jeu seul)
 	float dungeonReach = 11.0f; // jusqu'où porte la lumière (la lanterne)
+
+	// Mode cinéma (une scène, une boutique, une cinématique) : le monde s'efface au noir et l'image
+	// du jeu apparaît sur un écran courbe, sans cadre, avec un halo de ses couleurs. 0 éteint, 1 plein.
+	float cinema = 0.0f;
+	Vec3 cinemaPos = {0, 0, -2.0f};  // centre de l'écran
+	Quat cinemaRot = {0, 0, 0, 1};   // son repère (l'axe du cylindre est en +Z local, à cinemaRadius)
+	float cinemaRadius = 2.0f;       // rayon du cylindre (la distance du joueur)
+	float cinemaHalfAngle = 0.45f;   // demi-largeur, en radians
+	float cinemaHalfH = 0.5f;        // demi-hauteur, en mètres
+	float cinemaRect[4] = {0, 0, 1, 1}; // portion de l'image du jeu (u0, v0, u1, v1)
+	Vec3 cinemaEdge[4] = {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}}; // couleurs des bords (gauche, droite, haut, bas ; linéaires)
 };
+
+// L'écran courbe du mode cinéma : le point (repère local de l'écran) à l'angle a (radians, 0 au
+// centre) et à la hauteur y. L'axe du cylindre est vertical, en (0, y, radius).
+inline Vec3 cinemaPoint(float radius, float a, float y) { return Vec3{radius * sinf(a), y, radius * (1.0f - cosf(a))}; }
 
 class Dungeon;
 

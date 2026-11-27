@@ -359,6 +359,47 @@ void main() {
 }
 )";
 
+// Halo du mode cinéma : autour de l'écran courbe, une lueur douce des couleurs de ses bords, qui
+// s'éteint dans le noir. aUvl : position dans l'écran (-1..1 à l'intérieur, au-delà dans le halo).
+const char *kHaloVs = R"(
+layout(location = 0) in vec3 aPos;
+layout(location = 2) in vec3 aUvl;
+uniform mat4 uViewProj;
+out vec2 vP;
+void main() {
+	vP = aUvl.xy;
+	gl_Position = uViewProj * vec4(aPos, 1.0);
+}
+)";
+
+const char *kHaloFs = R"(
+precision highp float;
+uniform vec2 uHalf;    // demi-largeur (le long de la courbe) et demi-hauteur, en mètres
+uniform float uReach;  // portée du halo, en mètres
+uniform float uAlpha;
+uniform vec3 uEdge[4]; // gauche, droite, haut, bas
+in vec2 vP;
+out vec4 oColor;
+void main() {
+	float dx = max(abs(vP.x) - 1.0, 0.0) * uHalf.x;
+	float dy = max(abs(vP.y) - 1.0, 0.0) * uHalf.y;
+	float d = length(vec2(dx, dy));
+	// Une lueur qui s'évanouit vite près du bord, puis doucement jusqu'à rien.
+	float x = clamp(d / uReach, 0.0, 1.0);
+	float f = exp(-4.0 * x) * (1.0 - x) * (1.0 - x);
+	// Le bord le plus proche donne sa couleur (un mélange dans les coins).
+	vec3 cx = vP.x < 0.0 ? uEdge[0] : uEdge[1];
+	vec3 cy = vP.y > 0.0 ? uEdge[2] : uEdge[3];
+	float wx = dx + 1e-4, wy = dy + 1e-4;
+	vec3 c = (cx * wx + cy * wy) / (wx + wy);
+	c *= f * 0.40 * uAlpha;
+#ifdef MANUAL_SRGB
+	c = pow(c, vec3(1.0 / 2.2));
+#endif
+	oColor = vec4(c, 0.0);
+}
+)";
+
 const char *kFlatVs = R"(
 layout(location = 0) in vec3 aPos;
 uniform mat4 uMvp;
@@ -485,7 +526,13 @@ struct TexJob {
 struct Scene::Impl {
 	bool srgb = true;
 	const Dungeon *dungeon = nullptr;
-	GLuint litProgram = 0, fxProgram = 0, crtProgram = 0, flatProgram = 0, panelProgram = 0;
+	GLuint litProgram = 0, fxProgram = 0, crtProgram = 0, flatProgram = 0, panelProgram = 0, haloProgram = 0;
+	struct {
+		GLint viewProj, half, reach, alpha, edge;
+	} halo;
+	// Mode cinéma : l'écran courbe et son halo (reconstruits quand l'écran bouge), le voile noir.
+	GlMesh cinemaMesh, haloMesh, fullMesh;
+	float cinemaKey[12] = {0};
 	struct {
 		GLint viewProj, game, gameSize, rect, border, alpha, hot, mode, glow;
 	} panel;
@@ -672,6 +719,12 @@ bool Scene::init(bool srgbTarget) {
 	d->panel.hot = glGetUniformLocation(d->panelProgram, "uHot");
 	d->panel.mode = glGetUniformLocation(d->panelProgram, "uMode");
 	d->panel.glow = glGetUniformLocation(d->panelProgram, "uGlow");
+	d->haloProgram = link(kHaloVs, kHaloFs, manual);
+	d->halo.viewProj = glGetUniformLocation(d->haloProgram, "uViewProj");
+	d->halo.half = glGetUniformLocation(d->haloProgram, "uHalf");
+	d->halo.reach = glGetUniformLocation(d->haloProgram, "uReach");
+	d->halo.alpha = glGetUniformLocation(d->haloProgram, "uAlpha");
+	d->halo.edge = glGetUniformLocation(d->haloProgram, "uEdge");
 	d->lit.viewProj = glGetUniformLocation(d->litProgram, "uViewProj");
 	d->lit.model = glGetUniformLocation(d->litProgram, "uModel");
 	d->lit.lightPos = glGetUniformLocation(d->litProgram, "uLightPos");
@@ -722,6 +775,8 @@ bool Scene::init(bool srgbTarget) {
 	setupLitMesh(d->crtGlass);
 	setupLitMesh(d->dynMesh);
 	setupLitMesh(d->panelMesh);
+	setupLitMesh(d->cinemaMesh);
+	setupLitMesh(d->haloMesh);
 	setupFxMesh(d->fxMesh);
 
 	MeshBuilder frame, body, glass;
@@ -742,6 +797,17 @@ bool Scene::init(bool srgbTarget) {
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 12, nullptr);
 	glBindVertexArray(0);
 	d->holeMesh.count = 6;
+	// Tout l'écran du casque (le voile noir du mode cinéma)
+	const float full[] = {-1, -1, 0, 1, -1, 0, 1, 1, 0, -1, -1, 0, 1, 1, 0, -1, 1, 0};
+	glGenVertexArrays(1, &d->fullMesh.vao);
+	glGenBuffers(1, &d->fullMesh.vbo);
+	glBindVertexArray(d->fullMesh.vao);
+	glBindBuffer(GL_ARRAY_BUFFER, d->fullMesh.vbo);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(full), full, GL_STATIC_DRAW);
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 12, nullptr);
+	glBindVertexArray(0);
+	d->fullMesh.count = 6;
 
 	d->startJob(0, true);
 	return true;
@@ -1020,6 +1086,50 @@ void Scene::prepare(const SceneState &s) {
 	uploadLitMesh(d->panelMesh, panel.verts, GL_DYNAMIC_DRAW);
 	uploadLitMesh(d->dynMesh, d->dynBuilder.verts, GL_DYNAMIC_DRAW);
 
+	// Mode cinéma : l'écran courbe, une grille régulière (prête pour un relief plus tard), et son halo
+	// tout autour, sur le même cylindre. Reconstruits seulement quand l'écran bouge.
+	if (s.cinema > 0.0f) {
+		const float key[12] = {s.cinemaPos.x, s.cinemaPos.y, s.cinemaPos.z, s.cinemaRot.x, s.cinemaRot.y, s.cinemaRot.z, s.cinemaRot.w,
+		                       s.cinemaRadius, s.cinemaHalfAngle, s.cinemaHalfH, s.cinemaRect[0] + s.cinemaRect[2] * 3.0f, s.cinemaRect[1] + s.cinemaRect[3] * 3.0f};
+		if (memcmp(key, d->cinemaKey, sizeof(key)) != 0) {
+			memcpy(d->cinemaKey, key, sizeof(key));
+			const Mat4 m = poseMatrix(s.cinemaPos, s.cinemaRot);
+			const float R = s.cinemaRadius, A = s.cinemaHalfAngle, H = s.cinemaHalfH;
+			auto vert = [&](std::vector<Vertex> &out, float a, float y, float u, float v) {
+				Vertex vx{};
+				const Vec3 p = transformPoint(m, cinemaPoint(R, a, y));
+				vx.pos[0] = p.x; vx.pos[1] = p.y; vx.pos[2] = p.z;
+				vx.uvl[0] = u; vx.uvl[1] = v;
+				out.push_back(vx);
+			};
+			auto grid = [&](std::vector<Vertex> &out, int nx, int ny, float a0, float a1, float y0, float y1, bool screen) {
+				for (int j = 0; j < ny; j++)
+					for (int i = 0; i < nx; i++) {
+						float aa[2] = {a0 + (a1 - a0) * i / nx, a0 + (a1 - a0) * (i + 1) / nx};
+						float yy[2] = {y0 + (y1 - y0) * j / ny, y0 + (y1 - y0) * (j + 1) / ny};
+						const int order[6][2] = {{0, 0}, {1, 0}, {1, 1}, {0, 0}, {1, 1}, {0, 1}};
+						for (const auto &o : order) {
+							const float a = aa[o[0]], y = yy[o[1]];
+							if (screen) {
+								// (u, v) dans l'image du jeu : v vers le bas
+								const float fu = (a / A + 1.0f) * 0.5f, fv = (1.0f - y / H) * 0.5f;
+								vert(out, a, y, s.cinemaRect[0] + (s.cinemaRect[2] - s.cinemaRect[0]) * fu, s.cinemaRect[1] + (s.cinemaRect[3] - s.cinemaRect[1]) * fv);
+							} else {
+								vert(out, a, y, a / A, y / H);
+							}
+						}
+					}
+			};
+			std::vector<Vertex> scr, halo;
+			grid(scr, 48, 24, -A, A, -H, H, true);
+			const float reach = 0.22f * R * A + 0.10f * H; // (à l'échelle de l'écran)
+			const float ma = reach / R;
+			grid(halo, 40, 12, -A - ma, A + ma, -H - reach, H + reach, false);
+			uploadLitMesh(d->cinemaMesh, scr, GL_DYNAMIC_DRAW);
+			uploadLitMesh(d->haloMesh, halo, GL_DYNAMIC_DRAW);
+		}
+	}
+
 	d->buildFx(s);
 	glBindBuffer(GL_ARRAY_BUFFER, d->fxMesh.vbo);
 	glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)(d->fxBuilder.verts.size() * sizeof(FxVertex)),
@@ -1048,10 +1158,28 @@ void Scene::render(const Mat4 &view, const Mat4 &proj, const SceneState &s) {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	// --- Le donjon en 3D, tout autour : l'interface (écran, fenêtres, mains) passe toujours devant. ---
-	if (inDungeon) {
+	// Mode cinéma : le monde s'efface au noir (tout noir : il n'est plus dessiné du tout).
+	const float cine = clampf(s.cinema, 0.0f, 1.0f);
+	const bool worldHidden = cine >= 0.999f;
+	if (inDungeon && !worldHidden) {
 		d->dungeon->render(viewProj, s.dungeonModel, camPos, s.dungeonLight, s.dungeonReach);
 		glClear(GL_DEPTH_BUFFER_BIT);
 		glEnable(GL_CULL_FACE);
+	}
+	if (cine > 0.0f) {
+		// Un voile noir opaque (il cache aussi la vraie pièce en réalité mixte).
+		glDisable(GL_DEPTH_TEST);
+		glDepthMask(GL_FALSE);
+		glEnable(GL_BLEND);
+		glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+		glUseProgram(d->flatProgram);
+		glUniformMatrix4fv(d->flat.mvp, 1, GL_FALSE, ident.m);
+		glUniform4f(d->flat.color, 0, 0, 0, cine);
+		glBindVertexArray(d->fullMesh.vao);
+		glDrawArrays(GL_TRIANGLES, 0, d->fullMesh.count);
+		glDisable(GL_BLEND);
+		glDepthMask(GL_TRUE);
+		glEnable(GL_DEPTH_TEST);
 	}
 
 	// --- Objets opaques ---
@@ -1069,10 +1197,12 @@ void Scene::render(const Mat4 &view, const Mat4 &proj, const SceneState &s) {
 		glUniform1i(d->lit.tex, 0);
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D_ARRAY, d->texArray);
-		if (library && d->roomSolid.count > 0) {
+		if (library && d->roomSolid.count > 0 && !worldHidden) {
+			glUniform1f(d->lit.fade, d->fade * (1.0f - cine));
 			glUniformMatrix4fv(d->lit.model, 1, GL_FALSE, d->roomMat.m);
 			glBindVertexArray(d->roomSolid.vao);
 			glDrawArrays(GL_TRIANGLES, 0, d->roomSolid.count);
+			glUniform1f(d->lit.fade, d->fade);
 		}
 		glUniformMatrix4fv(d->lit.model, 1, GL_FALSE, d->screenMat.m);
 		if (s.screenVisible && !s.screenFrameless) {
@@ -1115,15 +1245,55 @@ void Scene::render(const Mat4 &view, const Mat4 &proj, const SceneState &s) {
 		glDrawArrays(GL_TRIANGLES, 0, d->holeMesh.count);
 	}
 
+	// --- Mode cinéma : le halo, puis l'écran courbe (il apparaît pendant que le monde s'éteint) ---
+	if (cine > 0.0f && s.gameTexture && d->cinemaMesh.count > 0) {
+		glEnable(GL_BLEND);
+		glDisable(GL_CULL_FACE);
+		glDepthMask(GL_FALSE);
+		glUseProgram(d->haloProgram);
+		glUniformMatrix4fv(d->halo.viewProj, 1, GL_FALSE, viewProj.m);
+		glUniform2f(d->halo.half, s.cinemaRadius * s.cinemaHalfAngle, s.cinemaHalfH);
+		glUniform1f(d->halo.reach, 0.22f * s.cinemaRadius * s.cinemaHalfAngle + 0.10f * s.cinemaHalfH);
+		glUniform1f(d->halo.alpha, cine);
+		float edge[12];
+		for (int k = 0; k < 4; k++) {
+			edge[k * 3 + 0] = s.cinemaEdge[k].x; edge[k * 3 + 1] = s.cinemaEdge[k].y; edge[k * 3 + 2] = s.cinemaEdge[k].z;
+		}
+		glUniform3fv(d->halo.edge, 4, edge);
+		glBlendFuncSeparate(GL_ONE, GL_ONE, GL_ZERO, GL_ONE);
+		glBindVertexArray(d->haloMesh.vao);
+		glDrawArrays(GL_TRIANGLES, 0, d->haloMesh.count);
+		glDepthMask(GL_TRUE);
+		glUseProgram(d->panelProgram);
+		glUniformMatrix4fv(d->panel.viewProj, 1, GL_FALSE, viewProj.m);
+		glUniform1i(d->panel.game, 0);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, s.gameTexture);
+		glUniform2f(d->panel.gameSize, (float)s.gameWidth, (float)s.gameHeight);
+		glUniform4f(d->panel.rect, s.cinemaRect[0], s.cinemaRect[1], s.cinemaRect[2], s.cinemaRect[3]);
+		glUniform2f(d->panel.border, 0.001f, 0.001f);
+		glUniform1f(d->panel.alpha, cine);
+		glUniform4f(d->panel.hot, 0, 0, 0, 0);
+		glUniform1f(d->panel.mode, 0.0f);
+		glUniform1f(d->panel.glow, 0.0f);
+		glBlendFuncSeparate(GL_ONE, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+		glBindVertexArray(d->cinemaMesh.vao);
+		glDrawArrays(GL_TRIANGLES, 0, d->cinemaMesh.count);
+		glBindTexture(GL_TEXTURE_2D, 0);
+		glEnable(GL_CULL_FACE);
+		glDisable(GL_BLEND);
+	}
+
 	// --- Transparences ---
 	glEnable(GL_BLEND);
 	glDepthMask(GL_FALSE);
-	if (library && d->texturesReady && d->roomAlpha.count > 0) {
+	if (library && d->texturesReady && d->roomAlpha.count > 0 && !worldHidden) {
 		glUseProgram(d->litProgram);
 		glUniform1f(d->lit.alphaMode, 1.0f);
 		glUniformMatrix4fv(d->lit.model, 1, GL_FALSE, d->roomMat.m);
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D_ARRAY, d->texArray);
+		glUniform1f(d->lit.fade, d->fade * (1.0f - cine));
 		glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ZERO, GL_ONE);
 		glBindVertexArray(d->roomAlpha.vao);
 		glDrawArrays(GL_TRIANGLES, 0, d->roomAlpha.count);
@@ -1139,7 +1309,7 @@ void Scene::render(const Mat4 &view, const Mat4 &proj, const SceneState &s) {
 		glUniform3f(d->fx.camUp, camUp.x, camUp.y, camUp.z);
 		glUniform3f(d->fx.camPos, camPos.x, camPos.y, camPos.z);
 		glUniform1f(d->fx.time, (float)fmod(s.time, 1000.0));
-		glUniform1f(d->fx.fade, library ? d->fade : 1.0f);
+		glUniform1f(d->fx.fade, (library ? d->fade : 1.0f) * (first == 0 ? 1.0f - cine : 1.0f));
 		glDisable(GL_CULL_FACE);
 		glBlendFuncSeparate(GL_ONE, GL_ONE_MINUS_SRC_ALPHA, GL_ZERO, GL_ONE);
 		glActiveTexture(GL_TEXTURE0);
@@ -1148,7 +1318,7 @@ void Scene::render(const Mat4 &view, const Mat4 &proj, const SceneState &s) {
 		glEnable(GL_CULL_FACE);
 	};
 	// 1. Lueurs, flammes, ombres du décor (pas dans le donjon)
-	if (!inDungeon)
+	if (!inDungeon && !worldHidden)
 		drawFx(0, fxAmbient);
 	// 2. L'image du jeu doit rester pure : on efface tout ce que les lueurs du décor ont déposé
 	//    sur elle (sauf là où un objet solide, comme un gant, passe devant).

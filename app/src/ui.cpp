@@ -479,10 +479,13 @@ struct Ui::Impl {
 	int menuHot = -1;
 	// Lignes : le titre, le mode VR, la vue (en mode immersif : l'interface), les manettes, crédits
 	// et prérequis, fermer.
-	int menuRows() const { return 6; }
+	// Mode immersif : deux lignes de plus, le mode cinéma (taille de l'écran) et l'avant-partie.
+	int menuRows() const { return dungeonMode ? 8 : 6; }
+	int cinemaSize = 0;     // 0 moyen, 1 grand, 2 petit, 3 sans
+	bool cinemaIntro = true; // l'intro et les menus d'avant la partie dans le noir aussi
 	// (dessous, sans bouton, les remerciements)
 	int menuH() const { return kMenuRowH * menuRows() + kMenuFootH; }
-	int menuItem(int row) const { return row; }
+	int menuItem(int row) const { return dungeonMode || row < 3 ? row : row + 2; } // 1 mode, 2 vue, 3 cinéma, 4 avant-partie, 5 manettes, 6 crédits, 7 fermer
 	// Colonne du groupe recomposée
 	int chooserHot = -1; // bouton visé dans la fenêtre du choix de la vue
 	Composite comp[5];
@@ -1420,14 +1423,16 @@ void Ui::Impl::renderMenu() {
 	cv.gcenter(latin1(tr(L, "VR controls", "Réglages VR", "VR-Optionen")), 0, kMenuW, (kMenuRowH - th) / 2 + 2, 2, kWhite);
 	for (int r = 1; r < kMenuRows; r++) {
 		const int i = menuItem(r), y0 = r * kMenuRowH, by0 = y0 + 5, by1 = y0 + kMenuRowH - 5, ty = (by0 + by1 - th) / 2;
-		if (i <= 2) {
-			const std::string n = latin1(names[i - 1]);
-			const std::string v = latin1(values[i - 1]);
+		if (i <= 4) {
+			static const char *const cines[3][4] = {{"Medium", "Large", "Small", "Off"}, {"Moyen", "Grand", "Petit", "Sans"}, {"Mittel", "Groß", "Klein", "Aus"}};
+			static const char *const intros[3][2] = {{"Scenery", "Dark"}, {"Décor", "Noir"}, {"Kulisse", "Dunkel"}};
+			const std::string n = latin1(i <= 2 ? names[i - 1] : i == 3 ? tr(L, "Cinema", "Cinéma", "Kino") : tr(L, "Intro, menus", "Intro, menus", "Intro, Menüs"));
+			const std::string v = latin1(i <= 2 ? values[i - 1] : i == 3 ? cines[lg][cinemaSize < 0 || cinemaSize > 3 ? 0 : cinemaSize] : intros[lg][cinemaIntro ? 1 : 0]);
 			cv.gtext(n, split - 10 - Canvas::textW(n, Canvas::fit(n, split - 24, 2)), ty, Canvas::fit(n, split - 24, 2), kGold);
 			cv.bevel(split, by0, kMenuW - 12, by1, 2, true);
 			cv.gcenter(v, split, kMenuW - 12, ty, Canvas::fit(v, kMenuW - 24 - split, 2), kGold);
 		} else {
-			const std::string l = latin1(i == 3 ? tr(L, "Controller mapping", "Manettes et boutons", "Steuerung und Tasten") : i == 4 ? creditsTitle(L) : tr(L, "Close", "Fermer", "Schließen"));
+			const std::string l = latin1(i == 5 ? tr(L, "Controller mapping", "Manettes et boutons", "Steuerung und Tasten") : i == 6 ? creditsTitle(L) : tr(L, "Close", "Fermer", "Schließen"));
 			cv.bevel(12, by0, kMenuW - 12, by1, 2, true);
 			cv.gcenter(l, 12, kMenuW - 12, ty, 2, kGold);
 		}
@@ -1819,6 +1824,15 @@ void Ui::setHudMode(int mode) {
 }
 
 int Ui::hudMode() const { return d->hudMode; }
+
+void Ui::setCinema(int size, bool intro) {
+	size = size < 0 || size > 3 ? 0 : size;
+	if (size != d->cinemaSize || intro != d->cinemaIntro) {
+		d->cinemaSize = size;
+		d->cinemaIntro = intro;
+		d->menuDirty = true;
+	}
+}
 
 void Ui::setInventoryGrouped(bool) {} // (plus de fenêtres détachables : tout reste collé)
 
@@ -2265,12 +2279,12 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 		if (in.holdToMove)
 			return false;
 		if (i == kHandleScreen)
-			return !in.screenHidden;
+			return !in.screenHidden && !in.screenLocked;
 		if (d->grouped() && i != kPanelParty && Impl::isBlock(i))
 			return false;
 		return visible[i];
 	};
-	if (in.screenHidden && (d->drag == Impl::kScreenTarget || d->resize == Impl::kScreenTarget)) {
+	if ((in.screenHidden || in.screenLocked) && (d->drag == Impl::kScreenTarget || d->resize == Impl::kScreenTarget)) {
 		d->drag = -1;
 		d->resize = -1;
 	}
@@ -2450,7 +2464,34 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 		if (!in.screenHidden) {
 			Vec3 origin = rotate(screenInv, in.tip - in.screenPos);
 			Vec3 dir = rotate(screenInv, in.dir);
-			if (dir.z < -1e-4f && origin.z > 0.0f) {
+			const float R = in.curveRadius;
+			if (R > 0.05f && !in.crt && dir.z < -1e-4f) {
+				// Mode cinéma : l'écran courbe, un cylindre vertical d'axe (0, y, R), le joueur dedans.
+				const float A = atanf(in.dispW * 0.5f / R);
+				const float ox = origin.x, oz = origin.z - R;
+				const float a2 = dir.x * dir.x + dir.z * dir.z, b = 2.0f * (ox * dir.x + oz * dir.z), c = ox * ox + oz * oz - R * R;
+				const float disc = b * b - 4.0f * a2 * c;
+				if (a2 > 1e-8f && disc >= 0.0f) {
+					const float t = (-b + sqrtf(disc)) / (2.0f * a2);
+					const Vec3 hit = origin + dir * t;
+					if (t > 0.0f) {
+						const float ang = atan2f(hit.x, R - hit.z);
+						float u = (ang / A + 1.0f) * 0.5f, v = 0.5f - hit.y / in.dispH;
+						float e = fmaxf((fabsf(ang) - A) * R, fmaxf(-v, v - 1.0f) * in.dispH);
+						screenU01 = clampf(u, 0.0f, 1.0f);
+						screenV01 = clampf(v, 0.0f, 1.0f);
+						screenZ = 0.0f;
+						if (e <= 0.0f) {
+							if (t < bestT) {
+								bestT = t; hitKind = kHitScreen; hitIndex = 0;
+							}
+						} else if (e < 0.05f * t && e < nearExcess) {
+							nearExcess = e; nearKind = kHitScreen; nearIndex = 0; nearT = t;
+						}
+						screenHitOk = true;
+					}
+				}
+			} else if (dir.z < -1e-4f && origin.z > 0.0f) {
 				float zPlane = 0.0f, t = 0.0f;
 				Vec3 hit = origin;
 				for (int it = 0; it < (in.crt ? 3 : 1); it++) {
@@ -2478,7 +2519,7 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 		{
 			float cornerT = 1e9f, cornerBest = 1e9f;
 			for (int i = 0; i <= kUiPanelCount; i++) {
-				if (i < kUiPanelCount ? !visible[i] : in.screenHidden)
+				if (i < kUiPanelCount ? !visible[i] : (in.screenHidden || in.screenLocked))
 					continue;
 				if (frameVis && i != kPanelParty && Impl::isBlock(i))
 					continue; // (les coins du bloc sont ceux de son cadre)
@@ -2607,7 +2648,7 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 	}
 	// Ce qu'une gâchette maintenue déplacerait (voir update).
 	d->lastHoldable = false;
-	if (in.aimValid && d->drag == -1 && d->resize == -1 && ((hitKind == kHitPanel && hitIndex >= 0 && hitIndex < kUiPanelCount) || (hitKind == kHitScreen && !in.screenHidden))) {
+	if (in.aimValid && d->drag == -1 && d->resize == -1 && ((hitKind == kHitPanel && hitIndex >= 0 && hitIndex < kUiPanelCount) || (hitKind == kHitScreen && !in.screenHidden && !in.screenLocked))) {
 		const Vec3 p = in.tip + in.dir * bestT;
 		d->lastHoldable = true;
 		d->lastHoldTarget = hitKind == kHitScreen ? Impl::kScreenTarget : hitIndex;
@@ -2630,8 +2671,14 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 			out.gv = (in.cropY + rowY) / 200.0f;
 		}
 		Vec3 local{(screenU01 - 0.5f) * in.dispW, (0.5f - screenV01) * in.dispH, screenZ + 0.004f};
+		Vec3 right{1, 0, 0};
+		if (in.curveRadius > 0.05f && !in.crt) {
+			const float R = in.curveRadius, ang = (screenU01 * 2.0f - 1.0f) * atanf(in.dispW * 0.5f / R);
+			local = cinemaPoint(R, ang, (0.5f - screenV01) * in.dispH) + Vec3{-sinf(ang), 0, cosf(ang)} * 0.004f;
+			right = {cosf(ang), 0, sinf(ang)};
+		}
 		out.hit = rotate(in.screenRot, local) + in.screenPos;
-		out.hitRight = rotate(in.screenRot, Vec3{1, 0, 0});
+		out.hitRight = rotate(in.screenRot, right);
 		out.hitUp = rotate(in.screenRot, Vec3{0, 1, 0});
 		out.hitPixel = in.cropW > 0.0f ? in.dispW / in.cropW : 0.0f;
 	} else if (hitKind == kHitHandle) {
@@ -2734,9 +2781,13 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 				} else if (row == 2) {
 					out.action = d->dungeonMode ? kUiActionToggleHud : kUiActionCycleView;
 				} else if (row == 3) {
+					out.action = kUiActionCycleCinema;
+				} else if (row == 4) {
+					out.action = kUiActionToggleCinemaIntro;
+				} else if (row == 5) {
 					out.action = kUiActionToggleHelp;
 					d->menuOpen = false;
-				} else if (row == 4) {
+				} else if (row == 6) {
 					// Crédits et prérequis : un petit mot devant le joueur, un clic le ferme.
 					d->noticeKind = 1;
 					d->noticeDirty = true;

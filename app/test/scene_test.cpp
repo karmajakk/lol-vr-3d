@@ -264,6 +264,9 @@ int main(int argc, char **argv) {
 		{"block", kEnvLibrary, kThemeKeep, {0.0f, 1.10f, 0.2f}, 0, -6, 0.8f, false, 0.0f, 0.0f, 9},
 		{"block_open", kEnvLibrary, kThemeKeep, {0.0f, 1.10f, 0.2f}, 0, -2, 0.8f, false, 0.0f, 0.0f, 10},
 		{"split_windows", kEnvLibrary, kThemeKeep, {0.0f, 1.20f, 0.6f}, 0, -4, 1.1f, false, 0.0f, 0.0f, 8},
+		{"cinema", kEnvLibrary, kThemeKeep, seat, 0, 0, 1.15f, true, 0.0f, 0.0f, 11},
+		{"cinema_fondu", kEnvLibrary, kThemeKeep, seat, 0, 0, 1.15f, false, 0.0f, 0.0f, 12},
+		{"cinema_pt", kEnvPassthroughFrame, kThemeKeep, seat, 20, 0, 1.15f, false, 0.0f, 0.0f, 11},
 	};
 
 	// --- Essai de l'interface sans casque : pointage, poignées, clavier, butées ---
@@ -299,6 +302,23 @@ int main(int argc, char **argv) {
 		aimAt(in.screenPos);
 		ui.update(in, o, tmp);
 		check(o.pointerValid && fabsf(o.gu * 320 - 200) < 1.5f && fabsf(o.gv * 200 - 60) < 1.5f && o.buttonsToGame && !o.pointerLong, "écran : centre de la vue du donjon (200, 60)");
+		// 1b. Mode cinéma : l'écran courbe autour du joueur. Un point de la courbe aux trois quarts de
+		// la largeur (en angle) et au quart de la hauteur donne le pixel correspondant de la vue.
+		{
+			const float R = sqrtf((in.screenPos.x - in.anchorPos.x) * (in.screenPos.x - in.anchorPos.x) + (in.screenPos.z - in.anchorPos.z) * (in.screenPos.z - in.anchorPos.z));
+			const float A = atanf(in.dispW * 0.5f / R);
+			in.curveRadius = R;
+			in.screenLocked = true;
+			const Vec3 target = in.screenPos + rotate(in.screenRot, cinemaPoint(R, 0.5f * A, in.dispH * 0.25f));
+			aimAt(target);
+			ui.update(in, o, tmp);
+			check(o.pointerValid && fabsf(o.gu * 320 - (112 + 176 * 0.75f)) < 1.5f && fabsf(o.gv * 200 - 30) < 1.5f && length(o.hit - target) < 0.01f,
+			      "mode cinéma : un point de l'écran courbe donne le bon pixel");
+			in.curveRadius = 0.0f;
+			in.screenLocked = false;
+			aimAt(in.screenPos);
+			ui.update(in, o, tmp);
+		}
 		// 2. Le centre de chaque panneau donne le centre de sa zone de l'image
 		// Fenêtres recomposées : on vise un point donné de leur petite image.
 		auto aimIn = [&](int i, float cx, float cy, float w, float h) {
@@ -938,8 +958,8 @@ int main(int argc, char **argv) {
 				if (tmp.panels[i].visible) { shown4++; menu = i; }
 			SceneState::Panel m = tmp.panels[menu];
 			check(shown4 >= shown + 1 && m.center.z < in.headPos.z - 0.4f && fabsf(m.center.x - in.headPos.x) < 0.05f, "réglages VR : la fenêtre s'ouvre devant le joueur");
-			int rows = 6; // mode immersif : titre, mode VR, interface, manettes, crédits, fermer
-			check(fabsf(m.halfH / m.halfW - (6.0f * 44.0f + 38.0f) / 360.0f) < 0.01f, "réglages VR : mode immersif, six lignes (l'interface à la place de la vue)");
+			int rows = 8; // mode immersif : titre, mode VR, interface, cinéma, avant-partie, manettes, crédits, fermer
+			check(fabsf(m.halfH / m.halfW - (8.0f * 44.0f + 38.0f) / 360.0f) < 0.01f, "réglages VR : mode immersif, huit lignes (l'interface, le cinéma)");
 			auto row = [&](int r) { return m.center + m.up * ((1.0f - 2.0f * (r + 0.5f) * 44.0f / (44.0f * rows + 38.0f)) * m.halfH); };
 			in.tip = in.headPos + Vec3{0.15f, -0.15f, 0.0f};
 			auto click = [&](int r) {
@@ -956,7 +976,9 @@ int main(int argc, char **argv) {
 			check(click(2).action == kUiActionToggleHud, "réglages VR (immersif) : deuxième ligne, l'interface (fenêtres ou classique)");
 			ui.openMenu();
 			ui.update(in, o, tmp);
-			check(click(3).action == kUiActionToggleHelp, "réglages VR (immersif) : troisième ligne, les manettes");
+			check(click(3).action == kUiActionCycleCinema, "réglages VR (immersif) : troisième ligne, la taille du mode cinéma");
+			check(click(4).action == kUiActionToggleCinemaIntro, "réglages VR (immersif) : quatrième ligne, l'avant-partie dans le noir");
+			check(click(5).action == kUiActionToggleHelp, "réglages VR (immersif) : cinquième ligne, les manettes");
 			ui.setDungeonOption(0);
 			ui.setVrState(1, 0);
 			ui.openMenu();
@@ -1059,7 +1081,7 @@ int main(int argc, char **argv) {
 			continue;
 		st.environment = sh.env;
 		st.theme = sh.theme;
-		const bool split = sh.mode == 1 || (sh.mode >= 3 && sh.mode != 6);
+		const bool split = sh.mode == 1 || (sh.mode >= 3 && sh.mode != 6 && sh.mode < 11);
 		// Écran : image entière (4:3), ou vue du donjon seule à la même hauteur.
 		float fullW = 2.4f;
 		Vec3 screenPos = {0, 1.30f, -2.2f};
@@ -1107,6 +1129,7 @@ int main(int argc, char **argv) {
 		in.fullW = fullW;
 		in.roomClamp = isLibraryEnv(sh.env);
 		in.keyboardOpen = sh.mode == 2;
+		in.screenLocked = sh.mode == 11 || sh.mode == 12; // (mode cinéma : pas de poignée)
 		in.aimValid = sh.hands;
 		if (sh.hands) {
 			const HandState &hand = st.hands[1];
@@ -1199,6 +1222,20 @@ int main(int argc, char **argv) {
 			cp.halfW = 0.11f;
 			cp.halfH = 0.10f;
 		}
+		// Mode cinéma (11 plein, 12 à mi-fondu) : l'image entière sur l'écran courbe, sans calque quad.
+		st.cinema = sh.mode == 11 ? 1.0f : sh.mode == 12 ? 0.5f : 0.0f;
+		st.screenVisible = st.cinema <= 0.0f;
+		if (st.cinema > 0.0f) {
+			const float R = fabsf(st.screenPos.z - seat.z);
+			st.cinemaPos = st.screenPos;
+			st.cinemaRot = st.screenRot;
+			st.cinemaRadius = R;
+			st.cinemaHalfAngle = atanf(quadW * 0.5f / R);
+			st.cinemaHalfH = quadH * 0.5f;
+			st.cinemaRect[0] = 0; st.cinemaRect[1] = 0; st.cinemaRect[2] = 1; st.cinemaRect[3] = 1;
+			st.cinemaEdge[0] = {0.30f, 0.12f, 0.04f}; st.cinemaEdge[1] = {0.05f, 0.10f, 0.30f};
+			st.cinemaEdge[2] = {0.20f, 0.20f, 0.20f}; st.cinemaEdge[3] = {0.04f, 0.25f, 0.06f};
+		}
 		st.hitValid = uo.hitValid;
 		st.hit = uo.hit;
 		st.hitRight = uo.hitRight;
@@ -1230,7 +1267,7 @@ int main(int argc, char **argv) {
 		glBlendFunc(GL_ONE_MINUS_DST_ALPHA, GL_ONE);
 		glUseProgram(under);
 		glBindVertexArray(qvao);
-		if (Scene::usesQuadLayer(sh.env)) {
+		if (Scene::usesQuadLayer(sh.env) && st.cinema <= 0.0f) {
 			// Le quad de test mesure 1 x 0,75 : on l'étire à la taille réelle de la vue affichée.
 			Mat4 stretch = identity();
 			stretch.m[0] = quadW;

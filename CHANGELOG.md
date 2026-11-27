@@ -3,6 +3,18 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.54.0] — Cinema mode
+
+- Immersive mode: during a scene that shows its own picture (shop, place, character, cutscene),
+  the dungeon fades to black in 0.4 s and the game picture appears on a curved screen around the
+  player, without a frame, with a soft glow in the colors of its edges. The text, the inventory
+  and the portraits stay. It fades back when the scene ends.
+- Before the game (intro, menus, character selection), the same dark room, unless "Intro, menus"
+  is set to "Scenery" in the VR controls.
+- The size of the cinema screen is a setting (VR controls, "Cinema"): medium (55°), large (68°),
+  small (44°), or off (the old flat screen). It cannot be moved or resized by hand; L3 recenters.
+- The pointer aims at the curved screen.
+
 ## [0.53.0] — Saving in shops, wall pictures, bigger tabs
 
 - Swamp: the ceiling is a copy of the swamp wall.

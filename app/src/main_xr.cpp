@@ -450,6 +450,17 @@ struct App {
 	bool chooserPlaced = false;
 	bool screenShown = true;        // le grand écran est affiché
 	double screenNeededAt = 0;
+	// Mode cinéma (mode immersif) : pendant une scène qui montre sa propre image (boutique, lieu,
+	// personnage, cinématique), le monde s'efface au noir et l'image du jeu passe sur un écran courbe,
+	// sans cadre, avec un halo de ses couleurs. Taille : 0 moyen, 1 grand, 2 petit, 3 sans (l'ancien
+	// écran plat). Avant la partie (intro, menus) aussi, si cinemaIntro.
+	int cinemaSize = 0;
+	bool cinemaIntro = true;
+	bool cinemaWanted = false;
+	double cinemaSeenAt = -10.0, cinemaTime = 0.0;
+	float cinema = 0.0f;   // 0 éteint, 1 plein (le fondu)
+	float cinemaW = 0.0f;  // la largeur d'écran qui donne l'angle voulu
+	Vec3 cinemaEdge[4] = {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
 	float dunYaw = 0;               // lacet (monde) vers lequel le groupe regarde
 	bool dunYawSet = false;
 	int shownDir = -1;              // direction du groupe déjà prise en compte
@@ -1275,6 +1286,12 @@ void loadSettings(App &app, int &environment) {
 		} else if (!strcmp(name, "inventaire_colle")) {
 			if (sscanf(rest, "%d", &iv) == 1 && panelsCurrent)
 				app.ui.setInventoryGrouped(iv != 0);
+		} else if (!strcmp(name, "cinema")) {
+			if (sscanf(rest, "%d", &iv) == 1)
+				app.cinemaSize = iv >= 0 && iv <= 3 ? iv : 0;
+		} else if (!strcmp(name, "cinema_intro")) {
+			if (sscanf(rest, "%d", &iv) == 1)
+				app.cinemaIntro = iv != 0;
 		} else if (!strcmp(name, "interface")) {
 			if (sscanf(rest, "%d", &iv) == 1)
 				app.hudMode = iv >= 0 && iv <= 2 ? iv : 0;
@@ -1332,6 +1349,8 @@ void saveSettings(App &app) {
 	fprintf(f, "feu %d\n", app.fireOn ? 1 : 0);
 	fprintf(f, "panneaux %d\n", app.detached ? 1 : 0);
 	fprintf(f, "interface %d\n", app.hudMode);
+	fprintf(f, "cinema %d\n", app.cinemaSize);
+	fprintf(f, "cinema_intro %d\n", app.cinemaIntro ? 1 : 0);
 	fprintf(f, "inventaire_colle %d\n", app.ui.inventoryGrouped() ? 1 : 0);
 	fprintf(f, "colonne_collee %d\n", app.ui.columnGrouped() ? 1 : 0);
 	fprintf(f, "langue %d\n", app.language);
@@ -1786,6 +1805,13 @@ Vec3 viewCenter(const App &app) {
 	return app.screenPos + Vec3{0, app.viewLift, 0} + rotate(screenRot(app), {app.viewShift, 0, 0});
 }
 
+// Mode cinéma : le rayon de l'écran courbe, la distance (à plat) du joueur au centre de l'écran.
+float cinemaRadius(const App &app) {
+	const Vec3 c = viewCenter(app);
+	const float dx = c.x - app.anchorPos.x, dz = c.z - app.anchorPos.z;
+	return fmaxf(sqrtf(dx * dx + dz * dz), 0.5f);
+}
+
 void placeBand(App &app, const lolvr::UiFrameInput &in, lolvr::UiFrameOutput &out) {
 	if (!app.bandShown || !app.screenPlaced)
 		return;
@@ -1894,6 +1920,10 @@ void updateLayout(App &app, double now) {
 			placeScreen(app, false);
 	}
 	float w = shownWidth(app);
+	// Mode cinéma : la taille ne se règle pas à la main ; l'écran couvre un angle fixe (le réglage).
+	const bool cinemaSized = (app.cinemaWanted || app.cinema > 0.0f) && !(app.menuAlone && app.split);
+	if (cinemaSized && app.cinemaW > 0.0f)
+		w = app.cinemaW;
 	if (app.split) {
 		// La vue seule est un peu moins haute que l'image entière et remontée, pour laisser la place
 		// aux fenêtres du groupe et de l'inventaire dessous, dans le même plan.
@@ -1992,6 +2022,15 @@ void updateLayout(App &app, double now) {
 		app.dispW = w;
 		app.dispH = w * 0.75f;
 		app.viewLift = 0.0f;
+	}
+	if (cinemaSized && app.dispW > 1e-3f) {
+		// Largeur apparente : 55° (moyen), 68° (grand), 44° (petit). Tout est proportionnel à w.
+		static const float kAngle[3] = {55.0f, 68.0f, 44.0f};
+		const float a = kAngle[app.cinemaSize >= 0 && app.cinemaSize < 3 ? app.cinemaSize : 0] * 3.14159265f / 180.0f;
+		const float want = 2.0f * cinemaRadius(app) * tanf(a * 0.5f);
+		app.cinemaW = clampf(w * want / app.dispW, 0.2f, 12.0f);
+	} else {
+		app.cinemaW = 0.0f;
 	}
 }
 
@@ -2328,6 +2367,7 @@ void updateUi(App &app, XrTime time, float dt, double now, bool pointer, bool tr
 	app.ui.setOptions(app.fireOn, app.detached);
 	app.ui.setDungeonOption(app.dungeonMode);
 	app.ui.setHudMode(app.hudMode);
+	app.ui.setCinema(app.cinemaSize, app.cinemaIntro);
 	app.ui.setAtlasOption(app.atlasOn);
 	if (app.dungeonMode && app.hudMode == 1) {
 		CoreHost::get().inventoryDisable(); // la ligne d'objets du jeu, avec ses flèches
@@ -2399,7 +2439,9 @@ void updateUi(App &app, XrTime time, float dt, double now, bool pointer, bool tr
 		in.portraitX[i] = portraitX(in.characters, i);
 	in.gearHint = !app.gearKnown && !app.chooserOpen;
 	in.chooserOpen = app.chooserOpen;
-	in.screenHidden = !app.screenShown;
+	in.screenHidden = !app.screenShown && app.cinema <= 0.0f;
+	in.curveRadius = app.cinema > 0.0f ? cinemaRadius(app) : 0.0f;
+	in.screenLocked = app.cinemaWanted || app.cinema > 0.0f;
 	in.time = now;
 	app.ui.setInfo(app.imageInfo[0], app.imageInfo[1]);
 	if (!app.ui.hasLayout() && app.screenPlaced)
@@ -2511,6 +2553,17 @@ void updateUi(App &app, XrTime time, float dt, double now, bool pointer, bool tr
 		// Mode immersif : tout regroupé, des fenêtres séparées, puis la barre du bas du jeu.
 		app.hudMode = app.hudMode == 0 ? 2 : app.hudMode == 2 ? 1 : 0;
 		app.ui.setHudMode(app.hudMode);
+		app.settingsDirty = true;
+		break;
+	case lolvr::kUiActionCycleCinema:
+		// Moyen, grand, petit, sans
+		app.cinemaSize = (app.cinemaSize + 1) % 4;
+		app.ui.setCinema(app.cinemaSize, app.cinemaIntro);
+		app.settingsDirty = true;
+		break;
+	case lolvr::kUiActionToggleCinemaIntro:
+		app.cinemaIntro = !app.cinemaIntro;
+		app.ui.setCinema(app.cinemaSize, app.cinemaIntro);
 		app.settingsDirty = true;
 		break;
 	case lolvr::kUiActionCycleView:
@@ -2868,7 +2921,7 @@ void updateInput(App &app, XrTime time, float dt, double now) {
 		app.zoomSince = now;
 		app.zoomUsed = false;
 	}
-	if (zoomMode) {
+	if (zoomMode && !app.cinemaWanted && app.cinema <= 0.0f) {
 		const Limits &lim = kLimits[app.environment];
 		if (fabsf(right.y) > 0.3f && fabsf(right.y) >= fabsf(right.x)) {
 			shownWidth(app) = clampf(shownWidth(app) * (1.0f + right.y * 0.8f * dt), lim.wMin, lim.wMax); // (un menu seul : sa taille à lui)
@@ -3006,6 +3059,28 @@ void uploadFrame(App &app) {
 	if (n > 0) {
 		Vec3 avg{sum[0] / (float)n, sum[1] / (float)n, sum[2] / (float)n};
 		app.screenGlow = lolvr::lerp(app.screenGlow, avg, 0.25f);
+	}
+	// Mode cinéma : la couleur de chaque bord de la partie montrée (une bande de 6 pixels), pour le
+	// halo autour de l'écran courbe. Lissée, pour qu'il ne papillote pas.
+	if (app.cinema > 0.0f || app.cinemaWanted) {
+		const int W = app.frame.width, Hh = app.frame.height;
+		const float sx = (float)W / 320.0f, sy = (float)Hh / 200.0f;
+		const int x0 = (int)(app.cropX * sx), y0 = (int)(app.cropY * sy);
+		const int x1 = std::min(W, (int)((app.cropX + app.cropW) * sx)), y1 = std::min(Hh, (int)((app.cropY + app.cropH) * sy));
+		const int bw = std::max(1, (int)(6 * sx)), bh = std::max(1, (int)(6 * sy));
+		const int boxes[4][4] = {{x0, y0, x0 + bw, y1}, {x1 - bw, y0, x1, y1}, {x0, y0, x1, y0 + bh}, {x0, y1 - bh, x1, y1}};
+		for (int k = 0; k < 4; k++) {
+			float acc[3] = {0, 0, 0};
+			int cnt = 0;
+			for (int y = std::max(0, boxes[k][1]); y < std::min(Hh, boxes[k][3]); y += 2)
+				for (int x = std::max(0, boxes[k][0]); x < std::min(W, boxes[k][2]); x += 2, cnt++)
+					for (int c = 0; c < 3; c++) {
+						const float v = (float)px[((size_t)y * W + x) * 4 + c] * (1.0f / 255.0f);
+						acc[c] += v * v;
+					}
+			if (cnt > 0)
+				app.cinemaEdge[k] = lolvr::lerp(app.cinemaEdge[k], Vec3{acc[0] / cnt, acc[1] / cnt, acc[2] / cnt}, 0.2f);
+		}
 	}
 }
 
@@ -3588,6 +3663,18 @@ void updateScreenShown(App &app, double now) {
 	if (scene)
 		app.screenNeededAt = now;
 	bool show = need || scene || now - app.screenNeededAt < 0.1;
+	// Mode cinéma : une scène (en partie), ou l'avant-partie (intro, menus, choix du personnage).
+	const bool cinemaOk = app.dungeonMode && app.cinemaSize != 3 && !lolvr::isCrtEnv(app.environment);
+	if (cinemaOk && scene && app.gameStarted && !app.charSheet && !app.menuAlone && !app.automapOpen)
+		app.cinemaSeenAt = now;
+	const bool beforeGame = cinemaOk && app.cinemaIntro && !app.gameStarted && app.coreStarted;
+	// (un court délai : deux scènes qui s'enchaînent ne rallument pas le donjon entre elles)
+	app.cinemaWanted = cinemaOk && (now - app.cinemaSeenAt < 0.25 || beforeGame);
+	{
+		const float dt = (float)clampf((float)(now - app.cinemaTime), 0.0f, 0.1f);
+		app.cinemaTime = now;
+		app.cinema = clampf(app.cinema + (app.cinemaWanted ? dt : -dt) / 0.4f, 0.0f, 1.0f);
+	}
 	if (show && !app.screenShown && app.dungeonVisible && app.headValid && app.screenPlaced) {
 		// Il revient là où le joueur regarde, à sa distance et à sa hauteur habituelles.
 		Vec3 f = rotate(app.headRot, {0, 0, -1});
@@ -3623,7 +3710,22 @@ void fillSceneState(App &app, double now, bool focused) {
 	s.dungeonModel = lolvr::dungeonModel(app.roomPos, app.dunYaw, app.partyX, app.partyZ, app.partyYaw);
 	s.dungeonLight = app.dungeonLight;
 	s.dungeonReach = app.dungeonReach;
-	s.screenVisible = app.screenShown;
+	// Mode cinéma : l'écran plat (calque quad) laisse la place à l'écran courbe.
+	s.screenVisible = app.screenShown && app.cinema <= 0.0f;
+	s.cinema = app.cinema * app.cinema * (3.0f - 2.0f * app.cinema);
+	if (app.cinema > 0.0f) {
+		s.cinemaPos = viewCenter(app);
+		s.cinemaRot = screenRot(app);
+		s.cinemaRadius = cinemaRadius(app);
+		s.cinemaHalfAngle = atanf(app.dispW * 0.5f / s.cinemaRadius);
+		s.cinemaHalfH = app.dispH * 0.5f;
+		s.cinemaRect[0] = app.cropX / 320.0f;
+		s.cinemaRect[1] = app.cropY / 200.0f;
+		s.cinemaRect[2] = (app.cropX + app.cropW) / 320.0f;
+		s.cinemaRect[3] = (app.cropY + app.cropH) / 200.0f;
+		for (int k = 0; k < 4; k++)
+			s.cinemaEdge[k] = app.cinemaEdge[k];
+	}
 	s.screenFrameless = app.menuAlone && app.split;
 	for (int h = 0; h < 2; h++) {
 		lolvr::HandState &hand = s.hands[h];
@@ -3724,7 +3826,7 @@ void renderFrame(App &app, float dt, int savedEnvironment) {
 			passthroughLayer.layerHandle = app.passthroughLayer;
 			layers.push_back((const XrCompositionLayerBaseHeader *)&passthroughLayer);
 		}
-		if (app.screenPlaced && app.screenShown && Scene::usesQuadLayer(app.environment) && renderQuad(app)) {
+		if (app.screenPlaced && app.screenShown && app.cinema <= 0.0f && Scene::usesQuadLayer(app.environment) && renderQuad(app)) {
 			quadLayer.space = app.localSpace;
 			quadLayer.eyeVisibility = XR_EYE_VISIBILITY_BOTH;
 			quadLayer.subImage.swapchain = app.quadSwapchain.handle;
