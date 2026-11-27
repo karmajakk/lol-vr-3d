@@ -483,7 +483,7 @@ struct Ui::Impl {
 	int menuRows() const { return dungeonMode ? 8 : 6; }
 	int cinemaSize = 0;     // 0 moyen, 1 grand, 2 petit, 3 sans
 	float cinePitch = 0.0f;  // mode cinéma : la descente des fenêtres du jeu (radians)
-	bool cinemaIntro = true; // l'intro et les menus d'avant la partie dans le noir aussi
+	bool cinemaIntro = false; // l'intro et les menus d'avant la partie dans le noir aussi
 	// (dessous, sans bouton, les remerciements)
 	int menuH() const { return kMenuRowH * menuRows() + kMenuFootH; }
 	int menuItem(int row) const { return dungeonMode || row < 3 ? row : row + 2; } // 1 mode, 2 vue, 3 cinéma, 4 avant-partie, 5 manettes, 6 crédits, 7 fermer

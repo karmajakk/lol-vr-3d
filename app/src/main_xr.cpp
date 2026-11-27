@@ -455,7 +455,7 @@ struct App {
 	// sans cadre, avec un halo de ses couleurs. Taille : 0 moyen, 1 grand, 2 petit, 3 sans (l'ancien
 	// écran plat). Avant la partie (intro, menus) aussi, si cinemaIntro.
 	int cinemaSize = 0;
-	bool cinemaIntro = true;
+	bool cinemaIntro = false;
 	bool cinemaWanted = false;
 	double cinemaSeenAt = -10.0, cinemaTime = 0.0;
 	float cinema = 0.0f;   // 0 éteint, 1 plein (le fondu)
@@ -466,6 +466,9 @@ struct App {
 	bool cinemaArmed = true, prevGameStarted = false;
 	Vec3 cinemaHead = {0, 1.6f, 0}, cinemaCenter = {0, 1.6f, -1.5f};
 	float cinemaYaw = 0.0f, cinemaR = 1.5f;
+	// Réglés à la main (poignée, coins, joystick) et gardés : la taille (facteur), la hauteur (en plus
+	// de la ligne des yeux). La distance est cinemaR.
+	float cinemaZoom = 1.0f, cinemaLift = 0.0f;
 	Vec3 cinemaEdge[4] = {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
 	float dunYaw = 0;               // lacet (monde) vers lequel le groupe regarde
 	bool dunYawSet = false;
@@ -1298,9 +1301,16 @@ void loadSettings(App &app, int &environment) {
 		} else if (!strcmp(name, "cinema")) {
 			if (sscanf(rest, "%d", &iv) == 1)
 				app.cinemaSize = iv >= 0 && iv <= 3 ? iv : 0;
-		} else if (!strcmp(name, "cinema_intro")) {
+		} else if (!strcmp(name, "cinema_avant")) {
 			if (sscanf(rest, "%d", &iv) == 1)
 				app.cinemaIntro = iv != 0;
+		} else if (!strcmp(name, "cinema_ecran")) {
+			float z = 1.0f, r = 1.5f, l = 0.0f;
+			if (sscanf(rest, "%f %f %f", &z, &r, &l) == 3) {
+				app.cinemaZoom = clampf(z, 0.4f, 2.5f);
+				app.cinemaR = clampf(r, 0.6f, 4.0f);
+				app.cinemaLift = clampf(l, -1.5f, 1.5f);
+			}
 		} else if (!strcmp(name, "interface")) {
 			if (sscanf(rest, "%d", &iv) == 1)
 				app.hudMode = iv >= 0 && iv <= 2 ? iv : 0;
@@ -1359,7 +1369,8 @@ void saveSettings(App &app) {
 	fprintf(f, "panneaux %d\n", app.detached ? 1 : 0);
 	fprintf(f, "interface %d\n", app.hudMode);
 	fprintf(f, "cinema %d\n", app.cinemaSize);
-	fprintf(f, "cinema_intro %d\n", app.cinemaIntro ? 1 : 0);
+	fprintf(f, "cinema_avant %d\n", app.cinemaIntro ? 1 : 0);
+	fprintf(f, "cinema_ecran %.3f %.3f %.3f\n", app.cinemaZoom, app.cinemaR, app.cinemaLift);
 	fprintf(f, "inventaire_colle %d\n", app.ui.inventoryGrouped() ? 1 : 0);
 	fprintf(f, "colonne_collee %d\n", app.ui.columnGrouped() ? 1 : 0);
 	fprintf(f, "langue %d\n", app.language);
@@ -2035,10 +2046,10 @@ void updateLayout(App &app, double now) {
 		// Largeur apparente : 55° (moyen), 68° (grand), 44° (petit). Tout est proportionnel à w.
 		static const float kAngle[3] = {60.0f, 72.0f, 48.0f};
 		const float a = kAngle[app.cinemaSize >= 0 && app.cinemaSize < 3 ? app.cinemaSize : 0] * 3.14159265f / 180.0f;
-		const float want = 2.0f * cinemaRadius(app) * tanf(a * 0.5f);
+		const float want = 2.0f * cinemaRadius(app) * tanf(a * 0.5f) * app.cinemaZoom;
 		app.cinemaW = clampf(w * want / app.dispW, 0.2f, 12.0f);
 		const Vec3 f{-sinf(app.cinemaYaw), 0.0f, -cosf(app.cinemaYaw)};
-		app.cinemaCenter = Vec3{app.cinemaHead.x, app.cinemaHead.y - 0.12f * app.dispH, app.cinemaHead.z} + f * cinemaRadius(app);
+		app.cinemaCenter = Vec3{app.cinemaHead.x, app.cinemaHead.y - 0.12f * app.dispH + app.cinemaLift, app.cinemaHead.z} + f * cinemaRadius(app);
 	} else {
 		app.cinemaW = 0.0f;
 	}
@@ -2451,8 +2462,8 @@ void updateUi(App &app, XrTime time, float dt, double now, bool pointer, bool tr
 	in.chooserOpen = app.chooserOpen;
 	in.screenHidden = !app.screenShown && app.cinema <= 0.0f;
 	in.curveRadius = app.cinema > 0.0f ? cinemaRadius(app) : 0.0f;
-	in.screenLocked = app.cinemaWanted || app.cinema > 0.0f;
-	in.cinemaOn = in.screenLocked && app.gameStarted;
+	in.screenLocked = false; // (l'écran du mode cinéma se déplace et se redimensionne aussi)
+	in.cinemaOn = (app.cinemaWanted || app.cinema > 0.0f) && app.gameStarted;
 	if (in.cinemaOn) {
 		float dy = app.cinemaYaw - app.screenYaw;
 		while (dy > 3.14159265f) dy -= 6.2831853f;
@@ -2495,10 +2506,30 @@ void updateUi(App &app, XrTime time, float dt, double now, bool pointer, bool tr
 		}
 	}
 
-	if (out.screenDragging)
-		dragScreen(app, out.screenCenter - Vec3{0, app.viewLift, 0} - rotate(screenRot(app), {app.viewShift, 0, 0}), out.screenZoom);
-	if (out.screenResizing)
-		resizeScreen(app, out.screenZoom);
+	if (cinemaPlaced(app)) {
+		// Mode cinéma : l'écran courbe se déplace autour du joueur (distance, hauteur ; le côté pour
+		// cette scène seulement) et se redimensionne ; distance, hauteur et taille sont gardées.
+		if (out.screenDragging) {
+			const Vec3 v = out.screenCenter - app.cinemaHead;
+			const float hd = sqrtf(v.x * v.x + v.z * v.z);
+			if (hd > 0.1f) {
+				app.cinemaYaw = atan2f(-v.x, -v.z);
+				app.cinemaR = clampf(hd, 0.6f, 4.0f);
+				app.cinemaLift = clampf(out.screenCenter.y - (app.cinemaHead.y - 0.12f * app.dispH), -1.5f, 1.5f);
+			}
+			app.cinemaZoom = clampf(app.cinemaZoom * out.screenZoom, 0.4f, 2.5f);
+			app.settingsDirty = true;
+		}
+		if (out.screenResizing) {
+			app.cinemaZoom = clampf(app.cinemaZoom * out.screenZoom, 0.4f, 2.5f);
+			app.settingsDirty = true;
+		}
+	} else {
+		if (out.screenDragging)
+			dragScreen(app, out.screenCenter - Vec3{0, app.viewLift, 0} - rotate(screenRot(app), {app.viewShift, 0, 0}), out.screenZoom);
+		if (out.screenResizing)
+			resizeScreen(app, out.screenZoom);
+	}
 	for (int i = 0; i < out.keyCount; i++)
 		typeKey(app, out.keys[i], out.keyMods[i], now);
 	// L'atlas du jeu ouvert par une flèche de la fenêtre d'atlas : on tourne la page demandée.
@@ -2577,6 +2608,10 @@ void updateUi(App &app, XrTime time, float dt, double now, bool pointer, bool tr
 	case lolvr::kUiActionCycleCinema:
 		// Moyen, grand, petit, sans
 		app.cinemaSize = (app.cinemaSize + 1) % 4;
+		// (une taille choisie : l'écran revient à sa place et à sa taille d'origine)
+		app.cinemaZoom = 1.0f;
+		app.cinemaR = 1.5f;
+		app.cinemaLift = 0.0f;
 		app.ui.setCinema(app.cinemaSize, app.cinemaIntro);
 		app.settingsDirty = true;
 		break;
@@ -2940,7 +2975,18 @@ void updateInput(App &app, XrTime time, float dt, double now) {
 		app.zoomSince = now;
 		app.zoomUsed = false;
 	}
-	if (zoomMode && !app.cinemaWanted && app.cinema <= 0.0f) {
+	if (zoomMode && cinemaPlaced(app)) {
+		// Mode cinéma : haut/bas la taille, gauche/droite la distance (gardées).
+		if (fabsf(right.y) > 0.3f && fabsf(right.y) >= fabsf(right.x)) {
+			app.cinemaZoom = clampf(app.cinemaZoom * (1.0f + right.y * 0.8f * dt), 0.4f, 2.5f);
+			app.zoomUsed = true;
+			app.settingsDirty = true;
+		} else if (fabsf(right.x) > 0.3f) {
+			app.cinemaR = clampf(app.cinemaR * (1.0f + right.x * 0.6f * dt), 0.6f, 4.0f);
+			app.zoomUsed = true;
+			app.settingsDirty = true;
+		}
+	} else if (zoomMode) {
 		const Limits &lim = kLimits[app.environment];
 		if (fabsf(right.y) > 0.3f && fabsf(right.y) >= fabsf(right.x)) {
 			shownWidth(app) = clampf(shownWidth(app) * (1.0f + right.y * 0.8f * dt), lim.wMin, lim.wMax); // (un menu seul : sa taille à lui)
@@ -3690,8 +3736,8 @@ void updateScreenShown(App &app, double now) {
 	// (un court délai : deux scènes qui s'enchaînent ne rallument pas le donjon entre elles)
 	// La partie commence (après l'intro, ou une partie chargée) : on reste dans le noir un moment, le
 	// temps que la première scène (le garde) arrive, sans montrer le château avant.
-	if (app.gameStarted && !app.prevGameStarted && cinemaOk && app.cinemaIntro && app.cinema > 0.0f)
-		app.cinemaSeenAt = now + 2.25;
+	if (app.gameStarted && !app.prevGameStarted && cinemaOk)
+		app.cinemaSeenAt = now + 2.75;
 	app.prevGameStarted = app.gameStarted;
 	app.cinemaWanted = cinemaOk && (now - app.cinemaSeenAt < 0.25 || beforeGame);
 	{

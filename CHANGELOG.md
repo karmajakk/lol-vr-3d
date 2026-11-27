@@ -3,6 +3,16 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.56.0] — Cinema screen you can place
+
+- The intro and the character selection take place in your room again (the fire, the window). When
+  the game starts, it goes dark until the guard speaks, then the cinema mode takes over.
+  ("Intro, menus: Dark" in the VR controls keeps them in the dark room.)
+- The cinema screen can be moved (its handle) and resized (its corners, or L3 + right stick:
+  up/down the size, left/right the distance). The size, the distance and the height are kept for
+  the next scenes; it always appears straight ahead. Choosing a size in the VR controls puts it
+  back to its original place and size.
+
 ## [0.55.0] — Cinema mode, closer and at eye level
 
 - The cinema screen is placed in front of the head when the scene starts (or at recentering),
