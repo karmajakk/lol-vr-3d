@@ -3,6 +3,17 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.57.0] — Objects facing you, mine entrance, X for the spell level
+
+- An object in the middle of a block (the thief in the forest, a statue...) is one picture turned
+  toward the party, as in the game, instead of two crossed pictures seen from the side.
+- A place picture at the end of a corridor with a dead-end block behind it (the mine entrance
+  from Upper Opinwood) is at the back of its block, like the other places to visit.
+- The cinema screen is lower by default (the characters' eyes about a quarter from the top, at
+  eye level).
+- Default controls: X (right click) chooses the spell level when the level menu is open; R3 only
+  recenters.
+
 ## [0.56.0] — Cinema screen you can place
 
 - The intro and the character selection take place in your room again (the fire, the window). When

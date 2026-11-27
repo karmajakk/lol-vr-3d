@@ -1075,13 +1075,31 @@ void buildDungeonMesh(const uint8_t *walls, const DungeonGfx &g, const DungeonTe
 			if (tex.kind[t] == kWallObject) {
 				if (!objectDone && tex.typeLayer[t] >= 0 && tex.scenery[t]) {
 					// Un décor entier : au fond de la case, face à l'unique ouverture (sinon, comme un objet).
-					int open = -1, nOpen = 0, openMask = 0;
+					// (une case voisine en cul-de-sac, qui ne mène qu'ici, ne compte pas : l'entrée de la mine
+					// d'Upper Opinwood est au bout d'un couloir, avec une case derrière elle)
+					auto deadEnd = [&](int nb) {
+						int n = 0;
+						for (int k3 = 0; k3 < 4; k3++)
+							n += !isSolidBlock(walls, (nb + dx[k3] + dz[k3] * 32) & 1023, g) ? 1 : 0;
+						return n <= 1;
+					};
+					int open = -1, nOpen = 0, openMask = 0, nLive = 0, live = -1;
 					for (int k2 = 0; k2 < 4; k2++) {
-						if (!isSolidBlock(walls, (b + dx[k2] + dz[k2] * 32) & 1023, g)) { // (le plan boucle, comme le jeu)
+						const int nb = (b + dx[k2] + dz[k2] * 32) & 1023; // (le plan boucle, comme le jeu)
+						if (!isSolidBlock(walls, nb, g)) {
 							open = k2;
 							nOpen++;
 							openMask |= 1 << k2;
+							if (!deadEnd(nb)) {
+								nLive++;
+								live = k2;
+							}
 						}
+					}
+					if (nOpen == 2 && nLive == 1) {
+						nOpen = 1;
+						open = live;
+						openMask = 1 << live;
 					}
 					if (nOpen == 1) {
 						objectDone = true;
@@ -1098,11 +1116,12 @@ void buildDungeonMesh(const uint8_t *walls, const DungeonGfx &g, const DungeonTe
 					}
 				}
 				if (!objectDone && tex.typeLayer[t] >= 0) {
+					// Comme dans le jeu, une seule image, tournée vers le groupe (celle du côté qu'il
+					// regarde) : deux images croisées se voyaient de biais, de côté (le voleur).
 					objectDone = true;
-					uint8_t tn = w[0] && tex.kind[w[0]] == kWallObject ? w[0] : t;
-					uint8_t te = w[1] && tex.kind[w[1]] == kWallObject ? w[1] : t;
-					upright(cx, cz, 0.0f, 1.0f, (float)tex.typeLayer[tn], 1.0f, 1.0f, true);
-					upright(cx, cz, 1.0f, 0.0f, (float)tex.typeLayer[te], 0.9f, 1.0f, true);
+					const int toward = (viewDir + 2) & 3; // (le côté de la case tourné vers le groupe)
+					const uint8_t tv = w[toward] && tex.kind[w[toward]] == kWallObject && tex.typeLayer[w[toward]] >= 0 ? w[toward] : t;
+					upright(cx, cz, (float)dx[toward], (float)dz[toward], (float)tex.typeLayer[tv], 1.0f, 1.0f, true);
 				}
 				continue;
 			}

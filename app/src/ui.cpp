@@ -1191,9 +1191,9 @@ static const char *fnName(int lang, int f) {
 	switch (f) {
 	case kFnAttack: return tr(lang, "Attack (menus: Enter)", "Attaquer (menus : Entrée)", "Angriff (Menüs: Eingabe)");
 	case kFnMagic: return tr(lang, "Magic (menus: Escape)", "Magie (menus : Échap)", "Magie (Menüs: Esc)");
-	case kFnRightClick: return tr(lang, "Right click (drink, use)", "Clic droit (boire, utiliser)", "Rechtsklick (trinken, benutzen)");
+	case kFnRightClick: return tr(lang, "Right click; spells: level", "Clic droit ; sorts : niveau", "Rechtsklick; Zauber: Stufe");
 	case kFnMap: return tr(lang, "Map", "Carte", "Karte");
-	case kFnRecenter: return tr(lang, "Recenter (spell level)", "Recentrer (niveau de sort)", "Zentrieren (Zauberstufe)");
+	case kFnRecenter: return tr(lang, "Recenter", "Recentrer", "Zentrieren");
 	case kFnView: return tr(lang, "View; hold: screen size", "Vue ; maintenu : taille écran", "Ansicht; halten: Bildgröße");
 	case kFnEnter: return tr(lang, "Enter", "Entrée", "Eingabe");
 	case kFnEscape: return tr(lang, "Escape (skip)", "Échap (passer)", "Esc (überspringen)");

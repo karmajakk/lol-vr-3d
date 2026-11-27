@@ -688,7 +688,10 @@ float &menuWidth(App &app) {
 }
 float &shownWidth(App &app) { return app.menuAlone && app.split ? menuWidth(app) : screenWidth(app); }
 float &screenDistance(App &app) { return app.distances[app.environment]; }
-// Mode cinéma : l'écran courbe a sa propre place (voir updateLayout).
+// Mode cinéma : l'écran courbe a sa propre place (voir updateLayout). Par défaut, le centre de
+// l'écran est sous les yeux de cette fraction de sa hauteur (la ligne des yeux des personnages,
+// vers le quart du haut de l'image, à hauteur des yeux).
+const float kCinemaEyeLine = 0.24f;
 bool cinemaPlaced(const App &app) { return app.cinemaWanted || app.cinema > 0.0f; }
 
 Quat screenRot(const App &app) { return quatYaw(cinemaPlaced(app) ? app.cinemaYaw : app.screenYaw); }
@@ -2049,7 +2052,7 @@ void updateLayout(App &app, double now) {
 		const float want = 2.0f * cinemaRadius(app) * tanf(a * 0.5f) * app.cinemaZoom;
 		app.cinemaW = clampf(w * want / app.dispW, 0.2f, 12.0f);
 		const Vec3 f{-sinf(app.cinemaYaw), 0.0f, -cosf(app.cinemaYaw)};
-		app.cinemaCenter = Vec3{app.cinemaHead.x, app.cinemaHead.y - 0.12f * app.dispH + app.cinemaLift, app.cinemaHead.z} + f * cinemaRadius(app);
+		app.cinemaCenter = Vec3{app.cinemaHead.x, app.cinemaHead.y - kCinemaEyeLine * app.dispH + app.cinemaLift, app.cinemaHead.z} + f * cinemaRadius(app);
 	} else {
 		app.cinemaW = 0.0f;
 	}
@@ -2515,7 +2518,7 @@ void updateUi(App &app, XrTime time, float dt, double now, bool pointer, bool tr
 			if (hd > 0.1f) {
 				app.cinemaYaw = atan2f(-v.x, -v.z);
 				app.cinemaR = clampf(hd, 0.6f, 4.0f);
-				app.cinemaLift = clampf(out.screenCenter.y - (app.cinemaHead.y - 0.12f * app.dispH), -1.5f, 1.5f);
+				app.cinemaLift = clampf(out.screenCenter.y - (app.cinemaHead.y - kCinemaEyeLine * app.dispH), -1.5f, 1.5f);
 			}
 			app.cinemaZoom = clampf(app.cinemaZoom * out.screenZoom, 0.4f, 2.5f);
 			app.settingsDirty = true;
@@ -2741,9 +2744,9 @@ void updateInput(App &app, XrTime time, float dt, double now) {
 		fnPressed[i] = fnDown[i] && !app.fnWasDown[i];
 		app.fnWasDown[i] = fnDown[i];
 	}
-	// Recentrer : l'écran (et la pièce) devant soi (menu de magie ouvert : niveau de sort suivant).
+	// Recentrer : l'écran (et la pièce) devant soi.
 	const bool r3Raw = fnDown[lolvr::kFnRecenter];
-	bool recenter = r3Raw && (app.level.magicMenu < 0 || app.dungeonMode);
+	bool recenter = r3Raw;
 	if (app.headValid && recenter && !app.recenterDown) {
 		updateFloor(app, time);
 		placeScreen(app, true);
@@ -2884,7 +2887,7 @@ void updateInput(App &app, XrTime time, float dt, double now) {
 			CoreHost::get().setPointer(ui.gu, ui.gv);
 		// Clic droit (boire une potion, utiliser un objet) : les boutons du profil qui le font
 		// (dans « Classique », X).
-		bool xRight = fnDown[lolvr::kFnRightClick] && ui.pointerValid && !ui.dragging;
+		bool xRight = fnDown[lolvr::kFnRightClick] && ui.pointerValid && !ui.dragging && !(app.inDungeon && app.characters > 0 && app.level.magicMenu >= 0);
 		CoreHost::get().setMouseButtons(app.triggerDown[hand] && toGame && !ui.pressPending, xRight);
 		if (xRight && !app.keyboardButtonDown) {
 			app.clickPulse = 1.0f;
@@ -3044,14 +3047,15 @@ void updateInput(App &app, XrTime time, float dt, double now) {
 			app.synthClickUntil = now + 0.16;
 			pulse(app, kRight, 0.25f, 0.03f);
 		}
-		// R3, menu ouvert : niveau suivant parmi ceux que le personnage peut lancer
-		const bool r3 = fnDown[lolvr::kFnRecenter];
-		if (r3 && !app.r3Down && menu >= 0 && !app.dungeonMode) {
+		// Le bouton du clic droit (X dans « Classique »), menu des niveaux ouvert : le niveau suivant
+		// parmi ceux que le personnage peut lancer (et pas de clic droit).
+		const bool lv = fnDown[lolvr::kFnRightClick];
+		if (lv && !app.r3Down && menu >= 0) {
 			const int n = app.level.magicLevels > 0 ? app.level.magicLevels : 1;
 			app.spellLevel = (app.spellLevel + 1) % n;
 			pulse(app, kRight, 0.20f, 0.02f);
 		}
-		app.r3Down = r3;
+		app.r3Down = lv;
 		// Changer de personnage : poignée gauche, celui d'avant (vers le haut) ; poignée droite, le
 		// suivant (vers le bas) ; ou un bouton qui le fait dans le profil. Le joystick droit vers le
 		// haut ou le bas ne le fait plus (il partait en plein combat).
