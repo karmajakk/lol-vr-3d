@@ -427,6 +427,7 @@ void copyLevel() {
 	// L'objet tenu par le pointeur, et l'image du curseur du jeu (en couleurs, le fond transparent)
 	l.itemInHand = s->itemInHand;
 	l.scenePicture = s->scenePicture != 0;
+	l.sceneCinema = s->scenePicture >= 2;
 	l.sceneRect = s->sceneRect;
 	l.spellCount = s->spellCount;
 	// L'atlas tel que le groupe l'a exploré (fenêtre de la carte)
@@ -797,6 +798,7 @@ bool CoreHost::levelSnapshot(LevelSnapshot &out) const {
 	out.textRect = l.textRect;
 	out.itemInHand = l.itemInHand;
 	out.scenePicture = l.scenePicture;
+	out.sceneCinema = l.sceneCinema;
 	out.sceneRect = l.sceneRect;
 	out.spellCount = l.spellCount;
 	if (out.map.serial != l.map.serial)

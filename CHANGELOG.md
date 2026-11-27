@@ -3,6 +3,18 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.58.0] — Cinema for places only, softer glow, dimmed Exit
+
+- The cinema mode is for places, shops and sequences only: a character who talks over the
+  dungeon view (Timothy after the inn) no longer turns the world black.
+- The glow around the cinema screen is narrower and much softer (it looked like dark walls
+  spilling over the windows).
+- The greyed-out "Exit" button during a dialogue is drawn in a dimmer yellow instead of the
+  game's checkerboard, which broke the letters into dots once enlarged.
+- Forest canopies are darker, closer to the foliage of the walls (Southland).
+- The mine entrance of Upper Opinwood: a wall of trees behind the picture hides the dead-end
+  block behind it.
+
 ## [0.57.0] — Objects facing you, mine entrance, X for the spell level
 
 - An object in the middle of a block (the thief in the forest, a statue...) is one picture turned

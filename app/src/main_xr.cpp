@@ -3734,7 +3734,9 @@ void updateScreenShown(App &app, double now) {
 	bool show = need || scene || now - app.screenNeededAt < 0.1;
 	// Mode cinéma : une scène (en partie), ou l'avant-partie (intro, menus, choix du personnage).
 	const bool cinemaOk = app.dungeonMode && app.cinemaSize != 3 && !lolvr::isCrtEnv(app.environment);
-	if (cinemaOk && scene && app.gameStarted && !app.charSheet && !app.menuAlone && !app.automapOpen)
+	// (seulement un lieu, une boutique ou une séquence : pas un personnage qui parle devant le donjon)
+	const bool cinemaScene = scene && app.level.sceneCinema && app.level.scenePicture;
+	if (cinemaOk && cinemaScene && app.gameStarted && !app.charSheet && !app.menuAlone && !app.automapOpen)
 		app.cinemaSeenAt = now;
 	const bool beforeGame = cinemaOk && app.cinemaIntro && !app.gameStarted && app.coreStarted;
 	// (un court délai : deux scènes qui s'enchaînent ne rallument pas le donjon entre elles)
@@ -3749,7 +3751,7 @@ void updateScreenShown(App &app, double now) {
 		app.cinemaTime = now;
 		app.cinema = clampf(app.cinema + (app.cinemaWanted ? dt : -dt) / 0.4f, 0.0f, 1.0f);
 		// L'écran lui-même : seulement quand il y a une scène (ou l'avant-partie) à montrer.
-		const bool picture = cinemaOk && ((scene && app.gameStarted) || beforeGame);
+		const bool picture = cinemaOk && ((cinemaScene && app.gameStarted) || beforeGame);
 		app.cinemaScreen = clampf(app.cinemaScreen + (picture ? dt : -dt) / 0.4f, 0.0f, 1.0f);
 	}
 	// Sa place : devant la tête, au début (ou au recentrage).

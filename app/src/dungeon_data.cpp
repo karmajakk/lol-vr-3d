@@ -259,10 +259,10 @@ static void makeCeiling(int style, const Rgba *bg, const Rgba *wall, Rgba sky, R
 					v = floorf(v * 6.0f + 0.5f) / 6.0f;
 					// les feuilles, en paliers : la rampe du jeu (trop sombre là-haut) mêlée de vert
 					if (haveLeaves) {
-						const float lv = v * 0.85f; // (le feuillage des murs est plutôt sombre)
+						const float lv = v * 0.62f; // (le feuillage des murs est sombre : les cimes aussi)
 						const float f = (lv < 0.0f ? 0.0f : lv > 0.999f ? 0.999f : lv) * 7.0f;
 						const int k = (int)f;
-						c = mix(leaves[k], leaves[k + 1 > 7 ? 7 : k + 1], f - (float)k);
+						c = scale(mix(leaves[k], leaves[k + 1 > 7 ? 7 : k + 1], f - (float)k), 0.80f);
 					} else {
 						const Rgba gr = {(uint8_t)(24 + 70 * v), (uint8_t)(48 + 110 * v), (uint8_t)(18 + 45 * v), 255};
 						c = mix(scale(rampAt(v), 1.3f), gr, 0.55f);
@@ -1096,13 +1096,18 @@ void buildDungeonMesh(const uint8_t *walls, const DungeonGfx &g, const DungeonTe
 							}
 						}
 					}
+					bool backdrop = false;
 					if (nOpen == 2 && nLive == 1) {
 						nOpen = 1;
 						open = live;
 						openMask = 1 << live;
+						backdrop = true;
 					}
 					if (nOpen == 1) {
 						objectDone = true;
+						// (derrière l'image, un mur de la région cache la case en cul-de-sac)
+						if (backdrop && tex.baseWallLayer >= 0)
+							upright(cx - dx[open] * (S * 0.5f + 0.002f), cz - dz[open] * (S * 0.5f + 0.002f), (float)dx[open], (float)dz[open], (float)tex.baseWallLayer, faceShade[open], 1.0f, false);
 						upright(cx - dx[open] * (S * 0.5f - 0.01f), cz - dz[open] * (S * 0.5f - 0.01f), (float)dx[open], (float)dz[open], (float)tex.typeLayer[t], faceShade[open], 1.0f, false);
 						continue;
 					}

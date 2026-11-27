@@ -103,6 +103,7 @@ struct LevelSnapshot {
 	// Les images des lieux (une hutte, un château, une marina) que le jeu montre en grand quand on
 	// entre dans leur image sur un mur : 176 x 120 en RVB, une par type de mur (placeTypes).
 	bool scenePicture = false; // une scène montre sa propre image (boutique, personnage), pas le donjon
+	bool sceneCinema = false;  // ... et c'est un lieu, une boutique ou une séquence (le mode cinéma)
 	int spellCount = 0;        // les sorts du parchemin
 	MapSnapshot map;           // l'atlas
 	bool animBusy = false;

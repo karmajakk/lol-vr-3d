@@ -392,7 +392,7 @@ void main() {
 	vec3 cy = vP.y > 0.0 ? uEdge[2] : uEdge[3];
 	float wx = dx + 1e-4, wy = dy + 1e-4;
 	vec3 c = (cx * wx + cy * wy) / (wx + wy);
-	c *= f * 0.40 * uAlpha;
+	c *= f * 0.22 * uAlpha;
 #ifdef MANUAL_SRGB
 	c = pow(c, vec3(1.0 / 2.2));
 #endif
@@ -1124,7 +1124,7 @@ void Scene::prepare(const SceneState &s) {
 			};
 			std::vector<Vertex> scr, halo;
 			grid(scr, 48, 24, -A, A, -H, H, true);
-			const float reach = 0.22f * R * A + 0.10f * H; // (à l'échelle de l'écran)
+			const float reach = 0.10f * R * A + 0.05f * H; // (à l'échelle de l'écran)
 			const float ma = reach / R;
 			grid(halo, 40, 12, -A - ma, A + ma, -H - reach, H + reach, false);
 			uploadLitMesh(d->cinemaMesh, scr, GL_DYNAMIC_DRAW);
@@ -1259,7 +1259,7 @@ void Scene::render(const Mat4 &view, const Mat4 &proj, const SceneState &s) {
 		glUseProgram(d->haloProgram);
 		glUniformMatrix4fv(d->halo.viewProj, 1, GL_FALSE, viewProj.m);
 		glUniform2f(d->halo.half, s.cinemaRadius * s.cinemaHalfAngle, s.cinemaHalfH);
-		glUniform1f(d->halo.reach, 0.22f * s.cinemaRadius * s.cinemaHalfAngle + 0.10f * s.cinemaHalfH);
+		glUniform1f(d->halo.reach, 0.10f * s.cinemaRadius * s.cinemaHalfAngle + 0.05f * s.cinemaHalfH);
 		glUniform1f(d->halo.alpha, cineScreen);
 		float edge[12];
 		for (int k = 0; k < 4; k++) {
