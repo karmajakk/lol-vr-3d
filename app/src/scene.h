@@ -107,6 +107,8 @@ struct SceneState {
 	float cinemaHalfH = 0.5f;        // demi-hauteur, en mètres
 	float cinemaRect[4] = {0, 0, 1, 1}; // portion de l'image du jeu (u0, v0, u1, v1)
 	Vec3 cinemaEdge[4] = {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}}; // couleurs des bords (gauche, droite, haut, bas ; linéaires)
+	float cinemaScreenAlpha = 1.0f;  // l'écran et son halo (éteints quand rien n'est à montrer)
+	Vec3 cinemaVoid = {0, 0, 0};     // la teinte du fond (linéaire), presque noire
 };
 
 // L'écran courbe du mode cinéma : le point (repère local de l'écran) à l'angle a (radians, 0 au

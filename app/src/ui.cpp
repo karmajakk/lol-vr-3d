@@ -482,6 +482,7 @@ struct Ui::Impl {
 	// Mode immersif : deux lignes de plus, le mode cinéma (taille de l'écran) et l'avant-partie.
 	int menuRows() const { return dungeonMode ? 8 : 6; }
 	int cinemaSize = 0;     // 0 moyen, 1 grand, 2 petit, 3 sans
+	float cinePitch = 0.0f;  // mode cinéma : la descente des fenêtres du jeu (radians)
 	bool cinemaIntro = true; // l'intro et les menus d'avant la partie dans le noir aussi
 	// (dessous, sans bouton, les remerciements)
 	int menuH() const { return kMenuRowH * menuRows() + kMenuFootH; }
@@ -2018,7 +2019,7 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 	if (visible[kPanelSpells])
 		d->compose(kCompSpells, in);
 	// L'atlas : quand le groupe a la carte (et le réglage le montre).
-	visible[kPanelAtlas] = placed && in.split && in.atlasOn && in.map && in.map->available && in.map->rgb;
+	visible[kPanelAtlas] = placed && in.split && in.atlasOn && !in.cinemaOn && in.map && in.map->available && in.map->rgb;
 	if (visible[kPanelAtlas]) {
 		if (placement[kPanelAtlas].c < 0.19f) // (une disposition d'avant l'atlas)
 			d->placeAtlas(placement);
@@ -2085,10 +2086,44 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 	const int kHandleScreen = kUiPanelCount, kHandleCount = kUiPanelCount + 1;
 	Quad content[kUiPanelCount], handle[kUiPanelCount + 1];
 	float panelDist[kUiPanelCount];
+	// Mode cinéma : les fenêtres du jeu suivent l'écran courbe (même lacet) et passent sous son bord du
+	// bas si elles le chevauchent (toutes ensemble : leur disposition ne change pas).
+	// (la descente est mesurée sur les fenêtres telles qu'elles sont posées, à la fin de l'étape 2)
+	if (!in.cinemaOn)
+		d->cinePitch = 0.0f;
+	const float cineYaw = in.cinemaOn ? in.cinemaYaw : 0.0f, cinePitch = d->cinePitch;
+	// Les fenêtres posées à côté de l'image (plus haut que son centre) s'écartent sur le côté ; celles
+	// d'en dessous descendent ensemble.
+	bool cineDown[kUiPanelCount] = {false};
+	float cineScreenYaw = 0.0f, cineScreenElev = 0.0f, cineHalfYaw = 0.0f;
+	if (in.cinemaOn) {
+		const Vec3 v = in.screenPos - in.anchorPos;
+		const float hd = sqrtf(v.x * v.x + v.z * v.z);
+		cineScreenYaw = wrapAngle(atan2f(-v.x, -v.z) - in.anchorYaw);
+		cineScreenElev = atan2f(v.y, hd);
+		cineHalfYaw = atan2f(in.dispW * 0.5f, fmaxf(hd, 0.3f));
+	}
 	for (int i = 0; i < kUiPanelCount; i++) {
 		const UiPlacement &pl = placement[i];
 		Quad &q = content[i];
-		q.c = in.anchorPos + directionFor(in.anchorYaw + pl.a, pl.b) * pl.c;
+		const bool cineMoved = in.cinemaOn && i < kPanelKeyboard;
+		float cineA = 0.0f, cineB = 0.0f;
+		if (cineMoved) {
+			cineA = cineYaw;
+			cineDown[i] = pl.b < cineScreenElev;
+			if (cineDown[i]) {
+				cineB = cinePitch;
+			} else {
+				// À côté : écartée juste assez pour ne pas toucher l'image.
+				const int ci = d->compOf(i);
+				const float sw = ci >= 0 && d->comp[ci].w ? (float)d->comp[ci].w : kSources[i].w;
+				const float half = atanf(sw * pl.scale * 0.5f / fmaxf(pl.c, 0.2f));
+				const float off = wrapAngle(pl.a + cineYaw - cineScreenYaw), need = cineHalfYaw + 0.03f + half;
+				if (fabsf(off) < need)
+					cineA += (off < 0.0f ? -need : need) - off;
+			}
+		}
+		q.c = in.anchorPos + directionFor(in.anchorYaw + pl.a + cineA, pl.b - cineB) * pl.c;
 		float scale = pl.scale;
 		const int ci = d->compOf(i);
 		float sw = ci >= 0 && d->comp[ci].w ? (float)d->comp[ci].w : kSources[i].w, sh = ci >= 0 && d->comp[ci].h ? (float)d->comp[ci].h : kSources[i].h;
@@ -2280,6 +2315,8 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 			return false;
 		if (i == kHandleScreen)
 			return !in.screenHidden && !in.screenLocked;
+		if (in.cinemaOn && i < kPanelKeyboard)
+			return false;
 		if (d->grouped() && i != kPanelParty && Impl::isBlock(i))
 			return false;
 		return visible[i];
@@ -2398,6 +2435,25 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 				}
 			}
 		}
+	}
+
+	// Mode cinéma : le haut des fenêtres du jeu (sans la descente) ; elles descendent juste assez pour
+	// passer sous le bord du bas de l'écran courbe.
+	if (in.cinemaOn) {
+		float top = -10.0f;
+		for (int i = 0; i < kPanelKeyboard; i++) {
+			if (!visible[i] || (!cineDown[i] && !(d->grouped() && Impl::isBlock(i) && cineDown[kPanelParty])))
+				continue;
+			const Quad &q = content[i];
+			for (int sx = -1; sx <= 1; sx++) { // (le haut d'une fenêtre plate sous les yeux : ses coins paraissent plus hauts)
+				const Vec3 p = q.c + q.u * q.hh + q.r * (q.hw * (float)sx) - in.anchorPos;
+				const float len = length(p);
+				if (len > 1e-3f)
+					top = fmaxf(top, asinf(clampf(p.y / len, -1.0f, 1.0f)));
+			}
+		}
+		if (top > -9.0f)
+			d->cinePitch = fmaxf(0.0f, top + d->cinePitch - (in.cinemaBottom - 0.04f));
 	}
 
 	bool tabHot = false; // le doigt est sur le bandeau du livre de sorts
@@ -2519,7 +2575,7 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 		{
 			float cornerT = 1e9f, cornerBest = 1e9f;
 			for (int i = 0; i <= kUiPanelCount; i++) {
-				if (i < kUiPanelCount ? !visible[i] : (in.screenHidden || in.screenLocked))
+				if (i < kUiPanelCount ? !visible[i] || (in.cinemaOn && i < kPanelKeyboard) : (in.screenHidden || in.screenLocked))
 					continue;
 				if (frameVis && i != kPanelParty && Impl::isBlock(i))
 					continue; // (les coins du bloc sont ceux de son cadre)
@@ -2648,7 +2704,7 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 	}
 	// Ce qu'une gâchette maintenue déplacerait (voir update).
 	d->lastHoldable = false;
-	if (in.aimValid && d->drag == -1 && d->resize == -1 && ((hitKind == kHitPanel && hitIndex >= 0 && hitIndex < kUiPanelCount) || (hitKind == kHitScreen && !in.screenHidden && !in.screenLocked))) {
+	if (in.aimValid && d->drag == -1 && d->resize == -1 && ((hitKind == kHitPanel && hitIndex >= 0 && hitIndex < kUiPanelCount && !(in.cinemaOn && hitIndex < kPanelKeyboard)) || (hitKind == kHitScreen && !in.screenHidden && !in.screenLocked))) {
 		const Vec3 p = in.tip + in.dir * bestT;
 		d->lastHoldable = true;
 		d->lastHoldTarget = hitKind == kHitScreen ? Impl::kScreenTarget : hitIndex;

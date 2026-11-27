@@ -460,6 +460,12 @@ struct App {
 	double cinemaSeenAt = -10.0, cinemaTime = 0.0;
 	float cinema = 0.0f;   // 0 éteint, 1 plein (le fondu)
 	float cinemaW = 0.0f;  // la largeur d'écran qui donne l'angle voulu
+	float cinemaScreen = 0.0f; // l'écran courbe lui-même (0..1) : éteint quand rien n'est à montrer
+	// L'écran courbe est posé devant la tête (au début de la scène ou au recentrage), à cinemaR, la
+	// ligne des yeux des personnages (38 % du haut de l'image) à hauteur des yeux.
+	bool cinemaArmed = true, prevGameStarted = false;
+	Vec3 cinemaHead = {0, 1.6f, 0}, cinemaCenter = {0, 1.6f, -1.5f};
+	float cinemaYaw = 0.0f, cinemaR = 1.5f;
 	Vec3 cinemaEdge[4] = {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
 	float dunYaw = 0;               // lacet (monde) vers lequel le groupe regarde
 	bool dunYawSet = false;
@@ -679,7 +685,10 @@ float &menuWidth(App &app) {
 }
 float &shownWidth(App &app) { return app.menuAlone && app.split ? menuWidth(app) : screenWidth(app); }
 float &screenDistance(App &app) { return app.distances[app.environment]; }
-Quat screenRot(const App &app) { return quatYaw(app.screenYaw); }
+// Mode cinéma : l'écran courbe a sa propre place (voir updateLayout).
+bool cinemaPlaced(const App &app) { return app.cinemaWanted || app.cinema > 0.0f; }
+
+Quat screenRot(const App &app) { return quatYaw(cinemaPlaced(app) ? app.cinemaYaw : app.screenYaw); }
 
 bool createSwapchain(App &app, int32_t width, int32_t height, Swapchain &out) {
 	XrSwapchainCreateInfo info{XR_TYPE_SWAPCHAIN_CREATE_INFO};
@@ -1410,6 +1419,7 @@ void updateFloor(App &app, XrTime time) {
 void placeScreen(App &app, bool newAnchor) {
 	bool library = lolvr::isLibraryEnv(app.environment);
 	if (newAnchor) {
+		app.cinemaArmed = true; // (l'écran courbe du mode cinéma aussi, devant soi)
 		Vec3 fwd = rotate(app.headRot, {0, 0, -1});
 		float yaw = atan2f(-fwd.x, -fwd.z);
 		Vec3 flat = rotate(quatYaw(yaw), {0, 0, -1});
@@ -1802,15 +1812,13 @@ void showHeldItem(App &app, Vec3 hit) {
 void placeBand(App &app, const lolvr::UiFrameInput &in, lolvr::UiFrameOutput &out);
 
 Vec3 viewCenter(const App &app) {
+	if (cinemaPlaced(app))
+		return app.cinemaCenter;
 	return app.screenPos + Vec3{0, app.viewLift, 0} + rotate(screenRot(app), {app.viewShift, 0, 0});
 }
 
 // Mode cinéma : le rayon de l'écran courbe, la distance (à plat) du joueur au centre de l'écran.
-float cinemaRadius(const App &app) {
-	const Vec3 c = viewCenter(app);
-	const float dx = c.x - app.anchorPos.x, dz = c.z - app.anchorPos.z;
-	return fmaxf(sqrtf(dx * dx + dz * dz), 0.5f);
-}
+float cinemaRadius(const App &app) { return app.cinemaR; }
 
 void placeBand(App &app, const lolvr::UiFrameInput &in, lolvr::UiFrameOutput &out) {
 	if (!app.bandShown || !app.screenPlaced)
@@ -2025,10 +2033,12 @@ void updateLayout(App &app, double now) {
 	}
 	if (cinemaSized && app.dispW > 1e-3f) {
 		// Largeur apparente : 55° (moyen), 68° (grand), 44° (petit). Tout est proportionnel à w.
-		static const float kAngle[3] = {55.0f, 68.0f, 44.0f};
+		static const float kAngle[3] = {60.0f, 72.0f, 48.0f};
 		const float a = kAngle[app.cinemaSize >= 0 && app.cinemaSize < 3 ? app.cinemaSize : 0] * 3.14159265f / 180.0f;
 		const float want = 2.0f * cinemaRadius(app) * tanf(a * 0.5f);
 		app.cinemaW = clampf(w * want / app.dispW, 0.2f, 12.0f);
+		const Vec3 f{-sinf(app.cinemaYaw), 0.0f, -cosf(app.cinemaYaw)};
+		app.cinemaCenter = Vec3{app.cinemaHead.x, app.cinemaHead.y - 0.12f * app.dispH, app.cinemaHead.z} + f * cinemaRadius(app);
 	} else {
 		app.cinemaW = 0.0f;
 	}
@@ -2442,6 +2452,15 @@ void updateUi(App &app, XrTime time, float dt, double now, bool pointer, bool tr
 	in.screenHidden = !app.screenShown && app.cinema <= 0.0f;
 	in.curveRadius = app.cinema > 0.0f ? cinemaRadius(app) : 0.0f;
 	in.screenLocked = app.cinemaWanted || app.cinema > 0.0f;
+	in.cinemaOn = in.screenLocked && app.gameStarted;
+	if (in.cinemaOn) {
+		float dy = app.cinemaYaw - app.screenYaw;
+		while (dy > 3.14159265f) dy -= 6.2831853f;
+		while (dy < -3.14159265f) dy += 6.2831853f;
+		in.cinemaYaw = dy;
+		const Vec3 b = app.cinemaCenter - Vec3{0, app.dispH * 0.5f, 0} - app.anchorPos;
+		in.cinemaBottom = atan2f(b.y, sqrtf(b.x * b.x + b.z * b.z));
+	}
 	in.time = now;
 	app.ui.setInfo(app.imageInfo[0], app.imageInfo[1]);
 	if (!app.ui.hasLayout() && app.screenPlaced)
@@ -3669,11 +3688,28 @@ void updateScreenShown(App &app, double now) {
 		app.cinemaSeenAt = now;
 	const bool beforeGame = cinemaOk && app.cinemaIntro && !app.gameStarted && app.coreStarted;
 	// (un court délai : deux scènes qui s'enchaînent ne rallument pas le donjon entre elles)
+	// La partie commence (après l'intro, ou une partie chargée) : on reste dans le noir un moment, le
+	// temps que la première scène (le garde) arrive, sans montrer le château avant.
+	if (app.gameStarted && !app.prevGameStarted && cinemaOk && app.cinemaIntro && app.cinema > 0.0f)
+		app.cinemaSeenAt = now + 2.25;
+	app.prevGameStarted = app.gameStarted;
 	app.cinemaWanted = cinemaOk && (now - app.cinemaSeenAt < 0.25 || beforeGame);
 	{
 		const float dt = (float)clampf((float)(now - app.cinemaTime), 0.0f, 0.1f);
 		app.cinemaTime = now;
 		app.cinema = clampf(app.cinema + (app.cinemaWanted ? dt : -dt) / 0.4f, 0.0f, 1.0f);
+		// L'écran lui-même : seulement quand il y a une scène (ou l'avant-partie) à montrer.
+		const bool picture = cinemaOk && ((scene && app.gameStarted) || beforeGame);
+		app.cinemaScreen = clampf(app.cinemaScreen + (picture ? dt : -dt) / 0.4f, 0.0f, 1.0f);
+	}
+	// Sa place : devant la tête, au début (ou au recentrage).
+	if (!app.cinemaWanted && app.cinema <= 0.0f)
+		app.cinemaArmed = true;
+	if (app.cinemaWanted && app.cinemaArmed && app.headValid) {
+		app.cinemaArmed = false;
+		const Vec3 f = rotate(app.headRot, {0, 0, -1});
+		app.cinemaYaw = atan2f(-f.x, -f.z);
+		app.cinemaHead = app.headPos;
 	}
 	if (show && !app.screenShown && app.dungeonVisible && app.headValid && app.screenPlaced) {
 		// Il revient là où le joueur regarde, à sa distance et à sa hauteur habituelles.
@@ -3713,6 +3749,7 @@ void fillSceneState(App &app, double now, bool focused) {
 	// Mode cinéma : l'écran plat (calque quad) laisse la place à l'écran courbe.
 	s.screenVisible = app.screenShown && app.cinema <= 0.0f;
 	s.cinema = app.cinema * app.cinema * (3.0f - 2.0f * app.cinema);
+	s.cinemaScreenAlpha = app.cinemaScreen * app.cinemaScreen * (3.0f - 2.0f * app.cinemaScreen);
 	if (app.cinema > 0.0f) {
 		s.cinemaPos = viewCenter(app);
 		s.cinemaRot = screenRot(app);
@@ -3723,8 +3760,13 @@ void fillSceneState(App &app, double now, bool focused) {
 		s.cinemaRect[1] = app.cropY / 200.0f;
 		s.cinemaRect[2] = (app.cropX + app.cropW) / 320.0f;
 		s.cinemaRect[3] = (app.cropY + app.cropH) / 200.0f;
-		for (int k = 0; k < 4; k++)
+		Vec3 mean{0, 0, 0};
+		for (int k = 0; k < 4; k++) {
 			s.cinemaEdge[k] = app.cinemaEdge[k];
+			mean = mean + app.cinemaEdge[k] * 0.25f;
+		}
+		// Le fond : un noir teinté des couleurs de la scène, à peine.
+		s.cinemaVoid = mean * (0.035f * s.cinemaScreenAlpha);
 	}
 	s.screenFrameless = app.menuAlone && app.split;
 	for (int h = 0; h < 2; h++) {

@@ -163,6 +163,11 @@ struct UiFrameInput {
 	// déplace ni ne se redimensionne à la main (sa taille est un réglage).
 	float curveRadius = 0.0f;
 	bool screenLocked = false;
+	// Mode cinéma en partie : les fenêtres du jeu tournent avec l'écran (cinemaYaw, radians) et
+	// descendent au besoin sous son bord du bas (cinemaBottom : élévation vue de anchorPos, radians).
+	// L'atlas est caché. Elles ne se déplacent pas à la main pendant ce temps.
+	bool cinemaOn = false;
+	float cinemaYaw = 0.0f, cinemaBottom = 0.0f;
 	// L'atlas : sa fenêtre est montrée (réglage) et la carte (nulle : pas de fenêtre).
 	bool atlasOn = false;
 	const UiMap *map = nullptr;

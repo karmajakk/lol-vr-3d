@@ -533,6 +533,7 @@ struct Scene::Impl {
 	// Mode cinéma : l'écran courbe et son halo (reconstruits quand l'écran bouge), le voile noir.
 	GlMesh cinemaMesh, haloMesh, fullMesh;
 	float cinemaKey[12] = {0};
+	bool manualSrgb = false;
 	struct {
 		GLint viewProj, game, gameSize, rect, border, alpha, hot, mode, glow;
 	} panel;
@@ -704,6 +705,7 @@ bool Scene::ready() const {
 bool Scene::init(bool srgbTarget) {
 	d->srgb = srgbTarget;
 	bool manual = !srgbTarget;
+	d->manualSrgb = manual;
 	d->litProgram = link(kLitVs, kLitFs, manual);
 	d->fxProgram = link(kFxVs, kFxFs, manual);
 	d->crtProgram = link(kCrtVs, kCrtFs, manual);
@@ -1174,7 +1176,10 @@ void Scene::render(const Mat4 &view, const Mat4 &proj, const SceneState &s) {
 		glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 		glUseProgram(d->flatProgram);
 		glUniformMatrix4fv(d->flat.mvp, 1, GL_FALSE, ident.m);
-		glUniform4f(d->flat.color, 0, 0, 0, cine);
+		Vec3 tint = s.cinemaVoid;
+		if (d->manualSrgb)
+			tint = {powf(tint.x, 1.0f / 2.2f), powf(tint.y, 1.0f / 2.2f), powf(tint.z, 1.0f / 2.2f)};
+		glUniform4f(d->flat.color, tint.x * cine, tint.y * cine, tint.z * cine, cine);
 		glBindVertexArray(d->fullMesh.vao);
 		glDrawArrays(GL_TRIANGLES, 0, d->fullMesh.count);
 		glDisable(GL_BLEND);
@@ -1246,7 +1251,8 @@ void Scene::render(const Mat4 &view, const Mat4 &proj, const SceneState &s) {
 	}
 
 	// --- Mode cinéma : le halo, puis l'écran courbe (il apparaît pendant que le monde s'éteint) ---
-	if (cine > 0.0f && s.gameTexture && d->cinemaMesh.count > 0) {
+	const float cineScreen = cine * clampf(s.cinemaScreenAlpha, 0.0f, 1.0f);
+	if (cineScreen > 0.0f && s.gameTexture && d->cinemaMesh.count > 0) {
 		glEnable(GL_BLEND);
 		glDisable(GL_CULL_FACE);
 		glDepthMask(GL_FALSE);
@@ -1254,7 +1260,7 @@ void Scene::render(const Mat4 &view, const Mat4 &proj, const SceneState &s) {
 		glUniformMatrix4fv(d->halo.viewProj, 1, GL_FALSE, viewProj.m);
 		glUniform2f(d->halo.half, s.cinemaRadius * s.cinemaHalfAngle, s.cinemaHalfH);
 		glUniform1f(d->halo.reach, 0.22f * s.cinemaRadius * s.cinemaHalfAngle + 0.10f * s.cinemaHalfH);
-		glUniform1f(d->halo.alpha, cine);
+		glUniform1f(d->halo.alpha, cineScreen);
 		float edge[12];
 		for (int k = 0; k < 4; k++) {
 			edge[k * 3 + 0] = s.cinemaEdge[k].x; edge[k * 3 + 1] = s.cinemaEdge[k].y; edge[k * 3 + 2] = s.cinemaEdge[k].z;
@@ -1263,7 +1269,7 @@ void Scene::render(const Mat4 &view, const Mat4 &proj, const SceneState &s) {
 		glBlendFuncSeparate(GL_ONE, GL_ONE, GL_ZERO, GL_ONE);
 		glBindVertexArray(d->haloMesh.vao);
 		glDrawArrays(GL_TRIANGLES, 0, d->haloMesh.count);
-		glDepthMask(GL_TRUE);
+		// L'écran n'écrit pas la profondeur : les fenêtres du jeu passent toujours par-dessus.
 		glUseProgram(d->panelProgram);
 		glUniformMatrix4fv(d->panel.viewProj, 1, GL_FALSE, viewProj.m);
 		glUniform1i(d->panel.game, 0);
@@ -1272,7 +1278,7 @@ void Scene::render(const Mat4 &view, const Mat4 &proj, const SceneState &s) {
 		glUniform2f(d->panel.gameSize, (float)s.gameWidth, (float)s.gameHeight);
 		glUniform4f(d->panel.rect, s.cinemaRect[0], s.cinemaRect[1], s.cinemaRect[2], s.cinemaRect[3]);
 		glUniform2f(d->panel.border, 0.001f, 0.001f);
-		glUniform1f(d->panel.alpha, cine);
+		glUniform1f(d->panel.alpha, cineScreen);
 		glUniform4f(d->panel.hot, 0, 0, 0, 0);
 		glUniform1f(d->panel.mode, 0.0f);
 		glUniform1f(d->panel.glow, 0.0f);
@@ -1280,6 +1286,7 @@ void Scene::render(const Mat4 &view, const Mat4 &proj, const SceneState &s) {
 		glBindVertexArray(d->cinemaMesh.vao);
 		glDrawArrays(GL_TRIANGLES, 0, d->cinemaMesh.count);
 		glBindTexture(GL_TEXTURE_2D, 0);
+		glDepthMask(GL_TRUE);
 		glEnable(GL_CULL_FACE);
 		glDisable(GL_BLEND);
 	}

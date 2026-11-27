@@ -267,6 +267,8 @@ int main(int argc, char **argv) {
 		{"cinema", kEnvLibrary, kThemeKeep, seat, 0, 0, 1.15f, true, 0.0f, 0.0f, 11},
 		{"cinema_fondu", kEnvLibrary, kThemeKeep, seat, 0, 0, 1.15f, false, 0.0f, 0.0f, 12},
 		{"cinema_pt", kEnvPassthroughFrame, kThemeKeep, seat, 20, 0, 1.15f, false, 0.0f, 0.0f, 11},
+		{"cinema_bloc", kEnvLibrary, kThemeKeep, seat, 0, -10, 1.15f, false, 0.0f, 0.0f, 13},
+		{"cinema_fenetres", kEnvLibrary, kThemeKeep, seat, 0, -10, 1.15f, false, 0.0f, 0.0f, 14},
 	};
 
 	// --- Essai de l'interface sans casque : pointage, poignées, clavier, butées ---
@@ -1081,7 +1083,8 @@ int main(int argc, char **argv) {
 			continue;
 		st.environment = sh.env;
 		st.theme = sh.theme;
-		const bool split = sh.mode == 1 || (sh.mode >= 3 && sh.mode != 6 && sh.mode < 11);
+		const bool split = sh.mode == 1 || (sh.mode >= 3 && sh.mode != 6 && (sh.mode < 11 || sh.mode >= 13));
+		const bool cineShot = sh.mode >= 11 && sh.mode <= 14;
 		// Écran : image entière (4:3), ou vue du donjon seule à la même hauteur.
 		float fullW = 2.4f;
 		Vec3 screenPos = {0, 1.30f, -2.2f};
@@ -1129,7 +1132,21 @@ int main(int argc, char **argv) {
 		in.fullW = fullW;
 		in.roomClamp = isLibraryEnv(sh.env);
 		in.keyboardOpen = sh.mode == 2;
-		in.screenLocked = sh.mode == 11 || sh.mode == 12; // (mode cinéma : pas de poignée)
+		in.screenLocked = cineShot; // (mode cinéma : pas de poignée)
+		// Mode cinéma (comme dans le casque) : l'écran courbe à 1,5 m, 60° de large, la ligne des yeux
+		// des personnages (38 % du haut) à hauteur des yeux ; les fenêtres passent dessous.
+		const float cineR = 1.5f;
+		if (cineShot) {
+			const float w = 2.0f * cineR * tanf(30.0f * 3.14159265f / 180.0f);
+			in.dispH = w * quadH / quadW;
+			in.dispW = w;
+			in.screenPos = seat + Vec3{0, -0.12f * in.dispH, -cineR};
+			in.curveRadius = cineR;
+			in.cinemaOn = split;
+			in.cinemaYaw = 0.0f;
+			const Vec3 b = in.screenPos - Vec3{0, in.dispH * 0.5f, 0} - in.anchorPos;
+			in.cinemaBottom = atan2f(b.y, sqrtf(b.x * b.x + b.z * b.z));
+		}
 		in.aimValid = sh.hands;
 		if (sh.hands) {
 			const HandState &hand = st.hands[1];
@@ -1175,7 +1192,7 @@ int main(int argc, char **argv) {
 			in.characters = 3;
 			in.partyMark[0] = 149; in.partyMark[1] = 143; in.partyMark[2] = 66; in.partyMark[3] = 34;
 			ui.setDungeonOption(1);
-			ui.setHudMode(sh.mode == 8 ? 2 : 0); // (8 : fenêtres séparées ; 9, 10 : le grand bloc, fermé puis ouvert)
+			ui.setHudMode(sh.mode == 8 || sh.mode == 14 ? 2 : 0); // (8 : fenêtres séparées ; 9, 10 : le grand bloc, fermé puis ouvert)
 			ui.setInventoryExpanded(sh.mode == 10);
 		}
 		if (sh.mode == 1) {
@@ -1195,6 +1212,8 @@ int main(int argc, char **argv) {
 		}
 		ui.update(in, uo, st);
 		ui.update(in, uo, st);
+		for (int k = 0; cineShot && k < 8; k++) // (mode cinéma : les fenêtres descendent en une ou deux images)
+			ui.update(in, uo, st);
 		if (sh.mode == 7) {
 			// Le curseur du jeu (un objet tenu) : image détourée, dessinée par-dessus tout. Un disque
 			// rouge sur fond transparent, devant le joueur.
@@ -1223,16 +1242,17 @@ int main(int argc, char **argv) {
 			cp.halfH = 0.10f;
 		}
 		// Mode cinéma (11 plein, 12 à mi-fondu) : l'image entière sur l'écran courbe, sans calque quad.
-		st.cinema = sh.mode == 11 ? 1.0f : sh.mode == 12 ? 0.5f : 0.0f;
+		st.cinema = sh.mode == 12 ? 0.5f : cineShot ? 1.0f : 0.0f;
 		st.screenVisible = st.cinema <= 0.0f;
 		if (st.cinema > 0.0f) {
-			const float R = fabsf(st.screenPos.z - seat.z);
-			st.cinemaPos = st.screenPos;
+			st.cinemaPos = in.screenPos;
 			st.cinemaRot = st.screenRot;
-			st.cinemaRadius = R;
-			st.cinemaHalfAngle = atanf(quadW * 0.5f / R);
-			st.cinemaHalfH = quadH * 0.5f;
-			st.cinemaRect[0] = 0; st.cinemaRect[1] = 0; st.cinemaRect[2] = 1; st.cinemaRect[3] = 1;
+			st.cinemaRadius = cineR;
+			st.cinemaHalfAngle = atanf(in.dispW * 0.5f / cineR);
+			st.cinemaHalfH = in.dispH * 0.5f;
+			st.cinemaRect[0] = rect[0]; st.cinemaRect[1] = rect[1]; st.cinemaRect[2] = rect[0] + rect[2]; st.cinemaRect[3] = rect[1] + rect[3];
+			st.cinemaScreenAlpha = 1.0f;
+			st.cinemaVoid = {0.006f, 0.004f, 0.003f};
 			st.cinemaEdge[0] = {0.30f, 0.12f, 0.04f}; st.cinemaEdge[1] = {0.05f, 0.10f, 0.30f};
 			st.cinemaEdge[2] = {0.20f, 0.20f, 0.20f}; st.cinemaEdge[3] = {0.04f, 0.25f, 0.06f};
 		}

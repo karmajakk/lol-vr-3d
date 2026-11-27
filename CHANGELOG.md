@@ -3,6 +3,19 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.55.0] — Cinema mode, closer and at eye level
+
+- The cinema screen is placed in front of the head when the scene starts (or at recentering),
+  closer (1.5 m) and more curved (60° medium, 72° large, 48° small), with the characters' eyes at
+  eye level. It is centered on the player, whatever the picture's width.
+- The game windows follow it: those beside the picture move aside, those below go down just
+  enough to stay under its bottom edge (nothing overlaps the picture any more; the dialogue
+  buttons, such as "Exit", stay visible). The screen no longer hides a window.
+- The dark room has a faint tint of the scene's colors.
+- The atlas (minimap) is hidden during scenes and shops, and comes back after.
+- After the intro, the game stays dark until the first scene (the guard), without showing the
+  castle first. The curved screen goes dark when there is no scene to show.
+
 ## [0.54.0] — Cinema mode
 
 - Immersive mode: during a scene that shows its own picture (shop, place, character, cutscene),
