@@ -25,12 +25,16 @@ struct DungeonSprite {
 	float width = 1, height = 1;   // mètres
 	float offset = 0;              // décalage latéral de l'image, mètres
 	float base = 0;                // hauteur du pied (objet dans une niche du mur)
+	bool faceParty = false;        // un monstre, un personnage : à plat dans la vue du groupe, comme dans le jeu
 };
 
 class Dungeon {
 public:
 	Dungeon();
 	~Dungeon();
+	// La droite de la vue du groupe (repère du niveau) : les monstres et les personnages y sont à plat.
+	void setPartyRight(float rx, float rz) { partyRx = rx; partyRz = rz; }
+	float partyRx = 1.0f, partyRz = 0.0f;
 
 	// srgbTarget : vrai si l'image de destination est au format sRGB.
 	bool init(bool srgbTarget);

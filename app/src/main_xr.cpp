@@ -450,6 +450,7 @@ struct App {
 	bool chooserPlaced = false;
 	bool screenShown = true;        // le grand écran est affiché
 	double screenNeededAt = 0;
+	double charSceneSince = -1.0; // (une scène d'un personnage devant le donjon : depuis quand)
 	// Mode cinéma (mode immersif) : pendant une scène qui montre sa propre image (boutique, lieu,
 	// personnage, cinématique), le monde s'efface au noir et l'image du jeu passe sur un écran courbe,
 	// sans cadre, avec un halo de ses couleurs. Taille : 0 moyen, 1 grand, 2 petit, 3 sans (l'ancien
@@ -1237,7 +1238,7 @@ void loadSettings(App &app, int &environment) {
 	if (!f)
 		return;
 	char line[256];
-	int screenIndex = 0, aimIndex = 0, loadedPanels = 0;
+	int screenIndex = 0, aimIndex = 0, loadedPanels = 0, cineLoaded = 0;
 	std::string activeProfile;
 	// La disposition (écran, fenêtres) n'est reprise que si elle a été enregistrée avec la disposition
 	// d'origine actuelle (« disposition 2 » : écran plus petit et plus proche, pour le donjon en 3D).
@@ -1361,9 +1362,21 @@ void loadSettings(App &app, int &environment) {
 						app.ui.placement[i] = {a, b, c, scale};
 						loadedPanels |= 1 << i;
 					}
+		} else if (!strcmp(name, "panneau_cinema")) {
+			// (la disposition des fenêtres pendant les scènes, réglée à la main)
+			char key[32] = "";
+			float a = 0, b = 0, c = 0, scale = 0;
+			bool ok = sscanf(rest, "%31s %f %f %f %f", key, &a, &b, &c, &scale) == 5;
+			if (ok && scale >= 0.0004f && scale <= 0.02f && fabsf(a) <= 3.2f && fabsf(b) <= 1.4f && c >= 0.2f && c <= 6.0f)
+				for (int i = 0; i < lolvr::kUiPanelCount; i++)
+					if (!strcmp(key, lolvr::Ui::panelKey(i))) {
+						app.ui.cinePlacement[i] = {a, b, c, scale};
+						cineLoaded |= 1 << i;
+					}
 		}
 	}
 	fclose(f);
+	app.ui.cineCustom = (cineLoaded & ((1 << lolvr::kPanelKeyboard) - 1)) == ((1 << lolvr::kPanelKeyboard) - 1);
 	app.ui.selectProfile(activeProfile);
 	// La disposition n'est reprise que si elle est complète (sinon : disposition d'origine).
 	// (l'atlas, venu plus tard, se place à côté des personnages s'il manque)
@@ -1411,6 +1424,11 @@ void saveSettings(App &app) {
 		for (int i = 0; i < lolvr::kUiPanelCount; i++) {
 			const lolvr::UiPlacement &pl = app.ui.placement[i];
 			fprintf(f, "panneau %s %.4f %.4f %.4f %.5f\n", lolvr::Ui::panelKey(i), pl.a, pl.b, pl.c, pl.scale);
+		}
+	if (app.ui.hasLayout() && app.ui.cineCustom)
+		for (int i = 0; i < lolvr::kUiPanelCount; i++) {
+			const lolvr::UiPlacement &pl = app.ui.cinePlacement[i];
+			fprintf(f, "panneau_cinema %s %.4f %.4f %.4f %.5f\n", lolvr::Ui::panelKey(i), pl.a, pl.b, pl.c, pl.scale);
 		}
 	fclose(f);
 }
@@ -3333,6 +3351,11 @@ void placeFlights(App &app) {
 		app.spriteList[i].x = f.fx + (f.tx - f.fx) * c;
 		app.spriteList[i].z = f.fz + (f.tz - f.fz) * c;
 	}
+	{
+		static const int rdx[4] = {0, 1, 0, -1}, rdz[4] = {-1, 0, 1, 0};
+		const int d = app.level.direction & 3;
+		app.dungeon.setPartyRight((float)-rdz[d], (float)rdx[d]);
+	}
 	app.dungeon.setSprites(app.spriteList);
 }
 
@@ -3473,6 +3496,7 @@ void updateDungeon(App &app, float dt) {
 			d.width = (float)(s.x1 - s.x0) * lolvr::kSpritePixel;
 			d.height = (float)(s.y1 - s.y0) * lolvr::kSpritePixel * 1.2f;
 			d.offset = ((float)(s.x0 + s.x1) * 0.5f - 88.0f) * lolvr::kSpritePixel;
+			d.faceParty = s.kind == 0;
 			// Un objet rangé dans un mur (niche, cachette) : le jeu ne le montre que si ce côté du mur
 			// laisse voir les objets (drapeau 0x80), comme vu depuis la case voisine. On le pose alors
 			// contre le mur, là où il apparaît dans le jeu ; sinon il reste caché.
@@ -3815,7 +3839,17 @@ void updateScreenShown(App &app, double now) {
 	// clique la porte ; elle apparaît aussi.
 	// (une animation d'un script hors conversation, un mur qui s'écroule sous le marteau : la vue du
 	// jeu apparaît le temps qu'elle se joue)
-	const bool scene = (app.level.scenePicture || (app.atHold && app.level.sceneBusy && app.dungeonMode)) && (app.level.sceneBusy || app.cutscene || (app.dungeonMode && app.level.animBusy));
+	bool scene = (app.level.scenePicture || (app.atHold && app.level.sceneBusy && app.dungeonMode)) && (app.level.sceneBusy || app.cutscene || (app.dungeonMode && app.level.animBusy));
+	// Un personnage qui parle devant le donjon : sa fenêtre attend un instant, le temps qu'on le voie
+	// se tourner vers nous dans le donjon, comme dans le jeu.
+	if (scene && app.dungeonMode && app.gameStarted && !app.level.sceneCinema) {
+		if (app.charSceneSince < 0.0)
+			app.charSceneSince = now;
+		if (now - app.charSceneSince < 0.6)
+			scene = false;
+	} else if (!scene) {
+		app.charSceneSince = -1.0;
+	}
 	if (scene)
 		app.screenNeededAt = now;
 	bool show = need || scene || now - app.screenNeededAt < 0.1;

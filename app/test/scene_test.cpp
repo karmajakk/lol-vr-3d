@@ -494,6 +494,45 @@ int main(int argc, char **argv) {
 			for (int i = 0; i < SceneState::kMaxHandles; i++)
 				handles += tmp.handles[i].visible ? 1 : 0;
 			check(handles == 0, "plus de poignées sous les fenêtres");
+			// Mode cinéma : les fenêtres tournent avec l'écran ; on peut les déplacer, et cette disposition
+			// ne vaut que pendant les scènes.
+			{
+				const SceneState::Panel outside = panel(1);
+				in.cinemaOn = true;
+				in.cinemaYaw = 0.3f;
+				in.cinemaBottom = 1.5f; // (rien à faire passer dessous)
+				in.time += 1.0;
+				ui.update(in, o, tmp);
+				ui.update(in, o, tmp);
+				const SceneState::Panel cine = panel(1);
+				check(length(cine.center - outside.center) > 0.05f && !ui.cineCustom, "mode cinéma : les fenêtres tournent avec l'écran");
+				aimAt(cine.center);
+				ui.update(in, o, tmp);
+				in.triggerDown = in.triggerPressed = true;
+				ui.update(in, o, tmp);
+				in.triggerPressed = false;
+				in.time += 0.5;
+				ui.update(in, o, tmp);
+				ui.update(in, o, tmp);
+				aimAt(cine.center + Vec3{0, 0.15f, 0});
+				in.time += 0.05;
+				ui.update(in, o, tmp);
+				ui.update(in, o, tmp);
+				const SceneState::Panel cineMoved = panel(1);
+				in.triggerDown = false;
+				ui.update(in, o, tmp);
+				check(ui.cineCustom && fabsf(cineMoved.center.y - cine.center.y - 0.15f) < 0.05f && fabsf(cineMoved.center.x - cine.center.x) < 0.05f, "mode cinéma : une fenêtre se déplace pendant une scène (là où on la porte)");
+				in.cinemaOn = false;
+				in.time += 1.0;
+				ui.update(in, o, tmp);
+				check(length(panel(1).center - outside.center) < 0.01f, "hors des scènes, les fenêtres reprennent leur place");
+				in.cinemaOn = true;
+				ui.update(in, o, tmp);
+				check(length(panel(1).center - cineMoved.center) < 0.02f, "à la scène suivante, la disposition des scènes revient");
+				in.cinemaOn = false;
+				ui.cineCustom = false;
+				ui.update(in, o, tmp);
+			}
 			// Les onglets sous l'inventaire (comme Lands of Lore 2) : à droite ouvrir / fermer, à gauche trier.
 			{
 				static std::vector<uint8_t> invPix((size_t)176 * 132 * 3, 90);

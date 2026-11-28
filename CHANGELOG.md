@@ -3,6 +3,16 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.63.0] — Windows movable during scenes, characters as in the game
+
+- During a scene (cinema mode), the game windows can be moved and resized like elsewhere. The
+  first one moved starts a separate layout for the scenes, kept and turned with the curved screen;
+  outside the scenes the usual layout stays. "Reset layout" goes back to the automatic one.
+- Monsters and characters are flat in the party's view, as the game draws them, instead of
+  turning toward the player's head: they turn (change picture) as in the game.
+- A character who talks over the dungeon: its window waits 0.6 s, to see it turn toward the
+  party first.
+
 ## [0.62.0] — Smoother pump
 
 - The pump of the mines: its wall shows the game's view only once the game really draws the pump

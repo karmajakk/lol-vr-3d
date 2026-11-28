@@ -483,6 +483,8 @@ struct Ui::Impl {
 	int menuRows() const { return dungeonMode ? 8 : 6; }
 	int cinemaSize = 0;     // 0 moyen, 1 grand, 2 petit, 3 sans
 	float cinePitch = 0.0f;  // mode cinéma : la descente des fenêtres du jeu (radians)
+	float cineOffA[kUiPanelCount] = {0}, cineOffB[kUiPanelCount] = {0}; // (ce qui a été ajouté à chacune)
+	Vec3 shownC[kUiPanelCount]; // (où chaque fenêtre est montrée, la dernière image)
 	bool cinemaIntro = false; // l'intro et les menus d'avant la partie dans le noir aussi
 	// (dessous, sans bouton, les remerciements)
 	int menuH() const { return kMenuRowH * menuRows() + kMenuFootH; }
@@ -1849,6 +1851,7 @@ UiPlacement Ui::defaultHelpPlacement(float yaw) {
 }
 
 void Ui::resetLayout(const UiFrameInput &in) {
+	cineCustom = false; // (la disposition des scènes repart de l'automatique)
 	// Au départ, tout est dans le plan de l'écran, autour de la vue du donjon. Chaque fenêtre est
 	// ensuite indépendante : sa position est notée par rapport au joueur (lacet, tangage, distance),
 	// et plus rien ne la lie à l'écran. Unités de travail : fractions de la largeur de l'image entière.
@@ -1940,7 +1943,35 @@ void Ui::update(const UiFrameInput &in0, UiFrameOutput &out, SceneState &scene) 
 		d->grabDist = d->lastHoldT;
 		d->grabOffset = d->lastHoldOffset;
 	}
+	// Mode cinéma réglé à la main : la disposition des scènes prend la place de l'autre le temps de
+	// l'image (le déplacement, la taille, le grand bloc s'y appliquent tels quels).
+	const bool cineSwap = in.cinemaOn && cineCustom;
+	auto swapCine = [&]() {
+		for (int i = 0; i < kUiPanelCount; i++)
+			std::swap(placement[i], cinePlacement[i]);
+	};
+	if (cineSwap)
+		swapCine();
 	updateFrame(in, out, scene);
+	if (cineSwap)
+		swapCine();
+	// (la première fenêtre du jeu saisie pendant une scène : la disposition des scènes part de ce
+	// qu'on voit)
+	if (in.cinemaOn && !cineCustom && ((d->drag >= 0 && d->drag < kPanelKeyboard) || (d->resize >= 0 && d->resize < kPanelKeyboard))) {
+		// (de là où chacune est montrée : le grand bloc garde des places notées autrement)
+		for (int i = 0; i < kUiPanelCount; i++) {
+			cinePlacement[i] = placement[i];
+			const Vec3 v = d->shownC[i] - in.anchorPos;
+			const float len = length(v);
+			if (i < kPanelKeyboard && len > 0.2f) {
+				cinePlacement[i].c = clampf(len, 0.20f, 6.0f);
+				cinePlacement[i].b = clampf(asinf(clampf(v.y / len, -1.0f, 1.0f)), -1.35f, 1.35f);
+				cinePlacement[i].a = wrapAngle(atan2f(-v.x, -v.z) - in.anchorYaw - in.cinemaYaw);
+			}
+		}
+		cineCustom = true;
+		out.layoutChanged = true;
+	}
 	if (startDrag)
 		out.grabbed = true;
 	if (synth)
@@ -2057,7 +2088,7 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 				Vec3 v = c - in.anchorPos;
 				pl.c = clampf(length(v), 0.20f, 6.0f);
 				pl.b = clampf(asinf(clampf(v.y / pl.c, -1.0f, 1.0f)), -1.35f, 1.35f);
-				pl.a = wrapAngle(atan2f(-v.x, -v.z) - in.anchorYaw);
+				pl.a = wrapAngle(atan2f(-v.x, -v.z) - in.anchorYaw - (in.cinemaOn && cineCustom && d->drag < kPanelKeyboard ? in.cinemaYaw : 0.0f));
 				pl.scale = clampf(pl.scale * expf(in.stickX * 0.9f * in.dt), 0.0004f, 0.02f);
 				// Le grand bloc (sorts, personnages, inventaire, colonne) bouge d'une pièce : on déplace les
 				// personnages d'autant, les autres se reposent autour d'eux.
@@ -2108,7 +2139,9 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 		Quad &q = content[i];
 		const bool cineMoved = in.cinemaOn && i < kPanelKeyboard;
 		float cineA = 0.0f, cineB = 0.0f;
-		if (cineMoved) {
+		if (cineMoved && cineCustom) {
+			cineA = cineYaw; // (réglée à la main : seulement tournée avec l'écran)
+		} else if (cineMoved) {
 			cineA = cineYaw;
 			cineDown[i] = pl.b < cineScreenElev;
 			if (cineDown[i]) {
@@ -2123,6 +2156,8 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 					cineA += (off < 0.0f ? -need : need) - off;
 			}
 		}
+		d->cineOffA[i] = cineA;
+		d->cineOffB[i] = cineB;
 		q.c = in.anchorPos + directionFor(in.anchorYaw + pl.a + cineA, pl.b - cineB) * pl.c;
 		float scale = pl.scale;
 		const int ci = d->compOf(i);
@@ -2206,7 +2241,8 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 		const Vec3 v = content[id].c - in.anchorPos;
 		pl.c = clampf(length(v), 0.20f, 6.0f);
 		pl.b = clampf(asinf(clampf(v.y / pl.c, -1.0f, 1.0f)), -1.35f, 1.35f);
-		pl.a = wrapAngle(atan2f(-v.x, -v.z) - in.anchorYaw);
+		// (disposition des scènes : le lacet est relatif à l'écran courbe)
+		pl.a = wrapAngle(atan2f(-v.x, -v.z) - in.anchorYaw - (in.cinemaOn && cineCustom && id < kPanelKeyboard ? in.cinemaYaw : 0.0f));
 		pl.scale = scale;
 	};
 	if (d->grouped() && visible[kPanelParty]) {
@@ -2315,8 +2351,6 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 			return false;
 		if (i == kHandleScreen)
 			return !in.screenHidden && !in.screenLocked;
-		if (in.cinemaOn && i < kPanelKeyboard)
-			return false;
 		if (d->grouped() && i != kPanelParty && Impl::isBlock(i))
 			return false;
 		return visible[i];
@@ -2437,9 +2471,11 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 		}
 	}
 
+	for (int i = 0; i < kUiPanelCount; i++)
+		d->shownC[i] = content[i].c;
 	// Mode cinéma : le haut des fenêtres du jeu (sans la descente) ; elles descendent juste assez pour
 	// passer sous le bord du bas de l'écran courbe.
-	if (in.cinemaOn) {
+	if (in.cinemaOn && !cineCustom) {
 		float top = -10.0f;
 		for (int i = 0; i < kPanelKeyboard; i++) {
 			if (!visible[i] || (!cineDown[i] && !(d->grouped() && Impl::isBlock(i) && cineDown[kPanelParty])))
@@ -2575,7 +2611,7 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 		{
 			float cornerT = 1e9f, cornerBest = 1e9f;
 			for (int i = 0; i <= kUiPanelCount; i++) {
-				if (i < kUiPanelCount ? !visible[i] || (in.cinemaOn && i < kPanelKeyboard) : (in.screenHidden || in.screenLocked))
+				if (i < kUiPanelCount ? !visible[i] : (in.screenHidden || in.screenLocked))
 					continue;
 				if (frameVis && i != kPanelParty && Impl::isBlock(i))
 					continue; // (les coins du bloc sont ceux de son cadre)
@@ -2704,7 +2740,7 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 	}
 	// Ce qu'une gâchette maintenue déplacerait (voir update).
 	d->lastHoldable = false;
-	if (in.aimValid && d->drag == -1 && d->resize == -1 && ((hitKind == kHitPanel && hitIndex >= 0 && hitIndex < kUiPanelCount && !(in.cinemaOn && hitIndex < kPanelKeyboard)) || (hitKind == kHitScreen && !in.screenHidden && !in.screenLocked))) {
+	if (in.aimValid && d->drag == -1 && d->resize == -1 && ((hitKind == kHitPanel && hitIndex >= 0 && hitIndex < kUiPanelCount) || (hitKind == kHitScreen && !in.screenHidden && !in.screenLocked))) {
 		const Vec3 p = in.tip + in.dir * bestT;
 		d->lastHoldable = true;
 		d->lastHoldTarget = hitKind == kHitScreen ? Impl::kScreenTarget : hitIndex;

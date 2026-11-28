@@ -267,8 +267,14 @@ void Dungeon::render(const Mat4 &viewProj, const Mat4 &model, Vec3 eye, float li
 			float tl = sqrtf(tx * tx + tz * tz);
 			if (tl < 1e-3f)
 				continue;
-			// Droite de l'image, vue de l'œil : perpendiculaire au regard, à l'horizontale.
+			// Droite de l'image, vue de l'œil : perpendiculaire au regard, à l'horizontale. Un monstre ou un
+			// personnage reste à plat dans la vue du groupe, comme le jeu le dessine : il ne pivote pas
+			// vers nous, il se tourne (change d'image) comme dans le jeu.
 			float rx = tz / tl, rz = -tx / tl;
+			if (s.faceParty) {
+				rx = partyRx;
+				rz = partyRz;
+			}
 			float cx = s.x + rx * s.offset, cz = s.z + rz * s.offset;
 			float hw = s.width * 0.5f;
 			float y0 = s.ceiling ? kWallHeight - s.height : s.base, y1 = y0 + s.height;

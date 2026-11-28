@@ -297,6 +297,11 @@ private:
 public:
 
 	UiPlacement placement[kUiPanelCount];
+	// Mode cinéma : la disposition des fenêtres du jeu pendant les scènes, réglée à la main (à la
+	// première fenêtre déplacée ; le lacet est relatif à l'écran courbe). Sans elle, elles suivent
+	// l'écran et passent dessous d'elles-mêmes.
+	UiPlacement cinePlacement[kUiPanelCount];
+	bool cineCustom = false;
 	static UiPlacement defaultHelpPlacement(float yaw);
 	static const char *panelKey(int id);
 
