@@ -107,6 +107,11 @@ struct SceneState {
 	float cinemaHalfH = 0.5f;        // demi-hauteur, en mètres
 	float cinemaRect[4] = {0, 0, 1, 1}; // portion de l'image du jeu (u0, v0, u1, v1)
 	Vec3 cinemaEdge[4] = {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}}; // couleurs des bords (gauche, droite, haut, bas ; linéaires)
+	unsigned int cinemaTexture = 0;  // l'image de l'écran courbe (0 : celle du jeu)
+	// La zone de texte du jeu (et ses boutons de réponse), collée sous l'image sur l'écran courbe :
+	// la part de la hauteur qu'elle prend (0 : aucune), et ce qu'elle montre (u0, v0, u1, v1).
+	float cinemaBandFrac = 0.0f;
+	float cinemaBandRect[4] = {0, 0, 1, 1};
 	float cinemaScreenAlpha = 1.0f;  // l'écran et son halo (éteints quand rien n'est à montrer)
 	Vec3 cinemaVoid = {0, 0, 0};     // la teinte du fond (linéaire), presque noire
 };

@@ -191,7 +191,7 @@ int main(int argc, char **argv) {
 				host.gameState(gs);
 				host.levelSnapshot(w);
 				char line[256];
-				snprintf(line, sizeof line, "niveau %d mode %d scène %d image %d texte %08x rect %08x case %d dir %d", gs.level, gs.controlMode, w.sceneBusy, (int)w.scenePicture, w.textRect, w.sceneRect, w.block, w.direction);
+				snprintf(line, sizeof line, "niveau %d mode %d scène %d image %d texte %08x rect %08x case %d dir %d", gs.level, gs.controlMode, w.sceneBusy, (int)w.scenePicture + (int)w.sceneCinema, w.textRect, w.sceneRect, w.block, w.direction);
 				if (last != line) {
 					last = line;
 					printf("  %5d ms : %s\n", i * 10, line);

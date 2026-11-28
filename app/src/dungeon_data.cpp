@@ -27,6 +27,92 @@ struct Rgba {
 	uint8_t r, g, b, a;
 };
 
+// Un escalier qui descend (la mine) : le jeu le dessine comme un passage qui finit sur un trou
+// noir, et son plafond est noir aussi. Sur un mur en 3D, on ne voyait pas que c'était un escalier :
+// des marches qui s'enfoncent dans le trou (de plus en plus sombres et étroites), et un plafond de
+// planches sombres.
+void drawStairsDown(Rgba *img, const uint8_t *al) {
+	const int N = kDunTexSize, R = kDunWallRows;
+	auto dark = [&](int x, int y) {
+		const Rgba &c = img[y * N + x];
+		return al[y * N + x] && c.r + c.g + c.b < 30;
+	};
+	// le trou : une colonne noire au milieu, dans le bas du mur
+	int yb1 = -1, yb0 = -1;
+	for (int y = R - 4; y > R / 3; y--) {
+		if (dark(N / 2, y)) {
+			if (yb1 < 0)
+				yb1 = y;
+			yb0 = y;
+		} else if (yb1 >= 0) {
+			break;
+		}
+	}
+	if (yb1 < 0 || yb1 - yb0 < 12 || yb1 < R / 2)
+		return;
+	const int ym = (yb0 + yb1) / 2;
+	int xb0 = N / 2, xb1 = N / 2;
+	while (xb0 > 0 && dark(xb0 - 1, ym))
+		xb0--;
+	while (xb1 < N - 1 && dark(xb1 + 1, ym))
+		xb1++;
+	const int W = xb1 - xb0 + 1, H = yb1 - yb0 + 1;
+	if (W < 16 || W > N * 6 / 10)
+		return;
+	int blackCount = 0;
+	for (int y = yb0; y <= yb1; y++)
+		for (int x = xb0; x <= xb1; x++)
+			blackCount += dark(x, y) ? 1 : 0;
+	if (blackCount * 10 < W * H * 9)
+		return;
+	// la couleur du bois (ce qui n'est pas noir, au-dessus du trou)
+	float acc[3] = {0, 0, 0};
+	int cnt = 0;
+	for (int y = R / 4; y < yb0; y++)
+		for (int x = 0; x < N; x++)
+			if (al[y * N + x] && !dark(x, y)) {
+				const Rgba &c = img[y * N + x];
+				acc[0] += c.r; acc[1] += c.g; acc[2] += c.b;
+				cnt++;
+			}
+	if (cnt < 50)
+		return;
+	const float wood[3] = {acc[0] / cnt, acc[1] / cnt, acc[2] / cnt};
+	auto paint = [&](int x, int y, float k) {
+		auto ch = [&](float v) { v *= k; return (uint8_t)(v < 0 ? 0 : v > 255 ? 255 : v); };
+		img[y * N + x] = Rgba{ch(wood[0]), ch(wood[1]), ch(wood[2]), 255};
+	};
+	// Le plafond de la cage d'escalier, qui descend vers le fond (des poutres de plus en plus basses,
+	// étroites et sombres) ; dessous, les marches vues d'en haut : leurs dessus clairs, séparés d'un
+	// trait sombre (la chute), de plus en plus étroits et sombres en s'éloignant dans le noir.
+	int y = yb0;
+	for (int k = 0; k < 4 && y < yb0 + H * 4 / 10; k++) {
+		const float f = powf(0.65f, (float)k);
+		const int beam = std::max(1, (int)lroundf((float)H * 0.08f * f)), gap = std::max(1, (int)lroundf((float)H * 0.06f * f));
+		const int inset = (int)lroundf((float)W * 0.07f * (float)k);
+		for (int r = 0; r < beam && y <= yb1; r++, y++)
+			for (int x = xb0 + inset; x <= xb1 - inset; x++)
+				paint(x, y, (0.50f - 0.2f * (float)r / (float)beam) * f);
+		y += gap;
+	}
+	const int stairTop = y + 2;
+	y = yb1;
+	for (int k = 0; k < 6 && y > stairTop; k++) {
+		const float f = powf(0.78f, (float)k);
+		const int tread = std::max(2, (int)lroundf((float)H * 0.15f * f));
+		const int inset = (int)lroundf((float)W * 0.06f * (float)k);
+		for (int r = 0; r < tread && y > stairTop; r++, y--)
+			for (int x = xb0 + inset; x <= xb1 - inset; x++)
+				paint(x, y, (1.45f - 0.45f * (float)r / (float)tread) * f * (((x * 7 + y * 3) % 5) == 0 ? 0.85f : 1.0f));
+		y -= 1; // (le trait sombre : la marche suivante est plus bas)
+	}
+	// le plafond noir du passage : des planches sombres
+	for (int y2 = 0; y2 < yb0 && y2 < R / 2; y2++)
+		for (int x = 0; x < N; x++)
+			if (dark(x, y2) || !al[y2 * N + x])
+				paint(x, y2, (y2 % 6 == 0 ? 0.22f : 0.40f) * (0.8f + 0.2f * (float)y2 / (float)(R / 2)));
+}
+
 uint8_t vga(uint8_t v) {
 	v &= 63;
 	return (uint8_t)((v << 2) | (v >> 4));
@@ -606,6 +692,8 @@ void decodeDungeonTextures(const DungeonGfx &g, DungeonTextures &out) {
 			for (int i = 0; i < n; i++)
 				if (al[i])
 					img[i] = rgb(px[i]);
+			if (g.vmpMap[t] && out.kind[t] != kWallObject)
+				drawStairsDown(img, al);
 			// Un « objet » qui est un grand décor (la sortie d'une grotte, vue de l'intérieur) : une seule
 			// image, agrandie à tout le mur, dressée au fond de la case (voir le maillage) ; deux images
 			// croisées au milieu de la case la coupaient en deux.

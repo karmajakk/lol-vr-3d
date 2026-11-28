@@ -3,6 +3,23 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.59.0] — Choices under the scene, frozen fade-out, mine stairs
+
+- Cinema mode: the game's text box, with the answers to choose (pay, attack, leave...), is shown
+  right under the picture on the curved screen; it was only in the windows below.
+- The game's arrow cursor is hidden on the cinema screen (the pointer is enough); a held item
+  still shows.
+- When a scene ends, the curved screen fades out on its last picture instead of switching to the
+  dungeon view behind it (leaving the inn).
+- A scene that leads elsewhere (the mine entrance from Upper Opinwood): it stays dark until the
+  new place is ready, then a single fade shows it.
+- The glow no longer spills under the cinema screen (over the windows) and is softer.
+- The defeat window: its dark bands are trimmed even when the screen behind it is dimmed or
+  dithered.
+- Place pictures are learnt only from the wall the party faces or crosses, and only for a wall
+  type found on a few faces of the level (the Clerk's office picture showed on empty walls).
+- Mine stairs going down: steps in the dark opening and a plank ceiling instead of black.
+
 ## [0.58.0] — Cinema for places only, softer glow, dimmed Exit
 
 - The cinema mode is for places, shops and sequences only: a character who talks over the

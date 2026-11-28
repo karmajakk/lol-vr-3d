@@ -1252,6 +1252,9 @@ int main(int argc, char **argv) {
 			st.cinemaHalfH = in.dispH * 0.5f;
 			st.cinemaRect[0] = rect[0]; st.cinemaRect[1] = rect[1]; st.cinemaRect[2] = rect[0] + rect[2]; st.cinemaRect[3] = rect[1] + rect[3];
 			st.cinemaScreenAlpha = 1.0f;
+			// (avec une cinématique de boutique : la zone de texte et ses réponses collée dessous)
+			st.cinemaBandFrac = sh.mode == 13 ? 0.28f : 0.0f;
+			st.cinemaBandRect[0] = 0.0f; st.cinemaBandRect[1] = 126.0f / 200.0f; st.cinemaBandRect[2] = 1.0f; st.cinemaBandRect[3] = 1.0f;
 			st.cinemaVoid = {0.006f, 0.004f, 0.003f};
 			st.cinemaEdge[0] = {0.30f, 0.12f, 0.04f}; st.cinemaEdge[1] = {0.05f, 0.10f, 0.30f};
 			st.cinemaEdge[2] = {0.20f, 0.20f, 0.20f}; st.cinemaEdge[3] = {0.04f, 0.25f, 0.06f};

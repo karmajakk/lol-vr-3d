@@ -469,6 +469,15 @@ struct App {
 	// Réglés à la main (poignée, coins, joystick) et gardés : la taille (facteur), la hauteur (en plus
 	// de la ligne des yeux). La distance est cinemaR.
 	float cinemaZoom = 1.0f, cinemaLift = 0.0f;
+	// L'image de l'écran courbe, sa place et sa taille : figées dès que la scène se termine, pour
+	// que l'écran s'éteigne sur elle (et non sur la vue du donjon qui revient derrière).
+	bool cinemaLive = false;
+	GLuint cinemaTex = 0;
+	int cinemaTexW = 0, cinemaTexH = 0;
+	Vec3 cineShowPos = {0, 0, 0};
+	Quat cineShowRot = {0, 0, 0, 1};
+	float cineShowHalfA = 0.0f, cineShowHalfH = 0.0f, cineShowRect[4] = {0, 0, 1, 1};
+	float cineShowBandFrac = 0.0f, cineShowBand[4] = {0, 0, 1, 1};
 	Vec3 cinemaEdge[4] = {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
 	float dunYaw = 0;               // lacet (monde) vers lequel le groupe regarde
 	bool dunYawSet = false;
@@ -508,6 +517,7 @@ struct App {
 	uint64_t builtTexHash = 0;
 	double gfxWaitSince = 0;
 	float levelFadeIn = 1.0f;       // fondu d'arrivée d'un nouveau décor (0 noir, 1 fini)
+	float gfxWaitAt = -10.0f;       // la dernière image où le nouveau décor était attendu
 	float partyX = 0, partyZ = 0, partyYaw = 0; // position affichée du groupe (glisse vers la vraie)
 	SceneState ss;
 	bool sceneOk = false;
@@ -692,6 +702,13 @@ float &screenDistance(App &app) { return app.distances[app.environment]; }
 // l'écran est sous les yeux de cette fraction de sa hauteur (la ligne des yeux des personnages,
 // vers le quart du haut de l'image, à hauteur des yeux).
 const float kCinemaEyeLine = 0.24f;
+
+// Le centre de l'écran courbe par rapport aux yeux (en hauteur) : la ligne des yeux de l'image à
+// hauteur des yeux, la zone de texte éventuelle dessous.
+float cinemaEyeOffset(const App &app) {
+	const float pic = app.cropH + app.bandH > 0.0f ? app.dispH * app.cropH / (app.cropH + app.bandH) : app.dispH;
+	return (0.5f - kCinemaEyeLine) * pic - 0.5f * app.dispH;
+}
 bool cinemaPlaced(const App &app) { return app.cinemaWanted || app.cinema > 0.0f; }
 
 Quat screenRot(const App &app) { return quatYaw(cinemaPlaced(app) ? app.cinemaYaw : app.screenYaw); }
@@ -1965,13 +1982,15 @@ void updateLayout(App &app, double now) {
 					const int fw = app.frame.width, fh = app.frame.height;
 					if (fw < 320 || fh < 200 || app.frame.rgba.size() < (size_t)fw * fh * 4 || y < 0 || y >= 200)
 						return false;
+					// (sombre : peu de pixels clairs ; l'écran derrière la boîte est noir, assombri ou
+					// tramé, alors que la boîte est claire presque partout)
 					const uint8_t *row = app.frame.rgba.data() + (size_t)(y * fh / 200) * fw * 4;
-					for (int x = (int)mx; x < (int)(mx + mw); x += 2) {
+					int n = 0, bright = 0;
+					for (int x = (int)mx; x < (int)(mx + mw); x++, n++) {
 						const uint8_t *q = row + (size_t)(x * fw / 320) * 4;
-						if (q[0] + q[1] + q[2] > 60) // (noir, ou presque : l'écran assombri derrière la boîte)
-							return false;
+						bright += q[0] + q[1] + q[2] > 150 ? 1 : 0;
 					}
-					return true;
+					return n > 0 && bright * 10 < n;
 				};
 				const float mh0 = mh;
 				while (mh > 16.0f && mh > mh0 * 0.3f && rowBlack((int)my)) {
@@ -1985,12 +2004,12 @@ void updateLayout(App &app, double now) {
 					const int fw = app.frame.width, fh = app.frame.height;
 					if (fw < 320 || fh < 200 || app.frame.rgba.size() < (size_t)fw * fh * 4 || x < 0 || x >= 320)
 						return false;
-					for (int y = (int)my; y < (int)(my + mh); y += 2) {
+					int n = 0, bright = 0;
+					for (int y = (int)my; y < (int)(my + mh); y++, n++) {
 						const uint8_t *q = app.frame.rgba.data() + ((size_t)(y * fh / 200) * fw + (size_t)(x * fw / 320)) * 4;
-						if (q[0] + q[1] + q[2] > 60) // (noir, ou presque : l'écran assombri derrière la boîte)
-							return false;
+						bright += q[0] + q[1] + q[2] > 150 ? 1 : 0;
 					}
-					return true;
+					return n > 0 && bright * 10 < n;
 				};
 				const float mw0 = mw;
 				while (mw > 16.0f && mw > mw0 * 0.3f && colBlack((int)mx)) {
@@ -2030,6 +2049,10 @@ void updateLayout(App &app, double now) {
 		}
 		app.bandShown = band;
 		app.bandH = 0.0f;
+		// Mode cinéma : la zone de texte (les réponses à choisir : payer, partir…) collée sous l'image,
+		// sur l'écran courbe, à sa largeur ; sinon on ne voyait pas qu'il fallait choisir.
+		if (cinemaSized && box && !app.menuAlone)
+			app.bandH = app.bandRect[3] * cw / app.bandRect[2];
 		const float viewOnlyH = w * lolvr::kSplitViewHeight;
 		app.dispH = viewOnlyH * (ch + app.bandH) / kViewH;
 		app.dispW = viewOnlyH * cw / (kViewH * 1.2f);
@@ -2052,7 +2075,7 @@ void updateLayout(App &app, double now) {
 		const float want = 2.0f * cinemaRadius(app) * tanf(a * 0.5f) * app.cinemaZoom;
 		app.cinemaW = clampf(w * want / app.dispW, 0.2f, 12.0f);
 		const Vec3 f{-sinf(app.cinemaYaw), 0.0f, -cosf(app.cinemaYaw)};
-		app.cinemaCenter = Vec3{app.cinemaHead.x, app.cinemaHead.y - kCinemaEyeLine * app.dispH + app.cinemaLift, app.cinemaHead.z} + f * cinemaRadius(app);
+		app.cinemaCenter = Vec3{app.cinemaHead.x, app.cinemaHead.y + cinemaEyeOffset(app) + app.cinemaLift, app.cinemaHead.z} + f * cinemaRadius(app);
 	} else {
 		app.cinemaW = 0.0f;
 	}
@@ -2518,7 +2541,7 @@ void updateUi(App &app, XrTime time, float dt, double now, bool pointer, bool tr
 			if (hd > 0.1f) {
 				app.cinemaYaw = atan2f(-v.x, -v.z);
 				app.cinemaR = clampf(hd, 0.6f, 4.0f);
-				app.cinemaLift = clampf(out.screenCenter.y - (app.cinemaHead.y - kCinemaEyeLine * app.dispH), -1.5f, 1.5f);
+				app.cinemaLift = clampf(out.screenCenter.y - (app.cinemaHead.y + cinemaEyeOffset(app)), -1.5f, 1.5f);
 			}
 			app.cinemaZoom = clampf(app.cinemaZoom * out.screenZoom, 0.4f, 2.5f);
 			app.settingsDirty = true;
@@ -2816,7 +2839,9 @@ void updateInput(App &app, XrTime time, float dt, double now) {
 	{
 		const bool own = app.level.cursorW > 0 && app.level.cursorRgba.size() >= (size_t)app.level.cursorW * app.level.cursorH * 4;
 		CoreHost::get().setOwnCursor(own);
-		if (own && ui.pointerValid && ui.hitPixel > 0.0f && CoreHost::get().cursorShown())
+		// (mode cinéma : pas de flèche sur la scène, le pointeur suffit ; un objet tenu reste montré)
+		const bool cinemaArrow = cinemaPlaced(app) && !app.level.itemInHand;
+		if (own && ui.pointerValid && ui.hitPixel > 0.0f && CoreHost::get().cursorShown() && !cinemaArrow)
 			drawGameCursor(app, ui.hit, ui.hitRight, ui.hitUp, ui.hitPixel);
 	}
 	// Un objet posé visé (sur la case du groupe ou celle devant), la main vide : le jeu le met dans la
@@ -3114,6 +3139,25 @@ void uploadFrame(App &app) {
 		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, app.srcTexW, app.srcTexH, GL_RGBA, GL_UNSIGNED_BYTE, app.frame.rgba.data());
 	}
 	glBindTexture(GL_TEXTURE_2D, 0);
+	// Mode cinéma : la copie de l'image pour l'écran courbe, tant que la scène dure.
+	const bool cineNow = app.cinemaLive && (!app.gameStarted || (app.level.sceneCinema && app.level.scenePicture && (app.level.sceneBusy || app.cutscene)));
+	if (cineNow) {
+		if (!app.cinemaTex)
+			glGenTextures(1, &app.cinemaTex);
+		glBindTexture(GL_TEXTURE_2D, app.cinemaTex);
+		if (app.cinemaTexW != app.frame.width || app.cinemaTexH != app.frame.height) {
+			app.cinemaTexW = app.frame.width;
+			app.cinemaTexH = app.frame.height;
+			glTexImage2D(GL_TEXTURE_2D, 0, app.srgb ? GL_SRGB8_ALPHA8 : GL_RGBA8, app.cinemaTexW, app.cinemaTexH, 0, GL_RGBA, GL_UNSIGNED_BYTE, app.frame.rgba.data());
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		} else {
+			glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, app.cinemaTexW, app.cinemaTexH, GL_RGBA, GL_UNSIGNED_BYTE, app.frame.rgba.data());
+		}
+		glBindTexture(GL_TEXTURE_2D, 0);
+	}
 
 	// Couleur moyenne de l'image : l'écran éclaire doucement les gants et la pièce.
 	const uint8_t *px = app.frame.rgba.data();
@@ -3131,7 +3175,7 @@ void uploadFrame(App &app) {
 	}
 	// Mode cinéma : la couleur de chaque bord de la partie montrée (une bande de 6 pixels), pour le
 	// halo autour de l'écran courbe. Lissée, pour qu'il ne papillote pas.
-	if (app.cinema > 0.0f || app.cinemaWanted) {
+	if (cineNow) {
 		const int W = app.frame.width, Hh = app.frame.height;
 		const float sx = (float)W / 320.0f, sy = (float)Hh / 200.0f;
 		const int x0 = (int)(app.cropX * sx), y0 = (int)(app.cropY * sy);
@@ -3352,6 +3396,7 @@ void updateDungeon(App &app, float dt) {
 		if (app.clock - app.gfxWaitSince < 1.0) {
 			app.dungeonLight = 0.0f;
 			app.levelFadeIn = 0.0f;
+			app.gfxWaitAt = app.clock;
 			app.dungeonVisible = app.dungeon.hasContent(); // (l'ancien décor, éteint)
 			return;
 		}
@@ -3745,6 +3790,14 @@ void updateScreenShown(App &app, double now) {
 	if (app.gameStarted && !app.prevGameStarted && cinemaOk)
 		app.cinemaSeenAt = now + 2.75;
 	app.prevGameStarted = app.gameStarted;
+	// Une scène du mode cinéma qui mène ailleurs (l'entrée de la mine) : on reste dans le noir le
+	// temps que le nouveau décor arrive, puis un seul fondu (celui du mode cinéma) le montre.
+	if (cinemaOk && app.cinema > 0.0f && app.levelFadeIn < 1.0f) {
+		if (app.clock - app.gfxWaitAt < 0.05)
+			app.cinemaSeenAt = fmax(app.cinemaSeenAt, now - 0.1);
+		else
+			app.levelFadeIn = 1.0f;
+	}
 	app.cinemaWanted = cinemaOk && (now - app.cinemaSeenAt < 0.25 || beforeGame);
 	{
 		const float dt = (float)clampf((float)(now - app.cinemaTime), 0.0f, 0.1f);
@@ -3752,6 +3805,7 @@ void updateScreenShown(App &app, double now) {
 		app.cinema = clampf(app.cinema + (app.cinemaWanted ? dt : -dt) / 0.4f, 0.0f, 1.0f);
 		// L'écran lui-même : seulement quand il y a une scène (ou l'avant-partie) à montrer.
 		const bool picture = cinemaOk && ((cinemaScene && app.gameStarted) || beforeGame);
+		app.cinemaLive = picture;
 		app.cinemaScreen = clampf(app.cinemaScreen + (picture ? dt : -dt) / 0.4f, 0.0f, 1.0f);
 	}
 	// Sa place : devant la tête, au début (ou au recentrage).
@@ -3803,15 +3857,33 @@ void fillSceneState(App &app, double now, bool focused) {
 	s.cinema = app.cinema * app.cinema * (3.0f - 2.0f * app.cinema);
 	s.cinemaScreenAlpha = app.cinemaScreen * app.cinemaScreen * (3.0f - 2.0f * app.cinemaScreen);
 	if (app.cinema > 0.0f) {
-		s.cinemaPos = viewCenter(app);
-		s.cinemaRot = screenRot(app);
+		// (pendant la scène, la place et la taille suivent ; après, elles restent figées)
+		if (app.cinemaLive || app.cineShowHalfH <= 0.0f) {
+			app.cineShowPos = viewCenter(app);
+			app.cineShowRot = screenRot(app);
+			app.cineShowHalfA = atanf(app.dispW * 0.5f / cinemaRadius(app));
+			app.cineShowHalfH = app.dispH * 0.5f;
+			app.cineShowRect[0] = app.cropX / 320.0f;
+			app.cineShowRect[1] = app.cropY / 200.0f;
+			app.cineShowRect[2] = (app.cropX + app.cropW) / 320.0f;
+			app.cineShowRect[3] = (app.cropY + app.cropH) / 200.0f;
+			app.cineShowBandFrac = app.bandH > 0.0f ? app.bandH / (app.cropH + app.bandH) : 0.0f;
+			app.cineShowBand[0] = app.bandRect[0] / 320.0f;
+			app.cineShowBand[1] = app.bandRect[1] / 200.0f;
+			app.cineShowBand[2] = (app.bandRect[0] + app.bandRect[2]) / 320.0f;
+			app.cineShowBand[3] = (app.bandRect[1] + app.bandRect[3]) / 200.0f;
+		}
+		s.cinemaBandFrac = app.cineShowBandFrac;
+		for (int k = 0; k < 4; k++)
+			s.cinemaBandRect[k] = app.cineShowBand[k];
+		s.cinemaPos = app.cineShowPos;
+		s.cinemaRot = app.cineShowRot;
 		s.cinemaRadius = cinemaRadius(app);
-		s.cinemaHalfAngle = atanf(app.dispW * 0.5f / s.cinemaRadius);
-		s.cinemaHalfH = app.dispH * 0.5f;
-		s.cinemaRect[0] = app.cropX / 320.0f;
-		s.cinemaRect[1] = app.cropY / 200.0f;
-		s.cinemaRect[2] = (app.cropX + app.cropW) / 320.0f;
-		s.cinemaRect[3] = (app.cropY + app.cropH) / 200.0f;
+		s.cinemaHalfAngle = app.cineShowHalfA;
+		s.cinemaHalfH = app.cineShowHalfH;
+		for (int k = 0; k < 4; k++)
+			s.cinemaRect[k] = app.cineShowRect[k];
+		s.cinemaTexture = app.cinemaTex;
 		Vec3 mean{0, 0, 0};
 		for (int k = 0; k < 4; k++) {
 			s.cinemaEdge[k] = app.cinemaEdge[k];

@@ -392,7 +392,9 @@ void main() {
 	vec3 cy = vP.y > 0.0 ? uEdge[2] : uEdge[3];
 	float wx = dx + 1e-4, wy = dy + 1e-4;
 	vec3 c = (cx * wx + cy * wy) / (wx + wy);
-	c *= f * 0.22 * uAlpha;
+	// (rien sous l'écran : les fenêtres du jeu y sont, la lueur y débordait)
+	if (vP.y < -1.0) f = 0.0;
+	c *= f * 0.12 * uAlpha;
 #ifdef MANUAL_SRGB
 	c = pow(c, vec3(1.0 / 2.2));
 #endif
@@ -531,7 +533,8 @@ struct Scene::Impl {
 		GLint viewProj, half, reach, alpha, edge;
 	} halo;
 	// Mode cinéma : l'écran courbe et son halo (reconstruits quand l'écran bouge), le voile noir.
-	GlMesh cinemaMesh, haloMesh, fullMesh;
+	GlMesh cinemaMesh, cinemaBandMesh, haloMesh, fullMesh;
+	float cinemaBandKey[4] = {0};
 	float cinemaKey[12] = {0};
 	bool manualSrgb = false;
 	struct {
@@ -778,6 +781,7 @@ bool Scene::init(bool srgbTarget) {
 	setupLitMesh(d->dynMesh);
 	setupLitMesh(d->panelMesh);
 	setupLitMesh(d->cinemaMesh);
+	setupLitMesh(d->cinemaBandMesh);
 	setupLitMesh(d->haloMesh);
 	setupFxMesh(d->fxMesh);
 
@@ -1092,8 +1096,10 @@ void Scene::prepare(const SceneState &s) {
 	// tout autour, sur le même cylindre. Reconstruits seulement quand l'écran bouge.
 	if (s.cinema > 0.0f) {
 		const float key[12] = {s.cinemaPos.x, s.cinemaPos.y, s.cinemaPos.z, s.cinemaRot.x, s.cinemaRot.y, s.cinemaRot.z, s.cinemaRot.w,
-		                       s.cinemaRadius, s.cinemaHalfAngle, s.cinemaHalfH, s.cinemaRect[0] + s.cinemaRect[2] * 3.0f, s.cinemaRect[1] + s.cinemaRect[3] * 3.0f};
-		if (memcmp(key, d->cinemaKey, sizeof(key)) != 0) {
+		                       s.cinemaRadius, s.cinemaHalfAngle, s.cinemaHalfH, s.cinemaRect[0] + s.cinemaRect[2] * 3.0f, s.cinemaRect[1] + s.cinemaRect[3] * 3.0f + s.cinemaBandFrac * 7.0f};
+		const float bandKey[4] = {s.cinemaBandRect[0], s.cinemaBandRect[1], s.cinemaBandRect[2], s.cinemaBandRect[3]};
+		if (memcmp(key, d->cinemaKey, sizeof(key)) != 0 || memcmp(bandKey, d->cinemaBandKey, sizeof(bandKey)) != 0) {
+			memcpy(d->cinemaBandKey, bandKey, sizeof(bandKey));
 			memcpy(d->cinemaKey, key, sizeof(key));
 			const Mat4 m = poseMatrix(s.cinemaPos, s.cinemaRot);
 			const float R = s.cinemaRadius, A = s.cinemaHalfAngle, H = s.cinemaHalfH;
@@ -1104,6 +1110,8 @@ void Scene::prepare(const SceneState &s) {
 				vx.uvl[0] = u; vx.uvl[1] = v;
 				out.push_back(vx);
 			};
+			const float *rc = s.cinemaRect;
+			float yTop = H, yBot = -H; // (la partie de l'écran que couvre rc)
 			auto grid = [&](std::vector<Vertex> &out, int nx, int ny, float a0, float a1, float y0, float y1, bool screen) {
 				for (int j = 0; j < ny; j++)
 					for (int i = 0; i < nx; i++) {
@@ -1114,16 +1122,25 @@ void Scene::prepare(const SceneState &s) {
 							const float a = aa[o[0]], y = yy[o[1]];
 							if (screen) {
 								// (u, v) dans l'image du jeu : v vers le bas
-								const float fu = (a / A + 1.0f) * 0.5f, fv = (1.0f - y / H) * 0.5f;
-								vert(out, a, y, s.cinemaRect[0] + (s.cinemaRect[2] - s.cinemaRect[0]) * fu, s.cinemaRect[1] + (s.cinemaRect[3] - s.cinemaRect[1]) * fv);
+								const float fu = (a / A + 1.0f) * 0.5f, fv = (yTop - y) / (yTop - yBot);
+								vert(out, a, y, rc[0] + (rc[2] - rc[0]) * fu, rc[1] + (rc[3] - rc[1]) * fv);
 							} else {
 								vert(out, a, y, a / A, y / H);
 							}
 						}
 					}
 			};
-			std::vector<Vertex> scr, halo;
-			grid(scr, 48, 24, -A, A, -H, H, true);
+			std::vector<Vertex> scr, band, halo;
+			const float bf = s.cinemaBandFrac > 0.0f && s.cinemaBandFrac < 0.8f ? s.cinemaBandFrac : 0.0f;
+			const float yb = H - 2.0f * H * (1.0f - bf); // (le haut de la zone de texte)
+			yTop = H; yBot = yb;
+			grid(scr, 48, 24, -A, A, yb, H, true);
+			if (bf > 0.0f) {
+				rc = s.cinemaBandRect;
+				yTop = yb; yBot = -H;
+				grid(band, 48, 6, -A, A, -H, yb, true);
+			}
+			uploadLitMesh(d->cinemaBandMesh, band, GL_DYNAMIC_DRAW);
 			const float reach = 0.10f * R * A + 0.05f * H; // (à l'échelle de l'écran)
 			const float ma = reach / R;
 			grid(halo, 40, 12, -A - ma, A + ma, -H - reach, H + reach, false);
@@ -1252,7 +1269,8 @@ void Scene::render(const Mat4 &view, const Mat4 &proj, const SceneState &s) {
 
 	// --- Mode cinéma : le halo, puis l'écran courbe (il apparaît pendant que le monde s'éteint) ---
 	const float cineScreen = cine * clampf(s.cinemaScreenAlpha, 0.0f, 1.0f);
-	if (cineScreen > 0.0f && s.gameTexture && d->cinemaMesh.count > 0) {
+	const GLuint cineTex = s.cinemaTexture ? (GLuint)s.cinemaTexture : (GLuint)s.gameTexture;
+	if (cineScreen > 0.0f && cineTex && d->cinemaMesh.count > 0) {
 		glEnable(GL_BLEND);
 		glDisable(GL_CULL_FACE);
 		glDepthMask(GL_FALSE);
@@ -1274,7 +1292,7 @@ void Scene::render(const Mat4 &view, const Mat4 &proj, const SceneState &s) {
 		glUniformMatrix4fv(d->panel.viewProj, 1, GL_FALSE, viewProj.m);
 		glUniform1i(d->panel.game, 0);
 		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, s.gameTexture);
+		glBindTexture(GL_TEXTURE_2D, cineTex);
 		glUniform2f(d->panel.gameSize, (float)s.gameWidth, (float)s.gameHeight);
 		glUniform4f(d->panel.rect, s.cinemaRect[0], s.cinemaRect[1], s.cinemaRect[2], s.cinemaRect[3]);
 		glUniform2f(d->panel.border, 0.001f, 0.001f);
@@ -1285,6 +1303,11 @@ void Scene::render(const Mat4 &view, const Mat4 &proj, const SceneState &s) {
 		glBlendFuncSeparate(GL_ONE, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 		glBindVertexArray(d->cinemaMesh.vao);
 		glDrawArrays(GL_TRIANGLES, 0, d->cinemaMesh.count);
+		if (d->cinemaBandMesh.count > 0) {
+			glUniform4f(d->panel.rect, s.cinemaBandRect[0], s.cinemaBandRect[1], s.cinemaBandRect[2], s.cinemaBandRect[3]);
+			glBindVertexArray(d->cinemaBandMesh.vao);
+			glDrawArrays(GL_TRIANGLES, 0, d->cinemaBandMesh.count);
+		}
 		glBindTexture(GL_TEXTURE_2D, 0);
 		glDepthMask(GL_TRUE);
 		glEnable(GL_CULL_FACE);

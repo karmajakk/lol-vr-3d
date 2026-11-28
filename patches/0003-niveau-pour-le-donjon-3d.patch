@@ -81,7 +81,7 @@ index 1016080..bfba10b 100644
  		// the global subtitles settings, we're using this hack to enable subtitles
  		// for fan translations
 diff --git a/engines/kyra/engine/lol.cpp b/engines/kyra/engine/lol.cpp
-index c4f86a3..63bac05 100644
+index c4f86a3..388bde7 100644
 --- a/engines/kyra/engine/lol.cpp
 +++ b/engines/kyra/engine/lol.cpp
 @@ -21,6 +21,8 @@
@@ -422,7 +422,7 @@ index c4f86a3..63bac05 100644
  	} else {
  		if (_activeSpell.p->mpRequired[spellLevel] > _characters[charNum].magicPointsCur)
  			return 0;
-@@ -2136,13 +2329,598 @@ int LoLEngine::castSpell(int charNum, int spellType, int spellLevel) {
+@@ -2136,13 +2329,606 @@ int LoLEngine::castSpell(int charNum, int spellType, int spellLevel) {
  		setCharacterMagicOrHitPoints(charNum, 0, -_activeSpell.p->hpRequired[spellLevel], 1);
  		gui_drawCharPortraitWithStats(charNum);
  
@@ -510,10 +510,21 @@ index c4f86a3..63bac05 100644
 +		Common::String line = in->readLine();
 +		int lv = 0, type = 0;
 +		char name[16] = {0};
-+		if (sscanf(line.c_str(), "%d %d %15s", &lv, &type, name) == 3 && lv == _currentLevel && type > 0 && type < 256)
++		if (sscanf(line.c_str(), "%d %d %15s", &lv, &type, name) == 3 && lv == _currentLevel && type > 0 && type < 256 && lolvrRarePlace(type))
 +			lolvrExportPlace(type, name);
 +	}
 +	delete in;
++}
++
++// A place is a door with its own picture: its wall type is on a few faces of the level, not on
++// a whole corridor (a picture learnt for a common type showed on empty walls: the Clerk's office
++// in the mines, learnt from the wall beside the party).
++bool LoLEngine::lolvrRarePlace(int type) {
++	int n = 0;
++	for (int b = 0; b < 1024; b++)
++		for (int k = 0; k < 4; k++)
++			n += _levelBlockProperties[b].walls[k] == type ? 1 : 0;
++	return n > 0 && n <= 4;
 +}
 +
 +void LoLEngine::lolvrPlaceBitmap(const char *name) {
@@ -528,15 +539,12 @@ index c4f86a3..63bac05 100644
 +	int type = 0;
 +	const uint16 front = calcNewBlockPosition(_currentBlock, _currentDirection);
 +	const uint8 *here = _levelBlockProperties[_currentBlock].walls;
++	// (only these two: a wall beside the party is not the place it entered)
 +	if (picture(_levelBlockProperties[front].walls[_currentDirection ^ 2]))
 +		type = _levelBlockProperties[front].walls[_currentDirection ^ 2];
 +	else if (picture(here[_currentDirection ^ 2]))
 +		type = here[_currentDirection ^ 2];
-+	else
-+		for (int k = 0; k < 4 && !type; k++)
-+			if (picture(here[k]))
-+				type = here[k];
-+	if (!type || !lolvrExportPlace(type, name))
++	if (!type || !lolvrRarePlace(type) || !lolvrExportPlace(type, name))
 +		return;
 +	// Remembered: the other places already known, and this one (in place of an older picture).
 +	Common::Array<Common::String> lines;
@@ -1021,7 +1029,7 @@ index c4f86a3..63bac05 100644
  int LoLEngine::castSpark(ActiveSpell *a) {
  	processMagicSpark(a->charNum, a->level);
  	return 1;
-@@ -3206,6 +3984,10 @@ void LoLEngine::addSpellToScroll(int spell, int charNum) {
+@@ -3206,6 +3992,10 @@ void LoLEngine::addSpellToScroll(int spell, int charNum) {
  		}
  	}
  
@@ -1032,7 +1040,7 @@ index c4f86a3..63bac05 100644
  	if (spell > 1)
  		transferSpellToScollAnimation(charNum, spell, slot - 1);
  
-@@ -3521,6 +4303,8 @@ int LoLEngine::calcInflictableDamage(int16 attacker, int16 target, int hitType)
+@@ -3521,6 +4311,8 @@ int LoLEngine::calcInflictableDamage(int16 attacker, int16 target, int hitType)
  int LoLEngine::inflictDamage(uint16 target, int damage, uint16 attacker, int skill, int flags) {
  	LoLMonster *m = 0;
  	LoLCharacter *c = 0;
@@ -1041,7 +1049,7 @@ index c4f86a3..63bac05 100644
  
  	if (target & 0x8000) {
  		m = &_monsters[target & 0x7FFF];
-@@ -4130,7 +4914,6 @@ uint16 LoLEngine::getNearestPartyMemberFromPos(int x, int y) {
+@@ -4130,7 +4922,6 @@ uint16 LoLEngine::getNearestPartyMemberFromPos(int x, int y) {
  // magic atlas
  
  void LoLEngine::displayAutomap() {
@@ -1049,7 +1057,7 @@ index c4f86a3..63bac05 100644
  	snd_playSoundEffect(105, -1);
  	gui_toggleButtonDisplayMode(_flags.isTalkie ? 78 : 76, 1);
  
-@@ -4174,6 +4957,9 @@ void LoLEngine::displayAutomap() {
+@@ -4174,6 +4965,9 @@ void LoLEngine::displayAutomap() {
  
  	_screen->copyPage(2, 0);
  	_screen->updateScreen();
@@ -1060,7 +1068,7 @@ index c4f86a3..63bac05 100644
  	uint32 delayTimer = _system->getMillis() + 8 * _tickLength;
  
 diff --git a/engines/kyra/engine/lol.h b/engines/kyra/engine/lol.h
-index a9028a2..fc7166f 100644
+index a9028a2..66b16bf 100644
 --- a/engines/kyra/engine/lol.h
 +++ b/engines/kyra/engine/lol.h
 @@ -50,6 +50,145 @@ struct LolvrGameState {
@@ -1209,7 +1217,7 @@ index a9028a2..fc7166f 100644
  }
  
  namespace Audio {
-@@ -335,6 +474,49 @@ private:
+@@ -335,6 +474,50 @@ private:
  
  	// main loop
  	void runLoop();
@@ -1253,6 +1261,7 @@ index a9028a2..fc7166f 100644
 +	bool lolvrFaceMonsters();         // lol-vr-3d: monsters near the party turn to face it
 +	// lol-vr-3d: the scene window shows a picture; 2 = a place or a sequence (cinema mode in the
 +	// headset), 1 = a character over the dungeon view
++	bool lolvrRarePlace(int type); // lol-vr-3d
 +	void lolvrScenePicture(int kind = 1) { if (g_lolvrLevel.scenePicture < kind) g_lolvrLevel.scenePicture = kind; }
 +private:
 +	bool lolvrDrawSprite(uint16 id, uint8 &ceiling); // lol-vr-3d
