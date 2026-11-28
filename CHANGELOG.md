@@ -3,6 +3,14 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.62.0] — Smoother pump
+
+- The pump of the mines: its wall shows the game's view only once the game really draws the pump
+  (compared with its picture), instead of an empty wall then black for a moment.
+- After a turn on the spot, a scene or picture that follows waits 0.25 s instead of 0.7 s; the
+  level script draws the pump at each turn toward it, and the party was blocked for a moment.
+- From an empty block, a picture drawn over the view by a level script no longer waits for the turn.
+
 ## [0.61.0] — The pump comes alive
 
 - The pump of the Urbish mines: facing it, its wall shows the game's own view, so what the game

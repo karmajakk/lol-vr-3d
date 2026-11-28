@@ -3591,6 +3591,34 @@ void updateDungeon(App &app, float dt) {
 		const int d = l.direction & 3, ahead = (l.block + ddx[d] + ddz[d] * 32) & 1023;
 		const uint8_t t = l.walls[ahead * 4 + ((d + 2) & 3)];
 		app.liveWall = t && app.dunTex.place[t] && app.dunTex.typeLayer[t] >= 0 && !lolvr::isSolidBlock(l.walls, ahead, g) && !l.sceneBusy;
+		// (seulement quand le jeu la dessine vraiment : sa vue ressemble à l'image du lieu ; sinon,
+		// pendant qu'il tourne ou redessine, l'image fixe du mur reste)
+		if (app.liveWall) {
+			int pi = -1;
+			for (size_t i = 0; i < l.placeTypes.size(); i++)
+				if (l.placeTypes[i] == (int)t && (i + 1) * 176 * 120 * 3 <= l.placeRgb.size())
+					pi = (int)i;
+			const int fw = app.frame.width, fh = app.frame.height;
+			// (en clarté, et corrélées : la mine peut être assombrie par la lanterne)
+			double sa = 0, sb = 0, saa = 0, sbb = 0, sab = 0;
+			int n = 0;
+			if (pi >= 0 && fw >= 320 && fh >= 200 && app.frame.rgba.size() >= (size_t)fw * fh * 4) {
+				const uint8_t *pic = &l.placeRgb[(size_t)pi * 176 * 120 * 3];
+				for (int y = 4; y < 120; y += 7)
+					for (int x = 4; x < 176; x += 9, n++) {
+						const uint8_t *a = pic + ((size_t)y * 176 + x) * 3;
+						const uint8_t *b = app.frame.rgba.data() + ((size_t)(y * fh / 200) * fw + (size_t)((112 + x) * fw / 320)) * 4;
+						const double la = a[0] * 0.3 + a[1] * 0.59 + a[2] * 0.11, lb = b[0] * 0.3 + b[1] * 0.59 + b[2] * 0.11;
+						sa += la; sb += lb; saa += la * la; sbb += lb * lb; sab += la * lb;
+					}
+			}
+			double corr = 0.0;
+			if (n > 0) {
+				const double ca = saa - sa * sa / n, cb = sbb - sb * sb / n, cab = sab - sa * sb / n;
+				corr = ca > 1e-6 && cb > 1e-6 ? cab / sqrt(ca * cb) : 0.0;
+			}
+			app.liveWall = corr > 0.6;
+		}
 		if (app.liveWall) {
 			float bx, bz;
 			lolvr::blockCenter(ahead, bx, bz);
