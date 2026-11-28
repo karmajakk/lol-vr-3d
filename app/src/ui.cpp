@@ -3066,7 +3066,7 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 			continue;
 		const Quad &q = content[i];
 		const Source &src = kSources[i];
-		if (np < SceneState::kMaxPanels - 2) {
+		if (np < SceneState::kMaxPanels - 3) {
 			SceneState::Panel &p = scene.panels[np++];
 			p = SceneState::Panel();
 			p.visible = true;
@@ -3182,7 +3182,7 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 	// sans à-coups. Elle s'efface quand on regarde sa main (l'engrenage prend le relais).
 	// (l'invitation s'efface dès qu'on regarde la montre)
 	const bool gearLooked = gearVisible && dot(normalize(gearQ.c - in.headPos), in.headDir) > 0.90f;
-	if (in.gearHint && placed && !d->menuOpen && !gearLooked && d->hintTex && np < SceneState::kMaxPanels - 2) {
+	if (in.gearHint && placed && !d->menuOpen && !gearLooked && d->hintTex && np < SceneState::kMaxPanels - 3) {
 		Vec3 flat = {in.headDir.x, 0.0f, in.headDir.z};
 		float fl = length(flat);
 		flat = fl > 1e-3f ? flat * (1.0f / fl) : Vec3{0, 0, -1};
@@ -3219,7 +3219,7 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 	if (!d->buttonTex)
 		d->makeButtons();
 	for (int b = 0; b < kBtnCount; b++) {
-		if (!btnVis[b] || np >= SceneState::kMaxPanels - 2)
+		if (!btnVis[b] || np >= SceneState::kMaxPanels - 3)
 			continue;
 		const bool hot = hotButton == b;
 		const int img = (b == kBtnSort ? 0 : d->invExpanded ? 4 : 2) + (hot ? 1 : 0); // (voir makeButtons)
@@ -3242,7 +3242,7 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 		p.v0 = 0.0f;
 		p.v1 = 1.0f;
 	}
-	if (palmVisible && np < SceneState::kMaxPanels - 2) {
+	if (palmVisible && np < SceneState::kMaxPanels - 3) {
 		// (le ZZZ du bouton du jeu)
 		SceneState::Panel &p = scene.panels[np++];
 		p = SceneState::Panel();
@@ -3258,7 +3258,7 @@ void Ui::updateFrame(const UiFrameInput &in, UiFrameOutput &out, SceneState &sce
 		p.texH = 20;
 	}
 	for (int w = 0; w < 3; w++) {
-		if ((w == 0 ? !gearVisible : w == 1 ? !d->menuOpen : !d->noticeOpen) || np >= SceneState::kMaxPanels - 2)
+		if ((w == 0 ? !gearVisible : w == 1 ? !d->menuOpen : !d->noticeOpen) || np >= SceneState::kMaxPanels - 3)
 			continue;
 		const Quad &q = w == 0 ? gearQ : w == 1 ? menuQ : noticeQ;
 		SceneState::Panel &p = scene.panels[np++];

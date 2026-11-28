@@ -70,7 +70,7 @@ struct SceneState {
 		bool onTop = false;                   // dessiné par-dessus tout (sans test de profondeur)
 		int layer = 0;                        // ordre de dessin : rapproché de 4 cm par cran (-1 le cadre d'un groupe, 1 l'inventaire ouvert, 2 les onglets)
 	};
-	static const int kMaxPanels = 18;         // 16 pour l'interface (fenêtres, boutons, poignets), la bande de texte, le curseur du jeu
+	static const int kMaxPanels = 19;         // 16 pour l'interface (fenêtres, boutons, poignets), un mur vivant, la bande de texte, le curseur du jeu
 	Panel panels[kMaxPanels];
 
 	// Poignées en laiton : on les attrape pour déplacer un panneau ou l'écran.

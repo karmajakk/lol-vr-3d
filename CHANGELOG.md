@@ -3,6 +3,13 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.61.0] — The pump comes alive
+
+- The pump of the Urbish mines: facing it, its wall shows the game's own view, so what the game
+  changes on it appears (the little side door that opens, the coal, the gear, the lever). A click
+  on it goes where the game draws it: its side door, its gear slot.
+- Cinema mode: the text box under the picture is removed again.
+
 ## [0.60.0] — The pump of the mines
 
 - The machine of the Urbish mines (the pump): the game draws it over the view when the party, in

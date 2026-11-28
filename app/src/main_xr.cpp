@@ -615,6 +615,11 @@ struct App {
 	int holdOverBlock = -1;
 	double holdOverIdle = 0.0; // depuis quand aucune scène ne tourne
 	bool atHold = false;       // le groupe est sur le bloc d'entrée d'un lieu (sa porte)
+	// Un mur vivant : l'image d'un lieu sur le côté d'une case de passage, que le jeu dessine (et fait
+	// changer : la porte de la pompe qui s'ouvre, l'engrenage posé) sur sa vue quand on la regarde de
+	// la case voisine. On y montre alors la vue du jeu elle-même. Repère local du niveau.
+	bool liveWall = false;
+	Vec3 liveWallC = {0, 0, 0}, liveWallR = {1, 0, 0};
 	int openBlock = -1;       // bloc d'entrée où l'on se tient (montré ouvert), -1 sinon
 	int builtOpen = -1;
 	float lightLevel = 1.0f;  // clarté du jeu (pénombre, lampe), adoucie
@@ -2049,10 +2054,6 @@ void updateLayout(App &app, double now) {
 		}
 		app.bandShown = band;
 		app.bandH = 0.0f;
-		// Mode cinéma : la zone de texte (les réponses à choisir : payer, partir…) collée sous l'image,
-		// sur l'écran courbe, à sa largeur ; sinon on ne voyait pas qu'il fallait choisir.
-		if (cinemaSized && box && !app.menuAlone)
-			app.bandH = app.bandRect[3] * cw / app.bandRect[2];
 		const float viewOnlyH = w * lolvr::kSplitViewHeight;
 		app.dispH = viewOnlyH * (ch + app.bandH) / kViewH;
 		app.dispW = viewOnlyH * cw / (kViewH * 1.2f);
@@ -3585,6 +3586,19 @@ void updateDungeon(App &app, float dt) {
 	// plein. La vue reste devant, face à l'image ; le jeu montre la scène ou change de région.
 	const bool hold = lolvr::isHoldBlock(l.walls, l.block, g);
 	app.atHold = hold;
+	{
+		static const int ddx[4] = {0, 1, 0, -1}, ddz[4] = {-1, 0, 1, 0};
+		const int d = l.direction & 3, ahead = (l.block + ddx[d] + ddz[d] * 32) & 1023;
+		const uint8_t t = l.walls[ahead * 4 + ((d + 2) & 3)];
+		app.liveWall = t && app.dunTex.place[t] && app.dunTex.typeLayer[t] >= 0 && !lolvr::isSolidBlock(l.walls, ahead, g) && !l.sceneBusy;
+		if (app.liveWall) {
+			float bx, bz;
+			lolvr::blockCenter(ahead, bx, bz);
+			const float S = lolvr::kBlockSize;
+			app.liveWallC = Vec3{bx - ddx[d] * (S * 0.5f - 0.03f), lolvr::kWallHeight * 0.5f, bz - ddz[d] * (S * 0.5f - 0.03f)};
+			app.liveWallR = Vec3{(float)-ddz[d], 0.0f, (float)ddx[d]};
+		}
+	}
 	// Une scène jouée sur ce bloc (l'intérieur de la hutte de Buck) : à la fin, le jeu y laisse le
 	// groupe tourné vers la sortie. C'est une arrivée, comme dans une nouvelle région.
 	bool leftScene = false;
@@ -3852,6 +3866,21 @@ void fillSceneState(App &app, double now, bool focused) {
 	s.dungeonModel = lolvr::dungeonModel(app.roomPos, app.dunYaw, app.partyX, app.partyZ, app.partyYaw);
 	s.dungeonLight = app.dungeonLight;
 	s.dungeonReach = app.dungeonReach;
+	{
+		lolvr::SceneState::Panel &p = s.panels[lolvr::SceneState::kMaxPanels - 3];
+		p = lolvr::SceneState::Panel();
+		if (app.liveWall && app.dungeonVisible && app.inDungeon && app.cinema <= 0.0f && app.srcTexW > 0) {
+			p.visible = true;
+			p.center = lolvr::transformPoint(s.dungeonModel, app.liveWallC);
+			p.right = normalize(lolvr::transformDir(s.dungeonModel, app.liveWallR));
+			p.up = normalize(lolvr::transformDir(s.dungeonModel, Vec3{0, 1, 0}));
+			p.halfW = lolvr::kBlockSize * 0.5f;
+			p.halfH = lolvr::kWallHeight * 0.5f;
+			p.u0 = 112.0f / 320.0f; p.v0 = 0.0f; p.u1 = 288.0f / 320.0f; p.v1 = 120.0f / 200.0f;
+			p.border = 0.0f;
+			p.layer = -1;
+		}
+	}
 	// Mode cinéma : l'écran plat (calque quad) laisse la place à l'écran courbe.
 	s.screenVisible = app.screenShown && app.cinema <= 0.0f;
 	s.cinema = app.cinema * app.cinema * (3.0f - 2.0f * app.cinema);

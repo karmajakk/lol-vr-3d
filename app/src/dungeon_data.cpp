@@ -1542,6 +1542,8 @@ void applyPlacePicture(DungeonTextures &tex, int type, const uint8_t *rgb) {
 		}
 	tex.typeLayer[type] = tex.layers++;
 	tex.place[type] = true;
+	// (le jeu la dessine sur toute sa vue : un clic sur le mur va là où il la dessine)
+	tex.picBox[type][0] = -24; tex.picBox[type][1] = -8; tex.picBox[type][2] = 176; tex.picBox[type][3] = 120;
 }
 
 
