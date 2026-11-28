@@ -1159,6 +1159,14 @@ void buildDungeonMesh(const uint8_t *walls, const DungeonGfx &g, const DungeonTe
 			uint8_t t = w[k];
 			if (!t)
 				continue;
+			// L'image d'un lieu sur le côté d'une case de passage (la pompe de la mine : le jeu la dessine
+			// quand on regarde vers elle depuis la case voisine) : un mur, sur ce côté.
+			if (!solid && t < 256 && tex.place[t] && tex.typeLayer[t] >= 0) {
+				const int nb = (b + dx[k] + dz[k] * 32) & 1023;
+				if (!isSolidBlock(walls, nb, g))
+					upright(cx + dx[k] * (S * 0.5f - 0.01f), cz + dz[k] * (S * 0.5f - 0.01f), (float)dx[k], (float)dz[k], (float)tex.typeLayer[t], faceShade[k], 1.0f, false);
+				continue;
+			}
 			// Un objet au milieu de la case : deux images croisées, visibles des deux côtés.
 			if (tex.kind[t] == kWallObject) {
 				if (!objectDone && tex.typeLayer[t] >= 0 && tex.scenery[t]) {
@@ -1533,6 +1541,7 @@ void applyPlacePicture(DungeonTextures &tex, int type, const uint8_t *rgb) {
 			d[3] = 255;
 		}
 	tex.typeLayer[type] = tex.layers++;
+	tex.place[type] = true;
 }
 
 

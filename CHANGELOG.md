@@ -3,6 +3,15 @@
 Format: [semantic versioning](https://semver.org/). While the number starts with 0, the project
 is in development and anything may still change.
 
+## [0.60.0] — The pump of the mines
+
+- The machine of the Urbish mines (the pump): the game draws it over the view when the party, in
+  the block before it, faces it; it is now a picture on that side of the block, like a place to
+  visit (clicking it does what the game does).
+- A place picture on the side of an open block is drawn as a wall there.
+- A picture drawn by a level script outside any scene no longer counts as a scene once the party
+  moves (it could open a tiny black cinema screen).
+
 ## [0.59.0] — Choices under the scene, frozen fade-out, mine stairs
 
 - Cinema mode: the game's text box, with the answers to choose (pay, attack, leave...), is shown

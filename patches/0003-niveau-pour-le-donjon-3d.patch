@@ -81,7 +81,7 @@ index 1016080..bfba10b 100644
  		// the global subtitles settings, we're using this hack to enable subtitles
  		// for fan translations
 diff --git a/engines/kyra/engine/lol.cpp b/engines/kyra/engine/lol.cpp
-index c4f86a3..388bde7 100644
+index c4f86a3..96855cc 100644
 --- a/engines/kyra/engine/lol.cpp
 +++ b/engines/kyra/engine/lol.cpp
 @@ -21,6 +21,8 @@
@@ -422,7 +422,7 @@ index c4f86a3..388bde7 100644
  	} else {
  		if (_activeSpell.p->mpRequired[spellLevel] > _characters[charNum].magicPointsCur)
  			return 0;
-@@ -2136,13 +2329,606 @@ int LoLEngine::castSpell(int charNum, int spellType, int spellLevel) {
+@@ -2136,13 +2329,611 @@ int LoLEngine::castSpell(int charNum, int spellType, int spellLevel) {
  		setCharacterMagicOrHitPoints(charNum, 0, -_activeSpell.p->hpRequired[spellLevel], 1);
  		gui_drawCharPortraitWithStats(charNum);
  
@@ -498,7 +498,8 @@ index c4f86a3..388bde7 100644
 +	static const struct { int level, type; const char *name; } kKnown[] = {
 +		{2, 58, "KEEP.CPS"}, {2, 67, "KEEP.CPS"}, {2, 61, "MARINA2.CPS"},
 +		{3, 56, "GREYEAGL.CPS"}, {3, 57, "BUCKHUT.CPS"}, {3, 59, "ROLRECK.CPS"}, {3, 60, "MARINA1.CPS"},
-+		{11, 67, "KINGPAL.CPS"}, {11, 68, "WDRHUT.CPS"}, {11, 69, "SFLETCH.CPS"}, {11, 70, "SMITHY.CPS"}
++		{11, 67, "KINGPAL.CPS"}, {11, 68, "WDRHUT.CPS"}, {11, 69, "SFLETCH.CPS"}, {11, 70, "SMITHY.CPS"},
++		{12, 62, "PUMP.CPS"} // the pump of the mines: the script draws it when facing east from the block before
 +	};
 +	for (const auto &k : kKnown)
 +		if (k.level == _currentLevel)
@@ -573,8 +574,12 @@ index c4f86a3..388bde7 100644
 +	g_lolvrLevel.direction = _currentDirection;
 +	// The game draws the new view at once, with the scene that follows; in the headset the party
 +	// turns or steps in the 3D dungeon, which takes a moment: a scene starting now waits for it.
-+	if (!_needSceneRestore && !_dialogueField)
++	if (!_needSceneRestore && !_dialogueField) {
 +		_lolvrTurnPending = true;
++		// (a picture drawn by a level script outside any scene — the pump of the mines, over the
++		// view from the block before it — is not a scene: forgotten as soon as the party moves on)
++		g_lolvrLevel.scenePicture = 0;
++	}
 +}
 +
 +void LoLEngine::lolvrExportMap() {
@@ -1029,7 +1034,7 @@ index c4f86a3..388bde7 100644
  int LoLEngine::castSpark(ActiveSpell *a) {
  	processMagicSpark(a->charNum, a->level);
  	return 1;
-@@ -3206,6 +3992,10 @@ void LoLEngine::addSpellToScroll(int spell, int charNum) {
+@@ -3206,6 +3997,10 @@ void LoLEngine::addSpellToScroll(int spell, int charNum) {
  		}
  	}
  
@@ -1040,7 +1045,7 @@ index c4f86a3..388bde7 100644
  	if (spell > 1)
  		transferSpellToScollAnimation(charNum, spell, slot - 1);
  
-@@ -3521,6 +4311,8 @@ int LoLEngine::calcInflictableDamage(int16 attacker, int16 target, int hitType)
+@@ -3521,6 +4316,8 @@ int LoLEngine::calcInflictableDamage(int16 attacker, int16 target, int hitType)
  int LoLEngine::inflictDamage(uint16 target, int damage, uint16 attacker, int skill, int flags) {
  	LoLMonster *m = 0;
  	LoLCharacter *c = 0;
@@ -1049,7 +1054,7 @@ index c4f86a3..388bde7 100644
  
  	if (target & 0x8000) {
  		m = &_monsters[target & 0x7FFF];
-@@ -4130,7 +4922,6 @@ uint16 LoLEngine::getNearestPartyMemberFromPos(int x, int y) {
+@@ -4130,7 +4927,6 @@ uint16 LoLEngine::getNearestPartyMemberFromPos(int x, int y) {
  // magic atlas
  
  void LoLEngine::displayAutomap() {
@@ -1057,7 +1062,7 @@ index c4f86a3..388bde7 100644
  	snd_playSoundEffect(105, -1);
  	gui_toggleButtonDisplayMode(_flags.isTalkie ? 78 : 76, 1);
  
-@@ -4174,6 +4965,9 @@ void LoLEngine::displayAutomap() {
+@@ -4174,6 +4970,9 @@ void LoLEngine::displayAutomap() {
  
  	_screen->copyPage(2, 0);
  	_screen->updateScreen();
@@ -2003,7 +2008,7 @@ index 00019e9..26a51d5 100644
  	Button::Callback mainMenuFunctor = BUTTON_FUNCTOR(GUI_LoL, this, &GUI_LoL::clickedMainMenu);
  	for (int i = 0; i < _mainMenu.numberOfItems; ++i)
 diff --git a/engines/kyra/script/script_lol.cpp b/engines/kyra/script/script_lol.cpp
-index 30c59a7..eba707b 100644
+index 30c59a7..b349d0b 100644
 --- a/engines/kyra/script/script_lol.cpp
 +++ b/engines/kyra/script/script_lol.cpp
 @@ -497,6 +497,9 @@ int LoLEngine::olol_loadDoorShapes(EMCState *script) {
@@ -2116,6 +2121,11 @@ index 30c59a7..eba707b 100644
  
  	switch (param[0]) {
  	case 0:
+@@ -3051,3 +3075,4 @@ void LoLEngine::setupOpcodeTable() {
+ } // End of namespace Kyra
+ 
+ #endif // ENABLE_LOL
++
 diff --git a/engines/kyra/text/text_lol.cpp b/engines/kyra/text/text_lol.cpp
 index 22882f4..16f0c9b 100644
 --- a/engines/kyra/text/text_lol.cpp
